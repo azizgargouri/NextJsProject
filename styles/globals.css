@@ -1,0 +1,98 @@
+@import 'tailwindcss';
+
+/*
+ * MoveUp — Swiss Industrial Print system
+ * Substrate: newsprint  |  Ink: carbon  |  Accent: hazard red (the only one)
+ * No gradients, no soft shadows, no border-radius. Rigid grid + visible rules.
+ */
+@theme {
+  --color-paper: #f2f1ec;
+  --color-paper-soft: #eae8e1;
+  --color-ink: #101010;
+  --color-ink-80: #3a3a38;
+  --color-ink-40: #8b8a84;
+  --color-hazard: #e61919;
+  --color-hazard-dark: #b81414;
+}
+
+html {
+  background-color: var(--color-paper);
+}
+
+body {
+  color: var(--color-ink);
+  font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--color-hazard);
+  color: #fff;
+}
+
+/* Fine mechanical grain over the whole document */
+.grain::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Hairline rules used across the system */
+.hairline-x {
+  background-image: repeating-linear-gradient(
+    to right,
+    var(--color-ink) 0,
+    var(--color-ink) 1px,
+    transparent 1px,
+    transparent 8px
+  );
+}
+
+/* dotted telemetry field */
+.dotgrid {
+  background-image: radial-gradient(circle, #10101022 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+/* blueprint crosshairs at rule intersections */
+.crosshair::after,
+.crosshair::before {
+  content: '+';
+  position: absolute;
+  color: var(--color-ink-40);
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: 10px;
+  line-height: 1;
+}
+
+.display {
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  line-height: 0.9;
+  text-transform: uppercase;
+}
+
+.mono {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Hide scrollbars for horizontal carriers */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track {
+    animation: none !important;
+  }
+}
