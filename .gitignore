@@ -1,0 +1,22 @@
+/node_modules
+/.next
+/out
+/build
+/coverage
+
+next-env.d.ts
+*.tsbuildinfo
+
+# env files
+.env
+.env*.local
+
+# mongodb local data (binaries/tools artifacts)
+*.db-journal
+
+# misc
+.DS_Store
+*.pem
+.vercel
+*.log
+yarn-error.log
