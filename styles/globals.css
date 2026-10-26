@@ -96,3 +96,55 @@ body {
     animation: none !important;
   }
 }
+
+/* --- Leaflet (team location map) dressed in the print system --- */
+.leaflet-container {
+  background: var(--color-paper-soft);
+  font-family: var(--font-archivo), sans-serif;
+  z-index: 0;
+}
+
+.map-label.leaflet-tooltip {
+  background: var(--color-paper);
+  border: 1px solid var(--color-ink);
+  border-radius: 0;
+  box-shadow: none;
+  color: var(--color-ink);
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  padding: 3px 6px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.map-label.leaflet-tooltip::before {
+  display: none;
+}
+
+.leaflet-container .leaflet-control-zoom {
+  border: 1px solid var(--color-ink);
+  border-radius: 0;
+  box-shadow: none;
+  overflow: hidden;
+}
+
+.leaflet-container .leaflet-control-zoom a {
+  width: 26px;
+  height: 26px;
+  line-height: 24px;
+  color: var(--color-ink);
+  background: var(--color-paper);
+  border-bottom: 1px solid var(--color-ink);
+  font-weight: 700;
+}
+
+.leaflet-container .leaflet-control-zoom a:hover {
+  background: var(--color-paper-soft);
+}
+
+.leaflet-container .leaflet-control-attribution {
+  background: color-mix(in srgb, var(--color-paper) 85%, transparent);
+  color: var(--color-ink-40);
+  font-size: 9px;
+}

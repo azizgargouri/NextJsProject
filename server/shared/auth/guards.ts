@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { verifyAccessToken, type AccessTokenPayload } from './jwt';
-import { UnauthorizedError, toErrorBody } from '../database/errors';
+import { ForbiddenError, UnauthorizedError, toErrorBody } from '../database/errors';
 
 /** Extracts and verifies the bearer access token (replaces @InjectAccessTokenPayload). */
 export async function getCurrentUser(request: Request): Promise<AccessTokenPayload | null> {
@@ -18,6 +18,16 @@ export async function getCurrentUser(request: Request): Promise<AccessTokenPaylo
 export async function requireAuth(request: Request): Promise<AccessTokenPayload> {
   const user = await getCurrentUser(request);
   if (!user) throw new UnauthorizedError();
+  return user;
+}
+
+/**
+ * Guard for the RH / employee-tracking admin surface (dashboard, directory,
+ * attendance, leave decisions). Replaces the local module's role check.
+ */
+export async function requireAdmin(request: Request): Promise<AccessTokenPayload> {
+  const user = await requireAuth(request);
+  if (user.role !== 'ADMIN') throw new ForbiddenError('Admin access required');
   return user;
 }
 
