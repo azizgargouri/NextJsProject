@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import type { AxiosError } from 'axios';
 import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
@@ -44,6 +44,9 @@ const ROLE_OPTIONS = [
 
 export function SignUpForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTarget = searchParams.get('redirect') || searchParams.get('next') || searchParams.get('callbackUrl');
+
   const { mutate, isPending, isError, error } = useSignUp();
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -74,7 +77,22 @@ export function SignUpForm() {
   );
 
   const onSubmit = (values: SignUpFormValues) => {
-    mutate({ ...values, locale: 'en' }, { onSuccess: () => router.push('/dashboard') });
+    mutate(
+      { ...values, locale: 'en' },
+      {
+        onSuccess: (response) => {
+          if (redirectTarget) {
+            router.push(redirectTarget);
+          } else if (response.user.role === 'ADMIN') {
+            router.push('/dashboard');
+          } else if (response.user.role === 'MOVER') {
+            router.push('/me');
+          } else {
+            router.push('/request');
+          }
+        },
+      },
+    );
   };
 
   return (
@@ -193,7 +211,7 @@ export function SignUpForm() {
         <p className="mono text-center text-[10px] text-ink-40">ALREADY REGISTERED?</p>
         <p className="mt-3 text-center">
           <Link
-            href="/sign-in"
+            href={redirectTarget ? `/sign-in?redirect=${encodeURIComponent(redirectTarget)}` : '/sign-in'}
             className="mono border-b-2 border-ink pb-0.5 text-[11px] hover:border-hazard hover:text-hazard"
           >
             GO TO LOGIN &gt;&gt;&gt;

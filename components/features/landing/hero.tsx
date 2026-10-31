@@ -2,6 +2,7 @@
 
 import { useRef } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useGSAP } from '@gsap/react';
@@ -88,7 +89,7 @@ export function Hero() {
 
       {/* Display type */}
       <div className="mx-auto w-full max-w-7xl px-4 py-16 md:px-6 md:py-24">
-        <h1 className="display max-w-6xl text-[clamp(3rem,9.5vw,7.5rem)] text-ink">
+        <h1 className="display max-w-6xl text-[clamp(2.3rem,8.5vw,7.5rem)] text-ink">
           <span className="block overflow-hidden">
             {(line1 + ' ').split('').map((char, index) => (
               <span key={`a-${index}`} data-hero-char className="inline-block whitespace-pre">
@@ -116,7 +117,7 @@ export function Hero() {
 
         <div data-hero-fade className="mt-10 flex flex-wrap items-center gap-4">
           <Link
-            href="/sign-up"
+            href="/request"
             className="mono inline-flex h-14 items-center bg-hazard px-8 text-xs text-white transition-colors hover:bg-ink hover:text-paper"
           >
             REQUEST A MOVE &gt;&gt;&gt;
@@ -135,11 +136,13 @@ export function Hero() {
         data-hero-strip
         className="relative h-[38dvh] w-full overflow-hidden border-t-2 border-ink md:h-[46dvh]"
       >
-        <img
+        <Image
           src="https://picsum.photos/seed/moveup-van/1920/1080"
           alt="Moving truck loaded with furniture, monochrome"
+          fill
+          priority
+          sizes="100vw"
           className="size-full object-cover opacity-90 contrast-125 grayscale"
-          fetchPriority="high"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-paper/0 to-paper/20" aria-hidden />
         <span className="mono absolute bottom-3 left-4 text-[10px] text-white mix-blend-difference">

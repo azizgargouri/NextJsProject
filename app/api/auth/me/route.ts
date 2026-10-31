@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { errorResponse, getCurrentUser } from '@/server/shared/auth/guards';
 import { usersService } from '@/server/modules/users/users.service';
 
+export const dynamic = 'force-dynamic';
+
 /** GET /api/auth/me — current session probe (validated access token required). */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {

@@ -1,6 +1,8 @@
 import { authController } from '@/server/modules/auth/auth.controller';
 import type { NextRequest } from 'next/server';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   return authController.refreshToken(request);
 }

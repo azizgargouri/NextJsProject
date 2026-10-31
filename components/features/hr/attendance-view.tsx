@@ -257,7 +257,7 @@ export function AttendanceView() {
       </header>
 
       <div className="mt-8 flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             variant="outline"
             size="sm"
@@ -269,7 +269,7 @@ export function AttendanceView() {
           >
             ‹
           </Button>
-          <span className="mono min-w-48 text-center text-[11px] font-bold">{monthLabel}</span>
+          <span className="mono min-w-36 sm:min-w-48 text-center text-[11px] font-bold">{monthLabel}</span>
           <Button
             variant="outline"
             size="sm"
@@ -384,85 +384,89 @@ export function AttendanceView() {
         </div>
       )}
 
-      <section className="mt-6 overflow-hidden border border-ink bg-paper">
-        <div className="grid grid-cols-7 border-b border-ink">
-          {WEEKDAYS.map((day) => (
-            <div key={day} className="mono px-2 py-2 text-center text-[9px] text-ink-40">
-              {day}
+      <section className="mt-6 border border-ink bg-paper">
+        <div className="overflow-x-auto">
+          <div className="min-w-[620px]">
+            <div className="grid grid-cols-7 border-b border-ink">
+              {WEEKDAYS.map((day) => (
+                <div key={day} className="mono px-2 py-2 text-center text-[9px] text-ink-40">
+                  {day}
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
 
-        <div className="grid grid-cols-7">
-          {grid.map((date) => {
-            const key = dayKey(date);
-            const dayRecords = byDay.get(key) ?? [];
-            const inMonth = date.getMonth() === month.getMonth();
-            const isToday = key === todayKey;
-            const active = key === selectedKey;
+            <div className="grid grid-cols-7">
+              {grid.map((date) => {
+                const key = dayKey(date);
+                const dayRecords = byDay.get(key) ?? [];
+                const inMonth = date.getMonth() === month.getMonth();
+                const isToday = key === todayKey;
+                const active = key === selectedKey;
 
-            return (
-              <button
-                key={key}
-                type="button"
-                data-day={key}
-                onClick={() => setSelectedKey(key)}
-                className={[
-                  'min-h-28 border-b border-r border-ink/15 p-2 text-left align-top last:border-r-0',
-                  inMonth ? 'bg-paper' : 'bg-paper-soft text-ink-40',
-                  active ? 'ring-2 ring-inset ring-ink' : 'hover:bg-paper-soft',
-                ].join(' ')}
-              >
-                <div className="flex items-center justify-between">
-                  <span
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    data-day={key}
+                    onClick={() => setSelectedKey(key)}
                     className={[
-                      'mono flex h-5 w-5 items-center justify-center text-[10px]',
-                      isToday ? 'bg-hazard text-white' : '',
+                      'min-h-28 border-b border-r border-ink/15 p-2 text-left align-top last:border-r-0',
+                      inMonth ? 'bg-paper' : 'bg-paper-soft text-ink-40',
+                      active ? 'ring-2 ring-inset ring-ink' : 'hover:bg-paper-soft',
                     ].join(' ')}
                   >
-                    {date.getDate()}
-                  </span>
-                  {dayRecords.length > 0 && (
-                    <span className="mono text-[9px] text-ink-40">{dayRecords.length}</span>
-                  )}
-                </div>
-
-                <div className="mt-1 space-y-1">
-                  {dayRecords.slice(0, 3).map((record) => {
-                    const status = (record.status ?? 'present') as AttendanceStatus;
-                    const flagged = status === 'late' || status === 'absent';
-                    const label =
-                      employeeRef && !allMode
-                        ? `${CHART_LABEL[status]} ${formatTime(record.clockIn)}`
-                        : (record.employee?.fullName ?? 'Unknown');
-
-                    return (
+                    <div className="flex items-center justify-between">
                       <span
-                        key={record.id}
-                        className={`mono block truncate border px-1 py-0.5 text-[8px] ${
-                          flagged ? 'border-hazard/40 text-hazard' : 'border-ink/20 text-ink-80'
-                        }`}
-                        title={`${record.employee?.fullName ?? ''} — ${CHART_LABEL[status]} ${formatTime(record.clockIn)}`}
+                        className={[
+                          'mono flex h-5 w-5 items-center justify-center text-[10px]',
+                          isToday ? 'bg-hazard text-white' : '',
+                        ].join(' ')}
                       >
-                        {label}
+                        {date.getDate()}
                       </span>
-                    );
-                  })}
-                  {dayRecords.length > 3 && (
-                    <span
-                      className="mono block truncate text-[8px] text-ink-40"
-                      title={dayRecords
-                        .slice(3)
-                        .map((record) => record.employee?.fullName ?? 'Unknown')
-                        .join(', ')}
-                    >
-                      +{dayRecords.length - 3} MORE
-                    </span>
-                  )}
-                </div>
-              </button>
-            );
-          })}
+                      {dayRecords.length > 0 && (
+                        <span className="mono text-[9px] text-ink-40">{dayRecords.length}</span>
+                      )}
+                    </div>
+
+                    <div className="mt-1 space-y-1">
+                      {dayRecords.slice(0, 3).map((record) => {
+                        const status = (record.status ?? 'present') as AttendanceStatus;
+                        const flagged = status === 'late' || status === 'absent';
+                        const label =
+                          employeeRef && !allMode
+                            ? `${CHART_LABEL[status]} ${formatTime(record.clockIn)}`
+                            : (record.employee?.fullName ?? 'Unknown');
+
+                        return (
+                          <span
+                            key={record.id}
+                            className={`mono block truncate border px-1 py-0.5 text-[8px] ${
+                              flagged ? 'border-hazard/40 text-hazard' : 'border-ink/20 text-ink-80'
+                            }`}
+                            title={`${record.employee?.fullName ?? ''} — ${CHART_LABEL[status]} ${formatTime(record.clockIn)}`}
+                          >
+                            {label}
+                          </span>
+                        );
+                      })}
+                      {dayRecords.length > 3 && (
+                        <span
+                          className="mono block truncate text-[8px] text-ink-40"
+                          title={dayRecords
+                            .slice(3)
+                            .map((record) => record.employee?.fullName ?? 'Unknown')
+                            .join(', ')}
+                        >
+                          +{dayRecords.length - 3} MORE
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
       </section>
 

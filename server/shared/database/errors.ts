@@ -71,8 +71,51 @@ export function toErrorBody(error: unknown): {
     };
   }
 
+  // Mongo's unique-index error is deliberately translated here instead of
+  // leaking a driver exception as a generic 500. It also covers a race between
+  // the pre-create uniqueness check and the actual insert.
+  if (isMongoDuplicateKeyError(error)) {
+    const field = Object.keys(error.keyPattern ?? {})[0];
+    return {
+      status: 409,
+      body: {
+        message: field ? `An account already uses this ${field}` : 'This record already exists',
+        code: 'ALREADY_EXISTS',
+      },
+    };
+  }
+
+  // A temporarily unavailable MongoDB instance should be distinguishable from
+  // an application failure so the client can tell the user to retry.
+  if (isMongoConnectionError(error)) {
+    return {
+      status: 503,
+      body: { message: 'The service database is temporarily unavailable. Please try again.', code: 'DATABASE_UNAVAILABLE' },
+    };
+  }
+
+  // Keep unexpected details on the server, while the client receives a safe
+  // stable error response.
+  console.error('[api] Unhandled error', error);
+
   return {
     status: 500,
     body: { message: 'Internal server error', code: 'INTERNAL_SERVER_ERROR' },
   };
+}
+
+function isMongoDuplicateKeyError(error: unknown): error is {
+  code: number;
+  keyPattern?: Record<string, unknown>;
+} {
+  return typeof error === 'object' && error !== null && (error as { code?: unknown }).code === 11000;
+}
+
+function isMongoConnectionError(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false;
+  const candidate = error as { name?: unknown; message?: unknown };
+  return (
+    candidate.name === 'MongooseServerSelectionError' ||
+    (typeof candidate.message === 'string' && /ECONNREFUSED|server selection/i.test(candidate.message))
+  );
 }

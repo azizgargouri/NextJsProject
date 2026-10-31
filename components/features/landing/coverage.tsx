@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef } from 'react';
+import Image from 'next/image';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useGSAP } from '@gsap/react';
@@ -105,11 +106,12 @@ export function Coverage() {
                 }`}
               >
                 <div className={`relative ${city.rows === 2 ? 'h-full min-h-72' : 'h-40'}`}>
-                  <img
+                  <Image
                     src={`https://picsum.photos/seed/${city.seed}/700/1000`}
-                    alt=""
+                    alt={city.name}
+                    fill
+                    sizes="(min-width: 640px) 33vw, 50vw"
                     className="absolute inset-0 size-full object-cover grayscale contrast-125 opacity-80 transition-all duration-700 group-hover:scale-105 group-hover:opacity-100"
-                    loading="lazy"
                   />
                 </div>
                 <div className="absolute inset-x-0 bottom-0 flex items-center justify-between border-t border-ink bg-paper px-3 py-2">

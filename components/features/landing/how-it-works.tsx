@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef } from 'react';
+import Image from 'next/image';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useGSAP } from '@gsap/react';
@@ -119,11 +120,12 @@ export function HowItWorks() {
                 >
                   <div className="relative w-1/2 shrink-0 overflow-hidden">
                     <div data-step-visual className="relative z-10 size-full">
-                      <img
+                      <Image
                         src={`https://picsum.photos/seed/${step.seed}/900/1200`}
                         alt=""
+                        fill
+                        sizes="(min-width: 1024px) 30vw, 50vw"
                         className="size-full object-cover grayscale contrast-125"
-                        loading="lazy"
                       />
                     </div>
                     <span className="mono absolute bottom-3 left-3 z-20 bg-ink px-2 py-1 text-[10px] text-paper">

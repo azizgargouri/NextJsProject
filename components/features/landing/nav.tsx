@@ -85,39 +85,63 @@ export function Nav() {
               </Button>
             </Link>
             <button
-              className="mono flex h-9 w-9 items-center justify-center border border-ink md:hidden"
+              className="mono flex h-11 w-11 items-center justify-center border-2 border-ink md:hidden"
               onClick={() => setOpen((v) => !v)}
               aria-expanded={open}
-              aria-label="Toggle menu"
+              aria-label="Toggle navigation menu"
             >
-              {open ? <X size={16} /> : <Menu size={16} />}
+              {open ? <X size={18} /> : <Menu size={18} />}
             </button>
           </div>
         </div>
       </nav>
 
-      {/* Mobile drawer */}
+      {/* Mobile drawer with backdrop */}
       {mounted && open && (
-        <div className="fixed inset-x-0 top-[49px] z-40 border-b border-ink bg-paper md:hidden">
-          {NAV_LINKS.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              onClick={() => setOpen(false)}
-              className="mono block border-b border-ink/20 px-6 py-4 text-xs hover:bg-ink hover:text-paper"
-            >
-              {link.label}
-            </Link>
-          ))}
-          <div className="flex gap-px">
-            <Link href="/sign-in" className="mono flex-1 bg-paper px-6 py-4 text-xs">
-              Log in
-            </Link>
-            <Link href="/sign-up" className="mono flex-1 bg-hazard px-6 py-4 text-xs text-white">
-              Request a move
-            </Link>
+        <>
+          <div
+            className="fixed inset-0 top-[57px] z-30 bg-ink/40 backdrop-blur-xs md:hidden"
+            onClick={() => setOpen(false)}
+            aria-hidden
+          />
+          <div className="fixed inset-x-0 top-[57px] z-40 border-b-2 border-ink bg-paper shadow-2xl md:hidden">
+            {NAV_LINKS.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                onClick={() => setOpen(false)}
+                className="mono block border-b border-ink/20 px-6 py-4 text-xs font-semibold hover:bg-ink hover:text-paper"
+              >
+                {link.label}
+              </Link>
+            ))}
+            <div className="flex border-b border-ink/20">
+              <Link
+                href="/track"
+                onClick={() => setOpen(false)}
+                className="mono flex-1 border-r border-ink/20 px-6 py-4 text-xs text-ink-80 hover:bg-ink hover:text-paper"
+              >
+                TRACK A MOVE
+              </Link>
+            </div>
+            <div className="flex gap-px bg-ink">
+              <Link
+                href="/sign-in"
+                onClick={() => setOpen(false)}
+                className="mono flex-1 bg-paper px-6 py-4 text-center text-xs font-bold"
+              >
+                LOG IN
+              </Link>
+              <Link
+                href="/request"
+                onClick={() => setOpen(false)}
+                className="mono flex-1 bg-hazard px-6 py-4 text-center text-xs font-bold text-white hover:bg-hazard-dark"
+              >
+                REQUEST A MOVE
+              </Link>
+            </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );

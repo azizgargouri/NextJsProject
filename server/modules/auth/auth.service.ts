@@ -9,6 +9,7 @@ import { comparePasswords } from '../../shared/auth/password';
 import { UserService } from '../users/users.service';
 import { serializeUser, type UserResponse } from '../users/users.serializer';
 import { AuthRepository } from './auth.repository';
+import { MoverProfileModel } from '../../shared/database/models/mover-profile.model';
 import { serializeAuthSession, type AuthSessionResponse, type TokenPair } from './auth.serializer';
 import {
   InvalidCredentialsError,
@@ -34,7 +35,12 @@ export class AuthService {
   }
 
   async signIn(input: SignInInput): Promise<AuthSessionResponse> {
-    const user = await this.users.findByEmail(input.email);
+    let user = await this.users.findByEmail(input.email);
+    // The fallback MongoDB is intentionally temporary in local development.
+    // Seed the documented demo mover only there, never in production.
+    if (!user && process.env.NODE_ENV === 'development' && input.email.toLowerCase() === 'mover@moveup.tn') {
+      user = await this.createDevelopmentDemoMover();
+    }
     if (!user) throw new InvalidCredentialsError();
 
     const passwordOk = await comparePasswords(input.password, user.passwordHash);
@@ -98,6 +104,25 @@ export class AuthService {
 
     void accessToken;
     return { accessToken, refreshToken, expiresIn: env().ACCESS_TOKEN_TTL };
+  }
+
+  private async createDevelopmentDemoMover() {
+    const user = await this.users.createUser({
+      email: 'mover@moveup.tn',
+      password: 'Demo#2026!',
+      name: 'Mehdi Transport',
+      phone: '+21698123456',
+      role: 'MOVER',
+      locale: 'en',
+    });
+    await MoverProfileModel.findOneAndUpdate(
+      { userId: user.id },
+      { $set: { companyName: 'Mehdi Transport', bio: 'Moving van, 14 m³ — Greater Tunis.', zones: ['TUN'], verificationStatus: 'APPROVED' } },
+      { upsert: true },
+    );
+    const storedUser = await this.users.findByEmail('mover@moveup.tn');
+    if (!storedUser) throw new Error('Development demo mover was not created');
+    return storedUser;
   }
 }
 

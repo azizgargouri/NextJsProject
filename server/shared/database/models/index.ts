@@ -6,3 +6,4 @@ export { EmployeeModel, type EmployeeDoc } from './employee.model';
 export { AttendanceModel, type AttendanceDoc, type AttendanceLocation } from './attendance.model';
 export { LeaveRequestModel, type LeaveRequestDoc } from './leave-request.model';
 export { WorkScheduleModel, type WorkScheduleDoc } from './work-schedule.model';
+export { MoveModel, type MoveDoc, type MoveStage, type MoveStageKey } from './move.model';
