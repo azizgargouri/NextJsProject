@@ -14,8 +14,9 @@ import {
 
 export interface AdminNavItem {
   label: string;
-  href?: string;
+  href: string;
   icon: LucideIcon;
+  /** True while the module's product domain is not connected to the back office. */
   upcoming?: boolean;
 }
 
@@ -32,25 +33,30 @@ export const adminNavGroups: AdminNavGroup[] = [
   {
     label: 'Operations',
     items: [
-      { label: 'Move requests', icon: ClipboardList, upcoming: true },
-      { label: 'Assignments', icon: Truck, upcoming: true },
-      { label: 'Disputes', icon: Gavel, upcoming: true },
+      { label: 'Move requests', href: '/admin/moves', icon: ClipboardList, upcoming: true },
+      { label: 'Assignments', href: '/admin/assignments', icon: Truck, upcoming: true },
+      { label: 'Disputes', href: '/admin/disputes', icon: Gavel, upcoming: true },
     ],
   },
   {
     label: 'Network',
     items: [
       { label: 'User accounts', href: '/admin/users', icon: Users },
-      { label: 'Mover reviews', icon: ShieldCheck, upcoming: true },
-      { label: 'Customer reviews', icon: MessageSquareText, upcoming: true },
+      { label: 'Mover reviews', href: '/admin/mover-reviews', icon: ShieldCheck, upcoming: true },
+      {
+        label: 'Customer reviews',
+        href: '/admin/customer-reviews',
+        icon: MessageSquareText,
+        upcoming: true,
+      },
     ],
   },
   {
     label: 'Control',
     items: [
-      { label: 'Pricing rules', icon: BadgeDollarSign, upcoming: true },
-      { label: 'Content', icon: FileText, upcoming: true },
-      { label: 'Audit log', icon: History, upcoming: true },
+      { label: 'Pricing rules', href: '/admin/pricing', icon: BadgeDollarSign, upcoming: true },
+      { label: 'Content', href: '/admin/content', icon: FileText, upcoming: true },
+      { label: 'Audit log', href: '/admin/audit', icon: History },
     ],
   },
 ];

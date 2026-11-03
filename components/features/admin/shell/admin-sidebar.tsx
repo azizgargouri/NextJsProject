@@ -110,7 +110,7 @@ function SidebarItem({
       : pathname.startsWith(item.href)
     : false;
 
-  const content = item.href ? (
+  const content = (
     <Link
       href={item.href}
       onClick={onNavigate}
@@ -120,21 +120,9 @@ function SidebarItem({
         'flex h-9 items-center gap-3 rounded-md px-2 text-sm outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50',
         active
           ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground'
-          : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
-        compact && 'justify-center',
-      )}
-    >
-      <Icon className="size-4 shrink-0" />
-      {!compact ? <span className="truncate">{item.label}</span> : null}
-    </Link>
-  ) : (
-    <div
-      role="link"
-      aria-disabled="true"
-      aria-label={compact ? `${item.label}, coming soon` : undefined}
-      tabIndex={compact ? 0 : undefined}
-      className={cn(
-        'flex h-9 cursor-not-allowed items-center gap-3 rounded-md px-2 text-sm text-muted-foreground/70',
+          : item.upcoming
+            ? 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+            : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
         compact && 'justify-center',
       )}
     >
@@ -142,12 +130,14 @@ function SidebarItem({
       {!compact ? (
         <>
           <span className="min-w-0 flex-1 truncate">{item.label}</span>
-          <span className="rounded-md border border-sidebar-border px-1.5 py-0.5 text-[10px]">
-            Soon
-          </span>
+          {item.upcoming ? (
+            <span className="rounded-md border border-sidebar-border px-1.5 py-0.5 text-[10px]">
+              Soon
+            </span>
+          ) : null}
         </>
       ) : null}
-    </div>
+    </Link>
   );
 
   if (!compact) return content;
