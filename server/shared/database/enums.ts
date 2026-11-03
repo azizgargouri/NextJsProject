@@ -6,10 +6,8 @@ export type Role = (typeof ROLES)[number];
 export const USER_STATUSES = ['ACTIVE', 'BLOCKED'] as const;
 export type UserStatus = (typeof USER_STATUSES)[number];
 
-export const VERIFICATION_STATUSES = [
-  'PENDING',
-  'APPROVED',
-  'REJECTED',
-  'SUSPENDED',
-] as const;
+export const VERIFICATION_STATUSES = ['PENDING', 'APPROVED', 'REJECTED', 'SUSPENDED'] as const;
 export type VerificationStatus = (typeof VERIFICATION_STATUSES)[number];
+
+// Quality domain (claims / reviews) — single source of truth lives in lib/quality.
+export * from '../../../lib/quality/constants';

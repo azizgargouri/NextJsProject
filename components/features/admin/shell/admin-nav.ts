@@ -35,7 +35,7 @@ export const adminNavGroups: AdminNavGroup[] = [
     items: [
       { label: 'Move requests', href: '/admin/moves', icon: ClipboardList, upcoming: true },
       { label: 'Assignments', href: '/admin/assignments', icon: Truck, upcoming: true },
-      { label: 'Disputes', href: '/admin/disputes', icon: Gavel, upcoming: true },
+      { label: 'Disputes', href: '/admin/disputes', icon: Gavel },
     ],
   },
   {
@@ -47,7 +47,6 @@ export const adminNavGroups: AdminNavGroup[] = [
         label: 'Customer reviews',
         href: '/admin/customer-reviews',
         icon: MessageSquareText,
-        upcoming: true,
       },
     ],
   },
