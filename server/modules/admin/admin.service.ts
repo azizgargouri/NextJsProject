@@ -5,12 +5,31 @@ import { adminRepository } from './admin.repository';
 import { AuthRepository } from '../auth/auth.repository';
 import { usersService } from '../users/users.service';
 import type { ManagedUserCreateInput, ManagedUserUpdateInput } from '../users/users.schema';
+import { z } from 'zod';
+import { EventType } from '../../shared/logger/audit';
+import { ValidationError } from '../../shared/database/errors';
+
+export const AuditQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+  event: z.enum([...Object.values(EventType), 'ALL']).default('ALL'),
+});
 
 export class AdminService {
   private readonly tokens = new AuthRepository();
 
   getOverview() {
     return adminRepository.getOverview();
+  }
+
+  listAuditEvents(searchParams: URLSearchParams) {
+    const parsed = AuditQuerySchema.safeParse(Object.fromEntries(searchParams));
+    if (!parsed.success) throw new ValidationError('Invalid audit query', parsed.error.flatten());
+    return adminRepository.listAuditEvents(
+      parsed.data.page,
+      parsed.data.limit,
+      parsed.data.event === 'ALL' ? undefined : parsed.data.event,
+    );
   }
 
   listUsers(searchParams: URLSearchParams) {

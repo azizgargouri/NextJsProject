@@ -1,9 +1,11 @@
 import { axiosClient } from './client';
 import type {
+  AdminAuditQuery,
   AdminOverviewDto,
   AdminUserCreatePayload,
   AdminUserUpdatePayload,
   AdminUsersQuery,
+  AuditEventDto,
   PageDto,
   ResponseUserDto,
   UserStatus,
@@ -12,6 +14,15 @@ import type {
 export const adminApi = {
   overview: async (): Promise<AdminOverviewDto> => {
     const { data } = await axiosClient.get<AdminOverviewDto>('/api/admin/overview');
+    return data;
+  },
+
+  audit: async (query: AdminAuditQuery): Promise<PageDto<AuditEventDto>> => {
+    const params = new URLSearchParams();
+    if (query.page) params.set('page', String(query.page));
+    if (query.limit) params.set('limit', String(query.limit));
+    if (query.event && query.event !== 'ALL') params.set('event', query.event);
+    const { data } = await axiosClient.get<PageDto<AuditEventDto>>('/api/admin/audit', { params });
     return data;
   },
 

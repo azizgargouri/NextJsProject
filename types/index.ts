@@ -80,6 +80,31 @@ export interface AdminUsersQuery extends QueryParams {
   status?: UserStatus | 'ALL';
 }
 
+export type AuditEventType =
+  | 'SIGNIN'
+  | 'SIGNOUT'
+  | 'SIGNUP'
+  | 'REFRESH_TOKEN'
+  | 'USER_CREATE'
+  | 'USER_UPDATE'
+  | 'USER_DELETE'
+  | 'USER_STATUS';
+
+export interface AuditEventDto {
+  id: string;
+  event: AuditEventType;
+  userId: string | null;
+  actor: { id: string; name: string; email: string } | null;
+  method: string;
+  api: string;
+  logInfo: Record<string, string | undefined>;
+  createdAt: string;
+}
+
+export interface AdminAuditQuery extends QueryParams {
+  event?: AuditEventType | 'ALL';
+}
+
 export interface AdminUserCreatePayload {
   name: string;
   email: string;
