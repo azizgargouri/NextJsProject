@@ -55,7 +55,10 @@ export function SignInForm() {
   );
 
   const onSubmit = (values: SignInFormValues) => {
-    mutate(values, { onSuccess: () => router.push('/dashboard') });
+    mutate(values, {
+      onSuccess: (response) =>
+        router.push(response.user.role === 'ADMIN' ? '/admin' : '/dashboard'),
+    });
   };
 
   return (

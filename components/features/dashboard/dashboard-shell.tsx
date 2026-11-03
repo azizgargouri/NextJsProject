@@ -15,19 +15,32 @@ import { useSignOut } from '@/hooks/content/auth/use-sign-out';
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { user, isAuthenticated } = useAuthStore();
-  const [checked, setChecked] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
   const signOut = useSignOut();
 
   useEffect(() => {
-    if (!useAuthStore.persist.hasHydrated()) return;
+    const persistence = useAuthStore.persist;
+    if (!persistence) {
+      setHydrated(true);
+      return;
+    }
+    if (persistence.hasHydrated()) setHydrated(true);
+    return persistence.onFinishHydration(() => setHydrated(true));
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
     if (!isAuthenticated) {
       router.replace('/sign-in');
       return;
     }
-    setChecked(true);
-  }, [isAuthenticated, router]);
+    if (user?.role === 'ADMIN') {
+      router.replace('/admin');
+      return;
+    }
+  }, [hydrated, isAuthenticated, router, user?.role]);
 
-  if (!checked) {
+  if (!hydrated || !isAuthenticated || user?.role === 'ADMIN') {
     return (
       <div className="mono flex min-h-dvh items-center justify-center text-[11px] text-ink-80">
         LOADING WORKSPACE…

@@ -36,13 +36,19 @@ export async function generateRefreshToken(): Promise<string> {
 
 export async function verifyAccessToken(token: string): Promise<AccessTokenPayload> {
   const { payload } = await jwtVerify(token, secret());
-  if (!payload.sub || typeof payload.email !== 'string') {
+  const roles: AccessTokenPayload['role'][] = ['CLIENT', 'MOVER', 'ADMIN'];
+  if (
+    !payload.sub ||
+    typeof payload.email !== 'string' ||
+    typeof payload.role !== 'string' ||
+    !roles.includes(payload.role as AccessTokenPayload['role'])
+  ) {
     throw new Error('Invalid token payload');
   }
   return {
     sub: payload.sub,
     email: payload.email,
-    role: (payload.role as AccessTokenPayload['role']) ?? 'CLIENT',
+    role: payload.role as AccessTokenPayload['role'],
     iat: payload.iat ?? 0,
     exp: payload.exp ?? 0,
   };

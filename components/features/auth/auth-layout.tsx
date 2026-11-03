@@ -13,22 +13,24 @@ import { AuthPanel } from '@/components/features/auth/auth-panel';
 export function AuthLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const user = useAuthStore((state) => state.user);
   const [checked, setChecked] = useState(false);
 
   useEffect(() => {
     if (!useAuthStore.persist.hasHydrated()) return;
     if (isAuthenticated) {
-      router.replace('/');
+      router.replace(user?.role === 'ADMIN' ? '/admin' : '/dashboard');
       return;
     }
     setChecked(true);
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, router, user?.role]);
 
   useEffect(() => {
     // Persisted state may still be resolving on first paint.
     const unsub = useAuthStore.persist.onFinishHydration(() => {
       if (useAuthStore.getState().isAuthenticated) {
-        router.replace('/');
+        const role = useAuthStore.getState().user?.role;
+        router.replace(role === 'ADMIN' ? '/admin' : '/dashboard');
       } else {
         setChecked(true);
       }

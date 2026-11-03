@@ -59,6 +59,7 @@ export class AuthService {
     } catch {
       throw new UserNotFoundError();
     }
+    if (user.status === 'BLOCKED') throw new UserBlockedError();
 
     await this.tokens.revoke(stored.id);
     return serializeAuthSession({

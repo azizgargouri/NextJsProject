@@ -8,7 +8,8 @@ export function useSignOut() {
 
   return useMutation({
     mutationFn: async () => {
-      await api.auth.signOut();
+      // Local sign-out must remain available even when the API is unreachable.
+      await api.auth.signOut().catch(() => undefined);
       logout();
     },
   });
