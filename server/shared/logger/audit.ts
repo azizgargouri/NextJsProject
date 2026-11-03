@@ -9,6 +9,8 @@ export enum EventType {
   REFRESH_TOKEN = 'REFRESH_TOKEN',
   USER_CREATE = 'USER_CREATE',
   USER_UPDATE = 'USER_UPDATE',
+  USER_DELETE = 'USER_DELETE',
+  USER_STATUS = 'USER_STATUS',
 }
 
 export interface AuditLogRecord {

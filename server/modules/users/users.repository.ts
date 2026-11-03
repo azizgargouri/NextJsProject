@@ -53,33 +53,43 @@ export class UserRepository extends AbstractRepository<UserRow> {
   }
 
   async findByEmail(email: string): Promise<UserRow | null> {
-    const doc = await (await this.model())
+    const doc = await (
+      await this.model()
+    )
       .findOne({ email: email.toLowerCase(), deletedAt: null })
       .lean();
     return doc ? toUserRow(doc as unknown as UserDoc) : null;
   }
 
+  async findAnyByEmail(email: string): Promise<UserRow | null> {
+    const doc = await (await this.model()).findOne({ email: email.toLowerCase() }).lean();
+    return doc ? toUserRow(doc as unknown as UserDoc) : null;
+  }
+
   async findByPhone(phone: string): Promise<UserRow | null> {
-    const doc = await (await this.model())
-      .findOne({ phone, deletedAt: null })
-      .lean();
+    const doc = await (await this.model()).findOne({ phone, deletedAt: null }).lean();
+    return doc ? toUserRow(doc as unknown as UserDoc) : null;
+  }
+
+  async findAnyByPhone(phone: string): Promise<UserRow | null> {
+    const doc = await (await this.model()).findOne({ phone }).lean();
     return doc ? toUserRow(doc as unknown as UserDoc) : null;
   }
 
   /** Standardized paginated list (query DSL: page / limit / search / sort / filter). */
   async findPaginated(searchParams: URLSearchParams) {
     const query = parseListQuery(searchParams);
-    const where = this.buildWhere(query);
-    const orderBy = compileSort(query.sort, ['email', 'name', 'role', 'createdAt', 'updatedAt']);
+    const role = searchParams.get('role');
+    const status = searchParams.get('status');
+    const where = this.buildWhere(query, role, status);
+    const orderBy = query.sort
+      ? compileSort(query.sort, ['email', 'name', 'role', 'status', 'createdAt', 'updatedAt'])
+      : { createdAt: 'desc' as const };
     const skip = (query.page - 1) * query.limit;
     const M = await this.model();
 
     const [docs, itemCount] = await Promise.all([
-      M.find(where)
-        .sort(orderBy)
-        .skip(skip)
-        .limit(query.limit)
-        .lean(),
+      M.find(where).sort(orderBy).skip(skip).limit(query.limit).lean(),
       M.countDocuments(where),
     ]);
 
@@ -98,8 +108,10 @@ export class UserRepository extends AbstractRepository<UserRow> {
   }
 
   async update(id: string, data: Record<string, unknown>): Promise<UserRow> {
-    const doc = await (await this.model())
-      .findByIdAndUpdate(id, data as UpdateQuery<UserDoc>, { new: true })
+    const doc = await (
+      await this.model()
+    )
+      .findByIdAndUpdate(id, data as UpdateQuery<UserDoc>, { returnDocument: 'after' })
       .lean();
     if (!doc) throw new ReferenceError('User not found during update');
     return toUserRow(doc as unknown as UserDoc);
@@ -107,8 +119,12 @@ export class UserRepository extends AbstractRepository<UserRow> {
 
   /** Soft delete (parity with previous SQL behavior). */
   async delete(id: string): Promise<UserRow> {
-    const doc = await (await this.model())
-      .findByIdAndUpdate(id, { deletedAt: new Date() } as UpdateQuery<UserDoc>, { new: true })
+    const doc = await (
+      await this.model()
+    )
+      .findByIdAndUpdate(id, { deletedAt: new Date() } as UpdateQuery<UserDoc>, {
+        returnDocument: 'after',
+      })
       .lean();
     if (!doc) throw new ReferenceError('User not found during delete');
     return toUserRow(doc as unknown as UserDoc);
@@ -120,25 +136,32 @@ export class UserRepository extends AbstractRepository<UserRow> {
 
   async findMany(options: Record<string, unknown> = {}): Promise<UserRow[]> {
     const M = await this.model();
-    const { where = {}, orderBy = {}, skip = 0, limit = 50 } = (options ?? {}) as {
+    const {
+      where = {},
+      orderBy = {},
+      skip = 0,
+      limit = 50,
+    } = (options ?? {}) as {
       where?: Record<string, unknown>;
       orderBy?: Record<string, 'asc' | 'desc'>;
       skip?: number;
       limit?: number;
     };
-    const docs = await M.find(where)
-      .sort(orderBy)
-      .skip(skip)
-      .limit(limit)
-      .lean();
+    const docs = await M.find(where).sort(orderBy).skip(skip).limit(limit).lean();
     return docs.map((doc) => toUserRow(doc as unknown as UserDoc));
   }
 
-  private buildWhere(query: ReturnType<typeof parseListQuery>) {
+  private buildWhere(
+    query: ReturnType<typeof parseListQuery>,
+    role: string | null,
+    status: string | null,
+  ) {
     const where: Record<string, unknown> = { deletedAt: null };
+    if (role && ['CLIENT', 'MOVER', 'ADMIN'].includes(role)) where.role = role;
+    if (status && ['ACTIVE', 'BLOCKED'].includes(status)) where.status = status;
     if (query.search) {
       const pattern = new RegExp(escapeRegExp(query.search), 'i');
-      where.$or = [{ name: pattern }, { email: pattern }];
+      where.$or = [{ name: pattern }, { email: pattern }, { phone: pattern }];
     }
     return where;
   }
