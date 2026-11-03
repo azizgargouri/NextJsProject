@@ -58,3 +58,44 @@ export interface QueryParams {
   sort?: string;
   filter?: string;
 }
+
+export interface AdminOverviewDto {
+  users: {
+    total: number;
+    active: number;
+    blocked: number;
+    clients: number;
+    movers: number;
+    admins: number;
+    registeredLast30Days: number;
+  };
+  movers: {
+    pendingReview: number;
+    approved: number;
+  };
+}
+
+export interface AdminUsersQuery extends QueryParams {
+  role?: UserRole | 'ALL';
+  status?: UserStatus | 'ALL';
+}
+
+export interface AdminUserCreatePayload {
+  name: string;
+  email: string;
+  phone: string;
+  password: string;
+  role: UserRole;
+  locale: 'en' | 'fr' | 'ar';
+  status: UserStatus;
+}
+
+export interface AdminUserUpdatePayload {
+  name?: string;
+  email?: string;
+  phone?: string;
+  password?: string;
+  role?: UserRole;
+  locale?: 'en' | 'fr' | 'ar';
+  status?: UserStatus;
+}
