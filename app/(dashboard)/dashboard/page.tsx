@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { DashboardLayout } from '@/components/features/dashboard/dashboard-shell';
+import { HomesDashboardEntry } from '@/components/features/homes/homes-dashboard-entry';
 
 export const metadata: Metadata = {
   title: 'Dashboard',
@@ -22,6 +23,7 @@ export default function DashboardPage() {
             </div>
           ))}
         </div>
+        <HomesDashboardEntry />
       </main>
     </DashboardLayout>
   );
