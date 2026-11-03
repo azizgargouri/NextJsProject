@@ -20,3 +20,6 @@ next-env.d.ts
 .vercel
 *.log
 yarn-error.log
+
+# local agent review artifacts
+/.impeccable
