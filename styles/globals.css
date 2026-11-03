@@ -15,6 +15,92 @@
   --color-hazard-dark: #b81414;
 }
 
+/*
+ * MoveUp back office — scoped semantic system.
+ * Public surfaces keep the Swiss print tokens above; /admin consumes these
+ * semantic utilities so light/dark values change without class churn.
+ */
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.3211 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.3211 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.3211 0 0);
+  --primary: oklch(0.55 0.2 260);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.967 0.0029 264.5419);
+  --secondary-foreground: oklch(0.4461 0.0263 256.8018);
+  --muted: oklch(0.9846 0.0017 247.8389);
+  --muted-foreground: oklch(0.551 0.0234 264.3637);
+  --accent: oklch(0.9514 0.025 236.8242);
+  --accent-foreground: oklch(0.3791 0.1378 265.5222);
+  --destructive: oklch(0.56 0.22 25.3313);
+  --destructive-foreground: oklch(1 0 0);
+  --border: oklch(0.9276 0.0058 264.5313);
+  --input: oklch(0.9276 0.0058 264.5313);
+  --ring: oklch(0.6231 0.188 259.8145);
+  --sidebar: oklch(0.9846 0.0017 247.8389);
+  --sidebar-foreground: oklch(0.3211 0 0);
+  --sidebar-accent: oklch(0.9514 0.025 236.8242);
+  --sidebar-accent-foreground: oklch(0.3791 0.1378 265.5222);
+  --sidebar-border: oklch(0.9276 0.0058 264.5313);
+}
+
+.dark {
+  --background: oklch(0.2046 0 0);
+  --foreground: oklch(0.9219 0 0);
+  --card: oklch(0.2686 0 0);
+  --card-foreground: oklch(0.9219 0 0);
+  --popover: oklch(0.2686 0 0);
+  --popover-foreground: oklch(0.9219 0 0);
+  --primary: oklch(0.55 0.2 260);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.2686 0 0);
+  --secondary-foreground: oklch(0.9219 0 0);
+  --muted: oklch(0.2393 0 0);
+  --muted-foreground: oklch(0.7155 0 0);
+  --accent: oklch(0.3791 0.1378 265.5222);
+  --accent-foreground: oklch(0.8823 0.0571 254.1284);
+  --destructive: oklch(0.56 0.22 25.3313);
+  --destructive-foreground: oklch(1 0 0);
+  --border: oklch(0.3715 0 0);
+  --input: oklch(0.3715 0 0);
+  --ring: oklch(0.6231 0.188 259.8145);
+  --sidebar: oklch(0.2046 0 0);
+  --sidebar-foreground: oklch(0.9219 0 0);
+  --sidebar-accent: oklch(0.3791 0.1378 265.5222);
+  --sidebar-accent-foreground: oklch(0.8823 0.0571 254.1284);
+  --sidebar-border: oklch(0.3715 0 0);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+}
+
 html {
   background-color: var(--color-paper);
 }
@@ -24,6 +110,173 @@ body {
   font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+}
+
+body:has(.admin-surface) {
+  overflow: hidden;
+}
+
+body:has(.admin-surface).grain::before {
+  display: none;
+}
+
+.admin-surface,
+.admin-toast,
+.admin-dialog-content,
+.admin-sheet-content,
+.admin-mobile-nav,
+[data-radix-popper-content-wrapper] {
+  font-family: Verdana, system-ui, sans-serif;
+}
+
+.admin-surface * {
+  scrollbar-color: var(--border) transparent;
+  scrollbar-width: thin;
+}
+
+.admin-surface ::selection,
+.admin-dialog-content ::selection,
+.admin-sheet-content ::selection,
+.admin-mobile-nav ::selection,
+[data-radix-popper-content-wrapper] ::selection {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.admin-dialog-overlay[data-state='open'] {
+  animation: admin-fade-in 200ms ease-out;
+}
+
+.admin-dialog-overlay[data-state='closed'] {
+  animation: admin-fade-out 150ms ease-in;
+}
+
+.admin-dialog-content[data-state='open'] {
+  animation: admin-dialog-in 200ms ease-out;
+}
+
+.admin-dialog-content[data-state='closed'] {
+  animation: admin-dialog-out 150ms ease-in;
+}
+
+.admin-mobile-nav[data-state='open'] {
+  animation: admin-sheet-in 300ms ease-out;
+}
+
+.admin-mobile-nav[data-state='closed'] {
+  animation: admin-sheet-out 200ms ease-in;
+}
+
+.admin-sheet-content[data-state='open'] {
+  animation: admin-drawer-in 300ms ease-out;
+}
+
+.admin-sheet-content[data-state='closed'] {
+  animation: admin-drawer-out 200ms ease-in;
+}
+
+@keyframes admin-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes admin-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes admin-dialog-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -48%) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes admin-dialog-out {
+  from {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, -48%) scale(0.98);
+  }
+}
+
+@keyframes admin-sheet-in {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes admin-sheet-out {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes admin-drawer-in {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes admin-drawer-out {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(100%);
+  }
+}
+
+@media (min-width: 1500px) {
+  .admin-sheet-content[data-state='open'] {
+    animation-name: admin-side-sheet-in;
+  }
+
+  .admin-sheet-content[data-state='closed'] {
+    animation-name: admin-side-sheet-out;
+  }
+}
+
+@keyframes admin-side-sheet-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes admin-side-sheet-out {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(100%);
+  }
 }
 
 ::selection {
@@ -94,5 +347,14 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .marquee-track {
     animation: none !important;
+  }
+
+  .admin-dialog-overlay,
+  .admin-dialog-content,
+  .admin-sheet-content,
+  .admin-mobile-nav,
+  .admin-surface * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
   }
 }
