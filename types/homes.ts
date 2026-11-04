@@ -51,8 +51,49 @@ export interface HomeDto extends DatabaseEntity {
   floor: number;
   hasElevator: boolean;
   notes: string;
+  moveReference: string | null;
   rooms: RoomDto[];
   totalAreaM2: number;
+}
+
+export interface FootprintDto {
+  widthCm: number;
+  depthCm: number;
+  stackable: boolean;
+  source: 'catalogue' | 'estimated';
+}
+
+export interface MoveItemDto {
+  id: string;
+  name: string;
+  quantity: number;
+  volumeM3: number;
+  weightKg: number;
+  footprint: FootprintDto;
+}
+
+export interface LinkedMoveRequestDto {
+  reference: string;
+  pickupAddress: string;
+  destinationAddress: string;
+  moveDate: string;
+  items: MoveItemDto[];
+  totals: { itemCount: number; volumeM3: number; weightKg: number; floorM2: number };
+}
+
+/** Single-house responses (GET one + every mutation) carry the expanded move request. */
+export interface HomeDetailDto extends HomeDto {
+  moveRequest: LinkedMoveRequestDto | null;
+}
+
+/** Entry of the link picker: one of the client's move requests. */
+export interface ClientMoveRequestDto {
+  reference: string;
+  pickupAddress: string;
+  destinationAddress: string;
+  moveDate: string;
+  itemCount: number;
+  linkedHome: { id: string; label: string } | null;
 }
 
 export interface HomePayload {
@@ -64,6 +105,11 @@ export interface HomePayload {
   notes: string;
 }
 
+export type HomeUpdatePayload = Partial<HomePayload> & { moveReference?: string | null };
+
+/** Moving boxes stack: the server counts them in stacks of this many. */
+export const BOX_STACK = 3;
+
 export interface RoomPayload {
   name: string;
   type: RoomType;
@@ -74,3 +120,45 @@ export interface RoomPayload {
 }
 
 export type HomesQuery = Pick<QueryParams, 'page' | 'limit' | 'search'>;
+
+export type PlacementWall = Wall | 'CENTER';
+export type LayoutProvider = 'ollama' | 'groq';
+
+export interface LayoutPlacementDto {
+  unitId: string;
+  itemId: string;
+  name: string;
+  roomId: string;
+  wall: PlacementWall;
+  /** Drawn extents in cm inside the room (origin = north-west corner). */
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  reason: string;
+  /** 'moveup' = the AI skipped the item and MoveUp chose a room. */
+  source: 'ai' | 'moveup';
+  /** Wall the AI asked for when it had no space and another spot was used. */
+  requestedWall?: PlacementWall;
+}
+
+export interface LayoutPlanDto {
+  homeId: string;
+  moveReference: string;
+  provider: LayoutProvider;
+  model: string;
+  attempts: { provider: LayoutProvider; model: string; ok: boolean; ms: number; error?: string }[];
+  placements: LayoutPlacementDto[];
+  unplaced: {
+    unitId: string;
+    itemId: string;
+    name: string;
+    roomId: string | null;
+    reason: string;
+  }[];
+  tips: string[];
+  warnings: string[];
+  /** Rooms or items changed after the plan was made. */
+  stale: boolean;
+  createdAt: string;
+}

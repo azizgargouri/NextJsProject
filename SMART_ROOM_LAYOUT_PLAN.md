@@ -38,15 +38,26 @@ New house + rooms (CRUD) ────────────┘
 
 ## Environment
 
-| Variable            | Value                            | Used for                                                   |
-| ------------------- | -------------------------------- | ---------------------------------------------------------- |
-| `OLLAMA_BASE_URL`   | `http://localhost:11434`         | Local AI server                                            |
-| `OLLAMA_MODEL`      | `qwen3.5:4b-q4_K_M`              | Fast local model with JSON-schema output (~6 s per answer) |
-| `OLLAMA_TIMEOUT_MS` | `90000`                          | After this, switch to Groq                                 |
-| `GROQ_API_KEY`      | in `.env` only (never committed) | Fallback AI                                                |
-| `GROQ_MODEL`        | `openai/gpt-oss-120b`            | Fallback model available on this Groq account              |
+| Variable            | Value                            | Used for                                                                |
+| ------------------- | -------------------------------- | ----------------------------------------------------------------------- |
+| `OLLAMA_BASE_URL`   | `http://localhost:11434`         | Local AI server                                                         |
+| `OLLAMA_MODEL`      | `qwen3.5:4b-q4_K_M`              | Local text model for planning — **not installed right now** (see below) |
+| `OLLAMA_TIMEOUT_MS` | `90000`                          | After this, switch to Groq                                              |
+| `GROQ_API_KEY`      | in `.env` only (never committed) | Fallback AI                                                             |
+| `GROQ_MODEL`        | `openai/gpt-oss-120b`            | Fallback model available on this Groq account                           |
 
-Other installed Ollama models you can switch to: `gemma4:12b` (slower, smarter), `llama3.1:latest`.
+**Photo model:** `x/flux2-klein` is downloaded, but Ollama 0.40.14 refuses image models in the API
+and in the terminal (`image generation models are not currently supported`), so it is **not
+wired in**. Re-test with `ollama run x/flux2-klein "a bedroom"` after an Ollama update.
+
+**Ollama status (2026-11-04):** the old text models were removed to free disk space, and only
+`x/flux2-klein` (image generation, can't plan layouts) is installed. Decision: **Groq only for
+now** — every plan records "Ollama skipped: model … not found" and Groq answers in ~2 s. To turn
+Ollama-first back on, install a text model (no code change):
+
+```bash
+ollama pull qwen3.5:4b-q4_K_M
+```
 
 **Test accounts**
 
@@ -62,7 +73,11 @@ Other installed Ollama models you can switch to: `gemma4:12b` (slower, smarter),
 yarn db:seed && yarn tsx server/seeds/smart-layout.seed.ts   # demo accounts + Omar's client
 yarn dev                                                      # http://localhost:3000
 npx tsc --noEmit && yarn lint                                 # typecheck + lint
+yarn tsx server/modules/room-layout/furniture-sizes.check.ts  # furniture size self-check
 ```
+
+> After changing a Mongoose schema (e.g. adding a field), **restart `yarn dev`**: the dev server
+> keeps the old compiled model (`models.Home ?? model(...)`) and silently drops the new field.
 
 ---
 
@@ -70,9 +85,9 @@ npx tsc --noEmit && yarn lint                                 # typecheck + lint
 
 ```
 server/shared/database/models/home.model.ts         Home + embedded rooms/openings
-server/shared/database/models/layout-plan.model.ts  Saved AI plans                    (step 3)
+server/shared/database/models/layout-plan.model.ts  Saved AI plans (one per house)
 server/modules/homes/                               schema · repository · service · serializer · controller
-server/modules/room-layout/                         static request · sizes · checker · AI providers · service   (steps 2–3)
+server/modules/room-layout/                         static requests · sizes · move-requests service (step 2) · checker · AI (step 3)
 server/seeds/smart-layout.seed.ts                   Omar's test client
 app/api/homes/...                                   REST routes
 app/(dashboard)/dashboard/homes/...                 Client pages
@@ -96,7 +111,7 @@ types/homes.ts                                      DTO types
 
 ---
 
-### Step 1 — New house & rooms CRUD ✅ (waiting for your test)
+### Step 1 — New house & rooms CRUD ✅ (tested by you, pushed to `smart-room`)
 
 **Backend**
 
@@ -144,45 +159,123 @@ Sign in as `client@moveup.tn` and confirm you **cannot** see Omar's houses.
 
 ---
 
-### Step 2 — Connect the (static) move request + item sizes
+### Step 2 — Connect the (static) move request + item sizes ✅ (tested by you)
 
-- `server/modules/room-layout/static-move-request.ts`: 2 demo requests (e.g. `MU-2026-DEMO01`
-  apartment move, `MU-2026-DEMO02` studio move) with the teammate's item shape
-  (`id, name, volume, weight, quantity`), owned by Omar's test client.
-- `furniture-sizes.ts`: footprint table per catalogue id (bed 160×200, sofa 200×90, fridge 60×65,
-  washer 60×60, table 160×90, chair 50×50, box 50×35…). Unknown items get a footprint from their volume.
-- A house can be linked to one request (`moveReference` field, PATCH house).
-- House page shows **"Items coming to this house"** with quantity and footprint.
+**Backend** (`server/modules/room-layout/`)
 
-**You test:** link a house to `MU-2026-DEMO01`, see the item list with sizes, unlink it.
+- `static-move-requests.ts` — **the only file to replace** when `requests-and-inventory` merges.
+  Items use their exact `Move.items` shape `{ id, name, volume, weight, quantity }`:
+
+  | Reference        | Owner                   | Route                    | Items |
+  | ---------------- | ----------------------- | ------------------------ | ----- |
+  | `MU-2026-DEMO01` | `omar.client@moveup.tn` | Les Berges du Lac → Sfax | 37    |
+  | `MU-2026-DEMO02` | `omar.client@moveup.tn` | Ariana → Tunis           | 14    |
+  | `MU-2026-DEMO03` | `client@moveup.tn`      | La Marsa → Bizerte       | 12    |
+
+  Static data can't know Mongo ids, so ownership is by email here (the real model uses `clientId`).
+
+- `furniture-sizes.ts` — floor footprint per catalogue id (bed 160×200, sofa 200×90, wardrobe
+  120×60, table 160×90, desk 120×60, TV stand 150×40, fridge 60×65, washer 60×60, chair 50×50,
+  box 50×35). Unknown ids (e.g. the load scanner's `scan-7f3a` bookshelf) are **estimated** from
+  volume as a 1 m tall square block, 30–250 cm per side. Boxes count in stacks of 3.
+  Self-check: `furniture-sizes.check.ts`.
+- `move-requests.service.ts` — `listForClient`, `findForClient`, `expand` (items + footprints + totals).
+- `Home.moveReference` (nullable). Rules: the request must be the client's own (else 404), and one
+  request links to one house (else 409 "already linked to …"). Deleting a house frees its request.
+- Every single-house response (GET + all mutations) now includes `moveRequest` with items,
+  footprints and totals; the list only carries `moveReference`.
+
+| Method | Route                      | Action                                                        |
+| ------ | -------------------------- | ------------------------------------------------------------- |
+| GET    | `/api/homes/move-requests` | My move requests + which house each is linked to              |
+| PATCH  | `/api/homes/[id]`          | `{ "moveReference": "MU-2026-DEMO01" }` links, `null` unlinks |
+
+**Frontend**
+
+- House page → **"Moving in."** panel: pick a request (requests linked to another house are
+  disabled), then totals (items, volume, weight, floor needed), a fit hint comparing the floor
+  needed with the rooms' total area (Comfortable ≤ 40 % < Tight ≤ 60 % < Very tight), and the item
+  table (qty, size each, floor, catalogue/estimated). **Change request** and **Unlink**.
+- House list cards show the linked request.
+
+**Verified by me (2026-11-04):** 15/15 step-2 API checks (own requests only, mover 403, link,
+409 double link, 404 someone else's / unknown request, link survives room edits, relink, unlink,
+delete frees the request) · 16/16 step-1 API checks still green · size self-check · `tsc` +
+`eslint` clean · browser: link → totals + table → change to DEMO02 → unlink, list card shows the
+reference · 375 px: page fits, only the table scrolls sideways.
+
+**Bug found and fixed (from step 1):** with Zod 4, `HomeCreateSchema.partial()` kept the
+defaults, so any PATCH that didn't send `floor` / `hasElevator` / `notes` reset them to
+`0` / `false` / `''`. The edit form always sends every field, so step 1's UI never showed it;
+the link button did. `HomeUpdateSchema` is now built from fields without defaults, and the API
+checks include a regression test.
+
+**You test:** open your house → **Moving in.** → link `MU-2026-DEMO01` → check the item list,
+sizes and fit hint → **Change request** to `DEMO02` → **Unlink**. Then sign in as
+`client@moveup.tn`: only `MU-2026-DEMO03` is offered there.
 
 ---
 
-### Step 3 — AI layout generation (Ollama → Groq) + checks
+### Step 3 — AI layout + to-scale drawing ✅ (tested by you)
 
-- `ai/ollama.provider.ts`: `POST /api/chat` with `format: <JSON schema>`, `think: false`, timeout.
-- `ai/groq.provider.ts`: OpenAI-compatible `chat/completions` with `response_format: json_schema`.
-- `layout-ai.ts`: try Ollama → on timeout / error / invalid JSON, try Groq → otherwise fail cleanly.
-  The JSON schema comes from Zod (`z.toJSONSchema`), and the answer is validated with the same Zod schema.
-- `layout-checker.ts` (pure functions + a small test): each item inside its room, no overlap,
-  nothing blocking a door's swing area. Bad placements become **warnings**, never silent.
-- `LayoutPlan` model: `homeId`, `clientId`, `moveReference`, `status` (READY / FAILED),
-  `provider` (ollama / groq), `model`, `placements[]` (itemId, unit, roomId, x, y, rotated, reason),
-  `unplaced[]`, `warnings[]`, `tips[]`, `inputHash`.
-- Routes: `POST /api/homes/[id]/layout` (generate), `GET` (latest plan), `PATCH` (move or rotate one item), `DELETE`.
+**Decision (2026-11-04): "AI plans, the app draws."** Groq has no image models and the installed
+Ollama image model can't respect real sizes, so the AI chooses **room + wall + reason** for every
+item and MoveUp computes exact positions and draws each room to scale. A photo-style render with
+`x/flux2-klein` can come later as an extra.
 
-**You test:** press **Suggest layout**, see placements and which AI answered. Stop Ollama
-(`ollama stop` / quit the app) and press again → Groq answers.
+**Backend** (`server/modules/room-layout/`)
+
+- `ai/ai.config.ts` — reads `OLLAMA_*` / `GROQ_*` (empty value = provider skipped).
+- `ai/layout-prompt.ts` — Zod answer schema → JSON Schema (`z.toJSONSchema`) for both providers;
+  prompt rules (beds in bedrooms, sofa facing TV, fridge in kitchen, table + chairs together,
+  boxes in storage/largest room, avoid door walls, wall-only items never CENTER). Rooms are sent
+  as short keys `R1, R2…` — models mis-copied 24-char Mongo ids, which dropped items.
+- `ai/providers.ts` — Ollama `/api/chat` (`format`, `think: false`, timeout) and Groq
+  `chat/completions` (`response_format: json_schema`, `strict`, `reasoning_effort: low`). Plain
+  `fetch`, no new dependency, key-free error messages.
+- `ai/layout-ai.ts` — Ollama → Groq → 503 `LAYOUT_AI_UNAVAILABLE`; every attempt is recorded.
+- `layout-packer.ts` (+ `layout-packer.check.ts`) — exact positions: inside the room, no
+  overlaps (5 cm gap), door swings kept free, tall items (fridge, wardrobe, bookshelf) never in
+  front of windows, wall-only items never free-standing, full walls → next wall → centre, items
+  that don't fit are listed with the reason. An item with no usable AI room gets one from MoveUp
+  (flagged).
+- `layout.service.ts` — units (one per item, boxes in stacks of 3), AI call, packing, one saved
+  plan per house, `stale` flag when rooms/doors/windows/items change after the plan.
+- `LayoutPlan` model (`server/shared/database/models/layout-plan.model.ts`).
+
+| Method | Route                    | Action                                     |
+| ------ | ------------------------ | ------------------------------------------ |
+| POST   | `/api/homes/[id]/layout` | Generate (or regenerate) the plan          |
+| GET    | `/api/homes/[id]/layout` | Saved plan + `stale` (404 when none)       |
+| DELETE | `/api/homes/[id]/layout` | Delete the plan (house, rooms, items stay) |
+
+**Frontend** — house page → **"Layout."** section (after Rooms): Suggest layout / Regenerate /
+Delete plan, live "Planning… Ns" status, "Planned by Groq (cloud) · model · 2.1 s" + why Ollama
+was skipped, stale banner, every room drawn to scale with numbered items flush against the walls,
+numbered list with wall + the AI's reason, items that could not be placed, move-in tips.
+
+**Verified by me (2026-11-04):** 11/11 step-3 API checks (400 without request, 404 before
+generate, generate 2–3 s via Groq, 0 overlaps, stale after a room edit, other client 404, mover
+403, delete + 404 after) · AI fallback paths: Ollama not running / image-only model / timeout /
+not configured → Groq answers; both failing → clear 503 without leaking the key · packer and size
+self-checks · step-1 API checks still green · `tsc` + `eslint` clean · browser: generate →
+drawings + list + tips, regenerate, no console errors.
+Fixed during verification: duplicate React keys on identical warnings; walls now drawn over the
+furniture so items sit flush against them; long Mongo room ids replaced by `R1…` keys.
+
+**You test:** open your house → make sure a request is linked and rooms exist → **Layout.** →
+**Suggest layout** → read the drawings and reasons → edit a room (the plan shows "changed") →
+**Regenerate** → **Delete plan**.
 
 ---
 
-### Step 4 — Layout view
+### Step 4 — Edit the layout
 
-- `/dashboard/homes/[id]/layout`: each room drawn to scale as SVG (walls, door gaps, windows,
-  item rectangles + labels), item list with the AI's reason, unplaced items, warnings, tips.
-- Actions: move an item to another room, rotate it, regenerate, delete the plan.
+- Move an item to another room or wall, rotate it, with the packer re-checking the spot.
+- Simple furniture drawings (bed, sofa, table, chairs, fridge…) instead of plain rectangles.
+- `PATCH /api/homes/[id]/layout` for one item.
 
-**You test:** generate → read the drawing → move the sofa to another room → regenerate → delete.
+**You test:** move the sofa to another room → rotate the bed → regenerate → delete.
 
 ---
 
@@ -210,9 +303,9 @@ Sign in as `client@moveup.tn` and confirm you **cannot** see Omar's houses.
 
 | Step                       | Status  | Verified by me | Tested by you |
 | -------------------------- | ------- | -------------- | ------------- |
-| 0 — Preparation            | ✅ done | ✅             | ⏳            |
-| 1 — House & rooms CRUD     | ✅ done | ✅             | ⏳            |
-| 2 — Static request + sizes |         |                |               |
-| 3 — AI generation          |         |                |               |
-| 4 — Layout view            |         |                |               |
+| 0 — Preparation            | ✅ done | ✅             | ✅            |
+| 1 — House & rooms CRUD     | ✅ done | ✅             | ✅            |
+| 2 — Static request + sizes | ✅ done | ✅             | ✅            |
+| 3 — AI layout + drawing    | ✅ done | ✅             | ✅            |
+| 4 — Edit the layout        |         |                |               |
 | 5 — Hardening & hand-off   |         |                |               |

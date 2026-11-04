@@ -59,6 +59,8 @@ export interface HomeDoc {
   floor: number;
   hasElevator: boolean;
   notes: string;
+  /** Linked move request (teammate's Move.reference, e.g. MU-2026-000123), or null. */
+  moveReference: string | null;
   rooms: RoomDoc[];
   createdAt: Date;
   updatedAt: Date;
@@ -90,6 +92,7 @@ const HomeSchema = new Schema<HomeDoc>(
     floor: { type: Number, default: 0, min: 0 },
     hasElevator: { type: Boolean, default: false },
     notes: { type: String, default: '' },
+    moveReference: { type: String, default: null, trim: true },
     rooms: { type: [RoomSchema], default: [] },
     deletedAt: { type: Date, default: null },
   },

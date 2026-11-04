@@ -41,6 +41,7 @@ export interface HomeRow {
   floor: number;
   hasElevator: boolean;
   notes: string;
+  moveReference: string | null;
   rooms: RoomRow[];
   createdAt: Date;
   updatedAt: Date;
@@ -58,6 +59,7 @@ export function toHomeRow(doc: HomeDoc): HomeRow {
     floor: doc.floor,
     hasElevator: doc.hasElevator,
     notes: doc.notes ?? '',
+    moveReference: doc.moveReference ?? null,
     rooms: (doc.rooms ?? []).map((room) => ({
       id: String(room._id),
       name: room.name,
@@ -101,6 +103,16 @@ export class HomeRepository extends AbstractRepository<HomeRow> {
       .findOne({ _id: id, clientId, deletedAt: null })
       .lean<HomeDoc>();
     return doc ? toHomeRow(doc) : null;
+  }
+
+  /** The client's live houses linked to any of these move references. */
+  async findLinked(clientId: string, references: string[]): Promise<HomeRow[]> {
+    const docs = await (
+      await this.model()
+    )
+      .find({ clientId, deletedAt: null, moveReference: { $in: references } })
+      .lean<HomeDoc[]>();
+    return docs.map(toHomeRow);
   }
 
   async findPaginatedForClient(clientId: string, searchParams: URLSearchParams) {

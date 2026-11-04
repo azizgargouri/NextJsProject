@@ -73,16 +73,18 @@ export function RoomOutline({
       aria-label={label}
       className={cn('block h-full w-full', className)}
     >
+      <rect x={0} y={0} width={width} height={length} fill="var(--color-paper-soft)" />
+      {children}
+      {/* Walls after the children so furniture sits flush against their inner face. */}
       <rect
         x={0}
         y={0}
         width={width}
         height={length}
-        fill="var(--color-paper-soft)"
+        fill="none"
         stroke="var(--color-ink)"
         strokeWidth={wall}
       />
-      {children}
       {openings.map((opening, index) => {
         const wallLength = opening.wall === 'N' || opening.wall === 'S' ? width : length;
         const offset = Number.isFinite(opening.offsetCm)
