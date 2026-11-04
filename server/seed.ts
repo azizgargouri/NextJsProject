@@ -7,6 +7,7 @@ import { EmployeeModel } from './shared/database/models/employee.model';
 import { AttendanceModel } from './shared/database/models/attendance.model';
 import { LeaveRequestModel } from './shared/database/models/leave-request.model';
 import { WorkScheduleModel } from './shared/database/models/work-schedule.model';
+import { MoveModel } from './shared/database/models/move.model';
 import { PricingRuleModel } from './shared/database/models/pricing-rule.model';
 import { ContentEntryModel } from './shared/database/models/content-entry.model';
 import {
@@ -62,7 +63,7 @@ async function seed() {
   await seedHr(String(adminDoc._id), adminEmail.toLowerCase());
 
   // Demo client
-  await UserModel.findOneAndUpdate(
+  const clientDoc = await UserModel.findOneAndUpdate(
     { email: 'client@moveup.tn' },
     {
       $set: {
@@ -75,7 +76,7 @@ async function seed() {
       },
       $setOnInsert: { email: 'client@moveup.tn' },
     },
-    { upsert: true },
+    { upsert: true, returnDocument: 'after' },
   );
 
   // Omar (Smart layout client)
@@ -128,6 +129,52 @@ async function seed() {
     },
     { upsert: true },
   );
+
+  // Seed active live move for client@moveup.tn
+  if (clientDoc && moverDoc) {
+    const moveClientId = String(clientDoc._id);
+    const now = new Date();
+    await MoveModel.findOneAndUpdate(
+      { reference: 'MU-2026-004281' },
+      {
+        $set: {
+          clientId: moveClientId,
+          trackingToken: 'demo-tracking-token-2026',
+          pickupAddress: '12 Rue du Lac, Les Berges du Lac, Tunis',
+          destinationAddress: '8 Avenue Habib Bourguiba, La Marsa',
+          distance: 14,
+          volume: 3.33,
+          estimatedPrice: 185,
+          vehicle: { name: 'Moving van', capacity: 14, payload: 1800 },
+          mover: {
+            userId: moverId,
+            name: 'Mehdi Transport',
+            phone: '+21698123456',
+            companyName: 'Mehdi Transport',
+          },
+          currentStage: 'IN_TRANSIT',
+          items: [
+            { id: 'sofa', name: '3-Seater Upholstered Sofa', volume: 1.6, weight: 68, quantity: 1 },
+            { id: 'box', name: 'Standard Moving Box', volume: 0.08, weight: 14, quantity: 6 },
+            { id: 'table', name: 'Dining Table (Wood)', volume: 1.25, weight: 42, quantity: 1 },
+          ],
+          stages: [
+            { key: 'CONFIRMED', title: 'Booking confirmed', detail: 'Your move request has been confirmed and scheduled.', durationMinutes: 0, estimatedAt: new Date(now.getTime() - 7200000), completedAt: new Date(now.getTime() - 7200000) },
+            { key: 'ASSIGNED', title: 'Vehicle assigned', detail: 'A vetted vehicle and mover team have been assigned.', durationMinutes: 12, estimatedAt: new Date(now.getTime() - 6000000), completedAt: new Date(now.getTime() - 6000000) },
+            { key: 'EN_ROUTE', title: 'Driver en route', detail: 'Driver is travelling to your pickup location.', durationMinutes: 18, estimatedAt: new Date(now.getTime() - 4200000), completedAt: new Date(now.getTime() - 4200000) },
+            { key: 'ARRIVED', title: 'Vehicle arrives', detail: 'Driver arrives at pickup location and prepares loading.', durationMinutes: 5, estimatedAt: new Date(now.getTime() - 3600000), completedAt: new Date(now.getTime() - 3600000) },
+            { key: 'LOADING', title: 'Loading starts', detail: 'Furniture and boxes are inventoried and loaded into the vehicle.', durationMinutes: 45, estimatedAt: new Date(now.getTime() - 900000), completedAt: new Date(now.getTime() - 900000) },
+            { key: 'IN_TRANSIT', title: 'In transit', detail: 'Your cargo is securely on the road to destination.', durationMinutes: 26, estimatedAt: now, completedAt: null },
+            { key: 'DELIVERY', title: 'Delivery', detail: 'Unloading items at the delivery address.', durationMinutes: 35, estimatedAt: new Date(now.getTime() + 1500000), completedAt: null },
+            { key: 'COMPLETED', title: 'Move completed', detail: 'Move delivered. Please confirm and review your service.', durationMinutes: null, estimatedAt: new Date(now.getTime() + 3600000), completedAt: null },
+          ],
+        },
+        $setOnInsert: { reference: 'MU-2026-004281' },
+      },
+      { upsert: true },
+    );
+    console.log('Seeded live move: MU-2026-004281 (IN_TRANSIT) for client@moveup.tn');
+  }
 
   // Pricing rule — one active table (registry exclusivity is a service rule).
   await PricingRuleModel.findOneAndUpdate(

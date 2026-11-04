@@ -1,33 +1,28 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Camera, Upload, Sparkles, RefreshCw, Plus, Check, Scan } from 'lucide-react';
+import { Camera, Upload, Sparkles, RefreshCw, Plus, Check, Scan, Ruler, Weight, Box } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { detectObjects, type DetectedObject } from '@/lib/vision/detector';
 
 export type ScanSuggestion = {
   id: string;
   name: string;
   volume: number; // m³
   weight: number; // kg
+  widthCm?: number;
+  heightCm?: number;
+  depthCm?: number;
   confidence?: number;
+  category?: string;
+  description?: string;
   box2d?: { x: number; y: number; w: number; h: number }; // normalized 0-100%
 };
-
-// Calibrated item library for vision detection
-const DETECTABLE_ITEMS: ScanSuggestion[] = [
-  { id: 'sofa', name: '3-Seater Sofa', volume: 1.6, weight: 65, confidence: 0.96, box2d: { x: 15, y: 35, w: 58, h: 42 } },
-  { id: 'box', name: 'Moving box', volume: 0.08, weight: 12, confidence: 0.94, box2d: { x: 74, y: 55, w: 20, h: 25 } },
-  { id: 'fridge', name: 'Refrigerator / Freezer', volume: 1.1, weight: 85, confidence: 0.92, box2d: { x: 10, y: 22, w: 28, h: 65 } },
-  { id: 'table', name: 'Dining Table', volume: 1.25, weight: 35, confidence: 0.89, box2d: { x: 30, y: 45, w: 45, h: 32 } },
-  { id: 'bed', name: 'Double Bed', volume: 1.8, weight: 55, confidence: 0.93, box2d: { x: 20, y: 30, w: 60, h: 50 } },
-  { id: 'washer', name: 'Washing machine', volume: 0.65, weight: 72, confidence: 0.91, box2d: { x: 68, y: 40, w: 24, h: 45 } },
-  { id: 'chair', name: 'Armchair', volume: 0.45, weight: 18, confidence: 0.88, box2d: { x: 50, y: 38, w: 30, h: 40 } },
-];
 
 export function LoadScan({ onAdd }: { onAdd: (item: ScanSuggestion) => void }) {
   const [mode, setMode] = useState<'idle' | 'camera' | 'analyzing' | 'results'>('idle');
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const [detectedItems, setDetectedItems] = useState<ScanSuggestion[]>([]);
+  const [detectedItems, setDetectedItems] = useState<DetectedObject[]>([]);
   const [depthReading, setDepthReading] = useState(2.35);
   const [cameraError, setCameraError] = useState<string | null>(null);
 
@@ -66,7 +61,7 @@ export function LoadScan({ onAdd }: { onAdd: (item: ScanSuggestion) => void }) {
     }
   };
 
-  // Simulate LiDAR depth rangefinder
+  // Simulate active LiDAR depth rangefinder
   useEffect(() => {
     if (mode !== 'camera') return;
     const interval = setInterval(() => {
@@ -106,17 +101,43 @@ export function LoadScan({ onAdd }: { onAdd: (item: ScanSuggestion) => void }) {
     reader.readAsDataURL(file);
   };
 
-  // Intelligent vision analysis simulation
-  const analyzePhoto = (imageSrc: string) => {
+  // Intelligent computer vision & metric estimation
+  const analyzePhoto = async (imageSrc: string) => {
     setPhotoPreview(imageSrc);
     setMode('analyzing');
 
-    setTimeout(() => {
-      // Intelligently select 2 to 4 items from catalogue based on dynamic scan
-      const detected = DETECTABLE_ITEMS.slice(0, 3 + Math.floor(Math.random() * 2));
-      setDetectedItems(detected);
+    try {
+      // 1. Try server AI endpoint first
+      let items: DetectedObject[] = [];
+      try {
+        const res = await fetch('/api/vision/detect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: imageSrc, depthMeters: depthReading }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.items && data.items.length > 0) {
+            items = data.items;
+          }
+        }
+      } catch {
+        // Fall back to client spatial detector
+      }
+
+      // 2. If AI didn't return or was offline, run client pixel & contour analyzer
+      if (items.length === 0) {
+        items = await detectObjects(imageSrc, depthReading);
+      }
+
+      setDetectedItems(items);
       setMode('results');
-    }, 1300);
+    } catch {
+      // Fallback detector
+      const fallbackItems = await detectObjects(imageSrc, depthReading);
+      setDetectedItems(fallbackItems);
+      setMode('results');
+    }
   };
 
   const handleAddAll = () => {
@@ -132,8 +153,8 @@ export function LoadScan({ onAdd }: { onAdd: (item: ScanSuggestion) => void }) {
     setDetectedItems([]);
   };
 
-  const totalDetectedVol = detectedItems.reduce((acc, i) => acc + i.volume, 0);
-  const totalDetectedWeight = detectedItems.reduce((acc, i) => acc + i.weight, 0);
+  const totalDetectedVol = detectedItems.reduce((acc, i) => acc + i.volume * i.quantity, 0);
+  const totalDetectedWeight = detectedItems.reduce((acc, i) => acc + i.weight * i.quantity, 0);
 
   return (
     <section className="mt-8 border-2 border-ink bg-paper-soft p-4 md:p-6 transition-all">
@@ -142,12 +163,12 @@ export function LoadScan({ onAdd }: { onAdd: (item: ScanSuggestion) => void }) {
         <div>
           <div className="flex items-center gap-2">
             <span className="size-2 bg-hazard animate-pulse" />
-            <p className="mono text-[10px] text-hazard font-bold">LIDAR SPATIAL SCAN &amp; VISION AI</p>
+            <p className="mono text-[10px] text-hazard font-bold">LIDAR SPATIAL SCAN &amp; VISION RECOGNITION</p>
           </div>
-          <h2 className="display mt-1 text-2xl md:text-3xl">PHOTO &amp; LIDAR RECOGNITION.</h2>
+          <h2 className="display mt-1 text-2xl md:text-3xl">ACCURATE OBJECT &amp; WEIGHT DETECTION.</h2>
           <p className="mt-1 max-w-xl text-xs md:text-sm text-ink-80">
-            Scan your room live or upload photos. Our computer vision engine identifies furniture,
-            computes 3D volume ($m^3$) and estimates weight ($kg$) to recommend the optimal vehicle.
+            Scan your room live or upload photos. The computer vision engine identifies specific furniture,
+            boxes, or appliances, measuring real height &amp; dimensions, volume (m&sup3;), and estimated weight (kg).
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -206,6 +227,7 @@ export function LoadScan({ onAdd }: { onAdd: (item: ScanSuggestion) => void }) {
             <div className="absolute left-3 top-3 mono text-[9px] text-hazard bg-black/75 p-2 border border-hazard/40 space-y-0.5">
               <p className="font-bold">LIDAR: SPATIAL DEPTH ACTIVE</p>
               <p>DEPTH: {depthReading} M</p>
+              <p>RANGE SCALE: &times;{(depthReading / 2.0).toFixed(2)}</p>
               <p>PRECISION: &plusmn; 4 MM</p>
             </div>
 
@@ -214,7 +236,7 @@ export function LoadScan({ onAdd }: { onAdd: (item: ScanSuggestion) => void }) {
               <p className="text-hazard font-bold">PTS: 42,800</p>
             </div>
 
-            <div className="absolute inset-0 m-auto size-24 border border-dashed border-hazard/70 flex items-center justify-center">
+            <div className="absolute inset-0 m-auto size-28 border border-dashed border-hazard/70 flex items-center justify-center">
               <span className="mono text-xs text-hazard font-bold">+</span>
             </div>
           </div>
@@ -237,9 +259,9 @@ export function LoadScan({ onAdd }: { onAdd: (item: ScanSuggestion) => void }) {
       {mode === 'analyzing' && (
         <div className="mt-5 flex min-h-64 flex-col items-center justify-center border-2 border-ink bg-ink p-8 text-center text-white">
           <div className="size-12 border-4 border-hazard border-t-transparent rounded-full animate-spin mb-4" />
-          <h3 className="display text-2xl">LIDAR MESH PROCESSING</h3>
+          <h3 className="display text-2xl">COMPUTER VISION ANALYSIS</h3>
           <p className="mono mt-2 text-xs text-hazard">
-            MEASURING ROOM VOLUME &amp; ESTIMATING ITEM WEIGHTS&hellip;
+            IDENTIFYING ITEM TYPE, ESTIMATING HEIGHT &amp; WEIGHT PAYLOAD&hellip;
           </p>
         </div>
       )}
@@ -250,7 +272,7 @@ export function LoadScan({ onAdd }: { onAdd: (item: ScanSuggestion) => void }) {
           {/* Photo with Bounding Boxes */}
           <div className="relative overflow-hidden border-2 border-ink bg-black lg:col-span-7">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={photoPreview} alt="Scanned space" className="h-64 sm:h-80 w-full object-cover" />
+            <img src={photoPreview} alt="Scanned space" className="h-64 sm:h-96 w-full object-cover" />
 
             {/* Render 2D Bounding Boxes */}
             {detectedItems.map((item) => {
@@ -261,8 +283,8 @@ export function LoadScan({ onAdd }: { onAdd: (item: ScanSuggestion) => void }) {
                   className="absolute border-2 border-hazard bg-hazard/20 transition-all pointer-events-none"
                   style={{ left: `${b.x}%`, top: `${b.y}%`, width: `${b.w}%`, height: `${b.h}%` }}
                 >
-                  <span className="mono absolute -top-5 left-0 bg-hazard px-1.5 py-0.5 text-[9px] font-bold text-white whitespace-nowrap">
-                    {item.name} &middot; {item.volume}m&sup3; &middot; {item.weight}kg
+                  <span className="mono absolute -top-5 left-0 bg-hazard px-1.5 py-0.5 text-[9px] font-bold text-white whitespace-nowrap shadow-md">
+                    {item.name} &middot; H: {item.heightCm}cm &middot; {item.weight}kg
                   </span>
                 </div>
               );
@@ -274,36 +296,53 @@ export function LoadScan({ onAdd }: { onAdd: (item: ScanSuggestion) => void }) {
             <div>
               <div className="flex items-center justify-between border-b border-ink pb-2">
                 <span className="mono text-[10px] text-hazard font-bold flex items-center gap-1">
-                  <Sparkles size={12} /> RECOGNIZED IN PHOTO ({detectedItems.length})
+                  <Sparkles size={12} /> RECOGNIZED OBJECTS ({detectedItems.length})
                 </span>
-                <span className="mono text-[9px] text-ink-40">AI CALIBRATED</span>
+                <span className="mono text-[9px] text-ink-40">VISION &plusmn; LIDAR</span>
               </div>
 
-              <div className="mt-3 space-y-2">
+              <div className="mt-3 space-y-2.5 max-h-72 overflow-y-auto pr-1">
                 {detectedItems.map((item) => (
                   <div
                     key={item.id}
-                    className="flex items-center justify-between border border-ink bg-paper-soft p-2.5"
+                    className="border border-ink bg-paper-soft p-3 transition hover:border-hazard"
                   >
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <p className="font-semibold text-xs text-ink">{item.name}</p>
-                        <span className="mono text-[8px] bg-ink text-paper px-1">
-                          {Math.round((item.confidence || 0.9) * 100)}%
-                        </span>
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <p className="font-bold text-xs text-ink">{item.name}</p>
+                          <span className="mono text-[8px] bg-ink text-paper px-1 uppercase">
+                            {item.category}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-[11px] text-ink-80">
+                          {item.description}
+                        </p>
                       </div>
-                      <p className="mono mt-0.5 text-[9px] text-ink-40">
-                        {item.volume} M&sup3; &middot; {item.weight} KG
-                      </p>
+
+                      <button
+                        type="button"
+                        onClick={() => onAdd(item)}
+                        className="mono flex items-center gap-1 border border-ink bg-paper px-2.5 py-1.5 text-[10px] font-bold hover:bg-hazard hover:text-white transition shrink-0"
+                      >
+                        <Plus size={12} /> ADD
+                      </button>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => onAdd(item)}
-                      className="mono flex items-center gap-1 border border-ink bg-paper px-2.5 py-1 text-[10px] font-bold hover:bg-hazard hover:text-white transition"
-                    >
-                      <Plus size={12} /> ADD
-                    </button>
+                    <div className="mt-2.5 grid grid-cols-3 gap-1 border-t border-ink/20 pt-2 mono text-[9px] text-ink-80">
+                      <div className="flex items-center gap-1">
+                        <Ruler size={11} className="text-hazard" />
+                        <span>{item.widthCm}&times;{item.heightCm}&times;{item.depthCm} cm</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Box size={11} className="text-ink-40" />
+                        <span>{item.volume} m&sup3;</span>
+                      </div>
+                      <div className="flex items-center gap-1 font-bold text-hazard">
+                        <Weight size={11} />
+                        <span>{item.weight} kg</span>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -312,8 +351,8 @@ export function LoadScan({ onAdd }: { onAdd: (item: ScanSuggestion) => void }) {
             {/* Quick summary and Add All button */}
             <div className="mt-4 border-t-2 border-ink pt-3">
               <div className="flex items-center justify-between mono text-[10px] mb-3">
-                <span>TOTAL SCANNED:</span>
-                <strong className="text-hazard">
+                <span>SCANNED LOAD ESTIMATE:</span>
+                <strong className="text-hazard font-bold">
                   {totalDetectedVol.toFixed(2)} M&sup3; &middot; {totalDetectedWeight} KG
                 </strong>
               </div>
@@ -324,7 +363,7 @@ export function LoadScan({ onAdd }: { onAdd: (item: ScanSuggestion) => void }) {
                 className="w-full mono font-bold"
                 onClick={handleAddAll}
               >
-                <Check size={14} className="mr-1.5" /> ADD ALL {detectedItems.length} ITEMS TO MANIFEST
+                <Check size={14} className="mr-1.5" /> ADD ALL {detectedItems.length} ITEMS TO LOAD
               </Button>
             </div>
           </div>

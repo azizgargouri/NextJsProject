@@ -11,6 +11,7 @@ import { useWorkspace } from './workspace-context';
 const LINKS = [
   { href: '/dashboard', label: 'Overview', exact: true },
   { href: '/request', label: 'Book Move' },
+  { href: '/track', label: 'Live Tracking' },
   { href: '/dashboard/homes', label: 'Smart Rooms' },
   { href: '/dashboard/claims', label: 'Claims' },
   { href: '/dashboard/reviews', label: 'Reviews' },

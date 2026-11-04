@@ -14,22 +14,56 @@ export interface MoveCreatePayload {
   vehicleName?: string;
 }
 
-export interface MoveResponse {
-  move: {
-    id: string;
-    reference: string;
-    pickupAddress: string;
-    destinationAddress: string;
-    distance: number;
-    volume: number;
-    estimatedPrice: number;
-    trackingToken: string;
-    currentStage: string;
-    vehicle: {
-      name: string;
-      capacity: number;
-    };
+export interface MoveStageDto {
+  key: string;
+  title: string;
+  detail: string;
+  durationMinutes: number | null;
+  estimatedAt: string;
+  completedAt: string | null;
+}
+
+export interface MoveItemDto {
+  id: string;
+  name: string;
+  volume: number;
+  weight: number;
+  quantity: number;
+}
+
+export interface MoveDataDto {
+  id: string;
+  reference: string;
+  clientId: string;
+  pickupAddress: string;
+  destinationAddress: string;
+  distance: number;
+  volume: number;
+  estimatedPrice: number;
+  trackingToken?: string;
+  currentStage: string;
+  items?: MoveItemDto[];
+  vehicle: {
+    name: string;
+    capacity: number;
+    payload: number;
   };
+  mover: {
+    name: string;
+    phone: string;
+    companyName: string;
+  };
+  stages: MoveStageDto[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MoveResponse {
+  move: MoveDataDto;
+}
+
+export interface MovesListResponse {
+  moves: MoveDataDto[];
 }
 
 export const movesApi = {
@@ -37,10 +71,21 @@ export const movesApi = {
     const { data } = await axiosClient.post<MoveResponse>('/api/moves', payload);
     return data;
   },
-  getOne: async (id: string, token: string): Promise<MoveResponse> => {
-    const { data } = await axiosClient.get<MoveResponse>(`/api/moves/${id}`, {
-      params: { token },
+
+  list: async (): Promise<MovesListResponse> => {
+    const { data } = await axiosClient.get<MovesListResponse>('/api/moves');
+    return data;
+  },
+
+  getOne: async (identifier: string, token?: string): Promise<MoveResponse> => {
+    const { data } = await axiosClient.get<MoveResponse>(`/api/moves/${identifier}`, {
+      params: token ? { token } : undefined,
     });
+    return data;
+  },
+
+  advance: async (id: string, stage: string): Promise<MoveResponse> => {
+    const { data } = await axiosClient.patch<MoveResponse>(`/api/moves/${id}`, { stage });
     return data;
   },
 };

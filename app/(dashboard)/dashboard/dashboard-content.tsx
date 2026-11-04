@@ -25,6 +25,13 @@ export function DashboardContent() {
       icon: Truck,
     },
     {
+      href: '/track',
+      title: 'LIVE MOVE TRACKING',
+      meta: 'Real-time GPS route, telemetry & stages',
+      tag: 'ACTIVE MOVES',
+      icon: Truck,
+    },
+    {
       href: '/dashboard/homes',
       title: 'SMART ROOM LAYOUT',
       meta: 'Manage rooms & 2D layout planning',
@@ -55,6 +62,13 @@ export function DashboardContent() {
   ];
 
   const moverCells = [
+    {
+      href: '/track',
+      title: 'DISPATCH & TRACKING',
+      meta: 'View assigned moves & advance pipeline stages',
+      tag: 'LIVE OPERATIONS',
+      icon: Truck,
+    },
     {
       href: '/dashboard/claims',
       title: 'CLAIMS ABOUT ME',

@@ -1,2 +1,17 @@
+import type { Metadata } from 'next';
 import { MoveTracking } from '@/components/features/moves/move-tracking';
-export default async function TrackMoveByIdPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ token?: string }> }) { const [{ id }, { token }] = await Promise.all([params, searchParams]); return <MoveTracking moveId={id} trackingToken={token ?? ''} />; }
+
+export const metadata: Metadata = {
+  title: 'Track Move',
+};
+
+export default async function TrackMoveByIdPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ token?: string }>;
+}) {
+  const [{ id }, { token }] = await Promise.all([params, searchParams]);
+  return <MoveTracking moveId={id} trackingToken={token ?? ''} />;
+}
