@@ -21,19 +21,25 @@ import type { SignInInput, SignUpInput } from './auth.schema'; /**
  * Owns password checks, JWT issuance and refresh-token rotation.
  * Returns the serialized session DTO consumed by both controller and client store.
  */
+/** Device context recorded on the refresh-token document (display only, never trusted). */
+export interface SessionContext {
+  userAgent?: string | null;
+  sessionStartedAt?: Date | null;
+}
+
 export class AuthService {
   private readonly tokens = new AuthRepository();
   private readonly users = new UserService();
 
-  async signUp(input: SignUpInput): Promise<AuthSessionResponse> {
+  async signUp(input: SignUpInput, context: SessionContext = {}): Promise<AuthSessionResponse> {
     const user = await this.users.createUser(input);
     return serializeAuthSession({
       ...user,
-      tokens: await this.issueTokens(user.id, user.email, user.role),
+      tokens: await this.issueTokens(user.id, user.email, user.role, context),
     });
   }
 
-  async signIn(input: SignInInput): Promise<AuthSessionResponse> {
+  async signIn(input: SignInInput, context: SessionContext = {}): Promise<AuthSessionResponse> {
     const user = await this.users.findByEmail(input.email);
     if (!user) throw new InvalidCredentialsError();
 
@@ -43,7 +49,7 @@ export class AuthService {
 
     return serializeAuthSession({
       ...serializeUser(user),
-      tokens: await this.issueTokens(user.id, user.email, user.role),
+      tokens: await this.issueTokens(user.id, user.email, user.role, context),
     });
   }
 
@@ -62,9 +68,13 @@ export class AuthService {
     if (user.status === 'BLOCKED') throw new UserBlockedError();
 
     await this.tokens.revoke(stored.id);
+    // Rotation keeps the device identity and original start of the session.
     return serializeAuthSession({
       ...user,
-      tokens: await this.issueTokens(user.id, user.email, user.role),
+      tokens: await this.issueTokens(user.id, user.email, user.role, {
+        userAgent: stored.userAgent,
+        sessionStartedAt: stored.sessionStartedAt,
+      }),
     });
   }
 
@@ -86,6 +96,7 @@ export class AuthService {
     userId: string,
     email: string,
     role: UserResponse['role'],
+    context: SessionContext = {},
   ): Promise<TokenPair> {
     void email;
     const accessToken = await generateAccessToken({ sub: userId, email, role });
@@ -95,6 +106,8 @@ export class AuthService {
       userId,
       tokenHash: sha256Hex(refreshToken),
       ttlSeconds: env().REFRESH_TOKEN_TTL,
+      userAgent: context.userAgent ?? null,
+      sessionStartedAt: context.sessionStartedAt ?? null,
     });
 
     void accessToken;

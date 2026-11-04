@@ -14,6 +14,10 @@ export interface UserDoc {
   role: Role;
   locale: string;
   status: UserStatus;
+  /** Object-storage key of the current avatar (null when none). */
+  avatarKey: string | null;
+  /** Notifications created after this instant count as unread. */
+  notificationsSeenAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
@@ -38,6 +42,8 @@ const UserSchema = new Schema<UserDoc>(
     role: { type: String, enum: [...ROLES], default: 'CLIENT' },
     locale: { type: String, enum: ['en', 'fr', 'ar'], default: 'en' },
     status: { type: String, enum: [...USER_STATUSES], default: 'ACTIVE' },
+    avatarKey: { type: String, default: null },
+    notificationsSeenAt: { type: Date, default: null },
     deletedAt: { type: Date, default: null },
   },
   { timestamps: true },
