@@ -7,6 +7,13 @@ import { EmployeeModel } from './shared/database/models/employee.model';
 import { AttendanceModel } from './shared/database/models/attendance.model';
 import { LeaveRequestModel } from './shared/database/models/leave-request.model';
 import { WorkScheduleModel } from './shared/database/models/work-schedule.model';
+import { PricingRuleModel } from './shared/database/models/pricing-rule.model';
+import { ContentEntryModel } from './shared/database/models/content-entry.model';
+import {
+  CONTENT_DEFAULTS,
+  CONTENT_KEYS,
+  CONTENT_LOCALES,
+} from './modules/content/content.constants';
 
 // Load .env for standalone execution (Next.js pipelines export it in server runtime).
 try {
@@ -104,7 +111,49 @@ async function seed() {
     { upsert: true },
   );
 
-  console.log('Seed complete: admin, client, mover + moverProfile (demo accounts).');
+  // Pricing rule — one active table (registry exclusivity is a service rule).
+  await PricingRuleModel.findOneAndUpdate(
+    { name: 'MoveUp Standard 2026' },
+    {
+      $set: {
+        status: 'ACTIVE',
+        currency: 'TND',
+        baseFare: 45,
+        perKm: 1.2,
+        perM3: 18,
+        expressSurcharge: 20,
+        minQuote: 60,
+        effectiveFrom: new Date('2026-01-01T00:00:00.000Z'),
+        effectiveTo: null,
+        deletedAt: null,
+      },
+      $setOnInsert: { name: 'MoveUp Standard 2026' },
+    },
+    { upsert: true, returnDocument: 'after' },
+  );
+  // Never keep two ACTIVE rules after a seed.
+  await PricingRuleModel.updateMany(
+    { name: { $ne: 'MoveUp Standard 2026' }, status: 'ACTIVE' },
+    { $set: { status: 'RETIRED' } },
+  );
+
+  // Content entries — per-locale registry seeded with the in-code defaults.
+  for (const locale of CONTENT_LOCALES) {
+    for (const key of Object.keys(CONTENT_KEYS)) {
+      await ContentEntryModel.findOneAndUpdate(
+        { key, locale },
+        {
+          $set: { value: CONTENT_DEFAULTS[key] ?? '' },
+          $setOnInsert: { key, locale },
+        },
+        { upsert: true },
+      );
+    }
+  }
+
+  console.log(
+    'Seed complete: admin, client, mover + moverProfile, pricing rule, content entries (en/fr/ar).',
+  );
 }
 
 /**

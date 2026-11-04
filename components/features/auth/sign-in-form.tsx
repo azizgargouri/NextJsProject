@@ -64,7 +64,7 @@ export function SignInForm() {
         if (redirectTarget) {
           router.push(redirectTarget);
         } else if (response.user.role === 'ADMIN') {
-          router.push('/dashboard');
+          router.push('/admin');
         } else if (response.user.role === 'MOVER') {
           router.push('/me');
         } else {

@@ -7,3 +7,6 @@ export { AttendanceModel, type AttendanceDoc, type AttendanceLocation } from './
 export { LeaveRequestModel, type LeaveRequestDoc } from './leave-request.model';
 export { WorkScheduleModel, type WorkScheduleDoc } from './work-schedule.model';
 export { MoveModel, type MoveDoc, type MoveStage, type MoveStageKey } from './move.model';
+export { AuditEventModel, type AuditEventDoc } from './audit-event.model';
+export { PricingRuleModel, type PricingRuleDoc } from './pricing-rule.model';
+export { ContentEntryModel, type ContentEntryDoc } from './content-entry.model';

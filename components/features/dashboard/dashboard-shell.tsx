@@ -9,6 +9,7 @@ import { useSignOut } from '@/hooks/content/auth/use-sign-out';
 
 const HR_NAV = [
   { href: '/dashboard', label: 'Workspace' },
+  { href: '/admin', label: 'Admin Back-Office' },
   { href: '/employees', label: 'Employees' },
   { href: '/attendance', label: 'Attendance' },
   { href: '/leave', label: 'Leave' },
@@ -34,11 +35,16 @@ export function DashboardLayout({
   const signOut = useSignOut();
 
   useEffect(() => {
-    if (useAuthStore.persist?.hasHydrated?.()) {
+    const persistence = useAuthStore.persist;
+    if (!persistence) {
       setHydrated(true);
       return;
     }
-    const unsubscribe = useAuthStore.persist?.onFinishHydration?.(() => setHydrated(true));
+    if (persistence.hasHydrated?.()) {
+      setHydrated(true);
+      return;
+    }
+    const unsubscribe = persistence.onFinishHydration?.(() => setHydrated(true));
     const timer = window.setTimeout(() => setHydrated(true), 60);
 
     return () => {

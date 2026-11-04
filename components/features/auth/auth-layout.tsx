@@ -38,7 +38,7 @@ export function AuthLayout({ children }: { children: React.ReactNode }) {
               <div className="flex items-center gap-3">
                 <Link
                   href={
-                    user.role === 'ADMIN' ? '/dashboard' : user.role === 'MOVER' ? '/me' : '/request'
+                    user.role === 'ADMIN' ? '/admin' : user.role === 'MOVER' ? '/me' : '/request'
                   }
                   className="mono border border-ink bg-ink px-3 py-1 text-[10px] font-bold text-paper hover:bg-hazard hover:text-white transition"
                 >

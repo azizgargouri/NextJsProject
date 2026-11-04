@@ -141,3 +141,146 @@ export interface CheckInResponse {
   updatedLocation?: boolean;
   attendance: AttendanceDto;
 }
+
+/* --- Admin Back-Office DTOs --- */
+
+export interface AdminOverviewDto {
+  users: {
+    total: number;
+    active: number;
+    blocked: number;
+    clients: number;
+    movers: number;
+    admins: number;
+    registeredLast30Days: number;
+  };
+  movers: {
+    pendingReview: number;
+    approved: number;
+  };
+}
+
+export interface AdminUsersQuery extends QueryParams {
+  role?: UserRole | 'ALL';
+  status?: UserStatus | 'ALL';
+}
+
+export type AuditEventType =
+  | 'SIGNIN'
+  | 'SIGNOUT'
+  | 'SIGNUP'
+  | 'REFRESH_TOKEN'
+  | 'USER_CREATE'
+  | 'USER_UPDATE'
+  | 'USER_DELETE'
+  | 'USER_STATUS'
+  | 'PRICING_CREATE'
+  | 'PRICING_UPDATE'
+  | 'PRICING_DELETE'
+  | 'CONTENT_UPDATE'
+  | 'EMPLOYEE_CREATE'
+  | 'EMPLOYEE_UPDATE'
+  | 'ATTENDANCE_CHECKIN'
+  | 'LEAVE_CREATE'
+  | 'LEAVE_DECIDE';
+
+export interface AuditEventDto {
+  id: string;
+  event: AuditEventType;
+  userId: string | null;
+  actor: { id: string; name: string; email: string } | null;
+  method: string;
+  api: string;
+  logInfo: Record<string, string | undefined>;
+  createdAt: string;
+}
+
+export interface AdminAuditQuery extends QueryParams {
+  event?: AuditEventType | 'ALL';
+}
+
+export interface AdminUserCreatePayload {
+  name: string;
+  email: string;
+  phone: string;
+  password: string;
+  role: UserRole;
+  locale: 'en' | 'fr' | 'ar';
+  status: UserStatus;
+}
+
+export interface AdminUserUpdatePayload {
+  name?: string;
+  email?: string;
+  phone?: string;
+  password?: string;
+  role?: UserRole;
+  locale?: 'en' | 'fr' | 'ar';
+  status?: UserStatus;
+}
+
+export type PricingStatus = 'ACTIVE' | 'RETIRED';
+
+export interface PricingRuleDto {
+  id: string;
+  name: string;
+  status: PricingStatus;
+  currency: string;
+  baseFare: number;
+  perKm: number;
+  perM3: number;
+  expressSurcharge: number;
+  minQuote: number;
+  effectiveFrom: string;
+  effectiveTo: string | null;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminPricingQuery extends QueryParams {
+  status?: PricingStatus | 'ALL';
+}
+
+export interface PricingRulePayload {
+  name: string;
+  status: PricingStatus;
+  baseFare: number;
+  perKm: number;
+  perM3: number;
+  expressSurcharge: number;
+  minQuote: number;
+  effectiveFrom: string;
+  effectiveTo: string | null;
+}
+
+export interface ContentEntryDto {
+  key: string;
+  label: string;
+  value: string;
+  default: string;
+  overridden: boolean;
+  multiline: boolean;
+}
+
+export interface ContentSectionDto {
+  section: 'hero' | 'steps' | 'coverage';
+  title: string;
+  description: string;
+  entries: ContentEntryDto[];
+}
+
+export interface ContentBundleDto {
+  locale: 'en' | 'fr' | 'ar';
+  sections: ContentSectionDto[];
+}
+
+export interface ContentSavePayload {
+  locale: 'en' | 'fr' | 'ar';
+  entries: { key: string; value: string }[];
+}
+
+export interface ContentResetPayload {
+  locale: 'en' | 'fr' | 'ar';
+  keys: string[];
+}

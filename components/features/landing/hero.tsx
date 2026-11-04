@@ -11,12 +11,29 @@ if (typeof window !== 'undefined') {
   gsap.registerPlugin(ScrollTrigger);
 }
 
+export interface HeroCopy {
+  titleLine1?: string;
+  titleLine2?: string;
+  subtitle?: string;
+  primaryCta?: string;
+  secondaryCta?: string;
+}
+
+const DEFAULTS: Required<HeroCopy> = {
+  titleLine1: 'EVERY MOVE',
+  titleLine2: 'ON THE RECORD.',
+  subtitle:
+    'One request. Vetted movers. A tracked timeline from quote to keys on the table. MoveUp lets you request a move in under five minutes and watch it happen — with a full record of every address, price and status change.',
+  primaryCta: 'REQUEST A MOVE >>>',
+  secondaryCta: 'SEE HOW IT WORKS',
+};
+
 /**
  * Hero — Attention block.
  * Editorial asymmetry: macro display type (2 lines max), telemetry margin
  * columns, full-width image strip that scales in on load and drifts on scroll.
  */
-export function Hero() {
+export function Hero({ copy = {} }: { copy?: HeroCopy }) {
   const rootRef = useRef<HTMLElement>(null);
 
   useGSAP(
@@ -60,8 +77,8 @@ export function Hero() {
     { scope: rootRef },
   );
 
-  const line1 = 'EVERY MOVE';
-  const line2 = 'ON THE RECORD.';
+  const line1 = copy.titleLine1 ?? DEFAULTS.titleLine1;
+  const line2 = copy.titleLine2 ?? DEFAULTS.titleLine2;
 
   return (
     <section
@@ -110,9 +127,7 @@ export function Hero() {
           data-hero-fade
           className="mt-8 max-w-[46ch] text-base leading-relaxed text-ink-80 md:text-lg"
         >
-          One request. Vetted movers. A tracked timeline from quote to keys on the table. MoveUp
-          lets you request a move in under five minutes and watch it happen — with a full record of
-          every address, price and status change.
+          {copy.subtitle ?? DEFAULTS.subtitle}
         </p>
 
         <div data-hero-fade className="mt-10 flex flex-wrap items-center gap-4">
@@ -120,13 +135,13 @@ export function Hero() {
             href="/request"
             className="mono inline-flex h-14 items-center bg-hazard px-8 text-xs text-white transition-colors hover:bg-ink hover:text-paper"
           >
-            REQUEST A MOVE &gt;&gt;&gt;
+            {copy.primaryCta ?? DEFAULTS.primaryCta}
           </Link>
           <Link
             href="/#how-it-works"
             className="mono border-b-2 border-ink pb-1 text-[11px] text-ink hover:border-hazard hover:text-hazard"
           >
-            SEE HOW IT WORKS
+            {copy.secondaryCta ?? DEFAULTS.secondaryCta}
           </Link>
         </div>
       </div>
