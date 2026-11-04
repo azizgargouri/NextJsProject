@@ -84,7 +84,7 @@ export function DashboardContent() {
     <div>
       <p className="mono text-[10px] text-hazard">{role || 'CLIENT'} WORKSPACE</p>
       <h1 className="display mt-2 text-4xl md:text-6xl">
-        HELLO{user?.name ? `, ${user.name.split(' ')[0].toUpperCase()}` : ''}.
+        HELLO{user?.name ? `, ${user.name.split(' ')[0]?.toUpperCase() ?? ''}` : ''}.
       </h1>
       <p className="mono mt-4 text-[11px] text-ink-80">
         MANAGE MOVES, QUOTES, SMART ROOM LAYOUTS, CLAIMS &amp; RATINGS.

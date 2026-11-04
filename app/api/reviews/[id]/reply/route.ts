@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { NextResponse } from 'next/server';
 import { errorResponse, requireRole } from '@/server/shared/auth/guards';
 import { parseBody } from '@/server/shared/http/validate';

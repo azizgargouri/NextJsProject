@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { NextResponse } from 'next/server';
 import { errorResponse } from '@/server/shared/auth/guards';
 import { reviewsService } from '@/server/modules/reviews';

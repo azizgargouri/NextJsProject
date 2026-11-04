@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { NextResponse } from 'next/server';
 import { convertToModelMessages, stepCountIs, streamText, type UIMessage } from 'ai';
 import { errorResponse } from '@/server/shared/auth/guards';

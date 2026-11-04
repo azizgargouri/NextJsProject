@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { NextResponse } from 'next/server';
 import { adminService } from '@/server/modules/admin';
 import { errorResponse, requireAdmin } from '@/server/shared/auth/guards';

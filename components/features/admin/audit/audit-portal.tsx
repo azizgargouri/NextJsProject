@@ -30,6 +30,11 @@ const EVENT_LABELS: Record<AuditEventType, string> = {
   REVIEW_REPLY: 'Mover replied',
   REVIEW_MODERATE: 'Review moderated',
   AI_REQUEST: 'AI request',
+  EMPLOYEE_CREATE: 'Employee created',
+  EMPLOYEE_UPDATE: 'Employee updated',
+  ATTENDANCE_CHECKIN: 'Attendance check-in',
+  LEAVE_CREATE: 'Leave requested',
+  LEAVE_DECIDE: 'Leave decision',
 };
 
 const EVENT_VARIANTS: Record<AuditEventType, 'default' | 'secondary' | 'destructive'> = {
@@ -52,6 +57,11 @@ const EVENT_VARIANTS: Record<AuditEventType, 'default' | 'secondary' | 'destruct
   REVIEW_REPLY: 'secondary',
   REVIEW_MODERATE: 'destructive',
   AI_REQUEST: 'secondary',
+  EMPLOYEE_CREATE: 'default',
+  EMPLOYEE_UPDATE: 'default',
+  ATTENDANCE_CHECKIN: 'secondary',
+  LEAVE_CREATE: 'secondary',
+  LEAVE_DECIDE: 'default',
 };
 
 const eventOptions = [

@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { NextResponse } from 'next/server';
 import { connectMongo } from '@/server/shared/database/mongoose';
 import { UserModel } from '@/server/shared/database/models/user.model';

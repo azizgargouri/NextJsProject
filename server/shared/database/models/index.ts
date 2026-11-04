@@ -10,7 +10,7 @@ export { MoveModel, type MoveDoc, type MoveStage, type MoveStageKey } from './mo
 export { AuditEventModel, type AuditEventDoc } from './audit-event.model';
 export { PricingRuleModel, type PricingRuleDoc } from './pricing-rule.model';
 export { ContentEntryModel, type ContentEntryDoc } from './content-entry.model';
-export { HomeModel, type HomeDoc, type RoomDoc, type RoomPlacedItemDoc } from './home.model';
+export { HomeModel, type HomeDoc, type RoomDoc, type OpeningDoc } from './home.model';
 export { ClaimModel, type ClaimDoc, type ClaimEvent } from './claim.model';
 export { ReviewModel, type ReviewDoc } from './review.model';
 export { AiMessageModel, type AiMessageDoc } from './ai-message.model';

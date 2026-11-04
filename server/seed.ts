@@ -78,6 +78,24 @@ async function seed() {
     { upsert: true },
   );
 
+  // Omar (Smart layout client)
+  await UserModel.findOneAndUpdate(
+    { email: 'omar.client@moveup.tn' },
+    {
+      $set: {
+        passwordHash: demoHash,
+        name: 'Omar Test Client',
+        phone: '+21622000111',
+        role: 'CLIENT',
+        locale: 'en',
+        status: 'ACTIVE',
+        deletedAt: null,
+      },
+      $setOnInsert: { email: 'omar.client@moveup.tn' },
+    },
+    { upsert: true },
+  );
+
   // Demo mover (approved) + mover profile
   const moverDoc = await UserModel.findOneAndUpdate(
     { email: 'mover@moveup.tn' },

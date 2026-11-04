@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { streamText } from 'ai';
 import { errorResponse } from '@/server/shared/auth/guards';
 import { requireSessionUser } from '@/server/shared/auth/session';

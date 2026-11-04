@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { employeesController } from '@/server/modules/employees/employees.controller';
 import type { NextRequest } from 'next/server';
 
