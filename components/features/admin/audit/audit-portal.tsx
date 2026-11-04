@@ -19,6 +19,10 @@ const EVENT_LABELS: Record<AuditEventType, string> = {
   USER_UPDATE: 'User updated',
   USER_DELETE: 'User deleted',
   USER_STATUS: 'User status changed',
+  PRICING_CREATE: 'Pricing rule created',
+  PRICING_UPDATE: 'Pricing rule updated',
+  PRICING_DELETE: 'Pricing rule deleted',
+  CONTENT_UPDATE: 'Content updated',
 };
 
 const EVENT_VARIANTS: Record<AuditEventType, 'default' | 'secondary' | 'destructive'> = {
@@ -30,6 +34,10 @@ const EVENT_VARIANTS: Record<AuditEventType, 'default' | 'secondary' | 'destruct
   USER_UPDATE: 'default',
   USER_DELETE: 'destructive',
   USER_STATUS: 'destructive',
+  PRICING_CREATE: 'default',
+  PRICING_UPDATE: 'default',
+  PRICING_DELETE: 'destructive',
+  CONTENT_UPDATE: 'default',
 };
 
 const eventOptions = [

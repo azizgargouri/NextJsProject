@@ -54,8 +54,8 @@ export const adminNavGroups: AdminNavGroup[] = [
   {
     label: 'Control',
     items: [
-      { label: 'Pricing rules', href: '/admin/pricing', icon: BadgeDollarSign, upcoming: true },
-      { label: 'Content', href: '/admin/content', icon: FileText, upcoming: true },
+      { label: 'Pricing rules', href: '/admin/pricing', icon: BadgeDollarSign },
+      { label: 'Content', href: '/admin/content', icon: FileText },
       { label: 'Audit log', href: '/admin/audit', icon: History },
     ],
   },

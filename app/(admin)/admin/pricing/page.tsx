@@ -1,18 +1,8 @@
 import type { Metadata } from 'next';
-import { AdminModuleNotConnected } from '@/components/features/admin/admin-module-not-connected';
+import { PricingPortal } from '@/components/features/admin/pricing/pricing-portal';
 
 export const metadata: Metadata = { title: 'Pricing rules' };
 
 export default function AdminPricingPage() {
-  return (
-    <AdminModuleNotConnected
-      label="Pricing rules"
-      description="Tune base fares, distance and volume multipliers, and service surcharges."
-      planned={[
-        'Rule table with effective dates and version history',
-        'Distance and volume multiplier editor with validation',
-        'Quote simulation against pending move requests',
-      ]}
-    />
-  );
+  return <PricingPortal />;
 }

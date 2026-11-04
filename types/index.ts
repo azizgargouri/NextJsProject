@@ -88,7 +88,11 @@ export type AuditEventType =
   | 'USER_CREATE'
   | 'USER_UPDATE'
   | 'USER_DELETE'
-  | 'USER_STATUS';
+  | 'USER_STATUS'
+  | 'PRICING_CREATE'
+  | 'PRICING_UPDATE'
+  | 'PRICING_DELETE'
+  | 'CONTENT_UPDATE';
 
 export interface AuditEventDto {
   id: string;
@@ -123,4 +127,70 @@ export interface AdminUserUpdatePayload {
   role?: UserRole;
   locale?: 'en' | 'fr' | 'ar';
   status?: UserStatus;
+}
+
+export type PricingStatus = 'ACTIVE' | 'RETIRED';
+
+export interface PricingRuleDto {
+  id: string;
+  name: string;
+  status: PricingStatus;
+  currency: string;
+  baseFare: number;
+  perKm: number;
+  perM3: number;
+  expressSurcharge: number;
+  minQuote: number;
+  effectiveFrom: string;
+  effectiveTo: string | null;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminPricingQuery extends QueryParams {
+  status?: PricingStatus | 'ALL';
+}
+
+export interface PricingRulePayload {
+  name: string;
+  status: PricingStatus;
+  baseFare: number;
+  perKm: number;
+  perM3: number;
+  expressSurcharge: number;
+  minQuote: number;
+  effectiveFrom: string;
+  effectiveTo: string | null;
+}
+
+export interface ContentEntryDto {
+  key: string;
+  label: string;
+  value: string;
+  default: string;
+  overridden: boolean;
+  multiline: boolean;
+}
+
+export interface ContentSectionDto {
+  section: 'hero' | 'steps' | 'coverage';
+  title: string;
+  description: string;
+  entries: ContentEntryDto[];
+}
+
+export interface ContentBundleDto {
+  locale: 'en' | 'fr' | 'ar';
+  sections: ContentSectionDto[];
+}
+
+export interface ContentSavePayload {
+  locale: 'en' | 'fr' | 'ar';
+  entries: { key: string; value: string }[];
+}
+
+export interface ContentResetPayload {
+  locale: 'en' | 'fr' | 'ar';
+  keys: string[];
 }

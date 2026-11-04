@@ -2,11 +2,17 @@ import { axiosClient } from './client';
 import type {
   AdminAuditQuery,
   AdminOverviewDto,
+  AdminPricingQuery,
   AdminUserCreatePayload,
   AdminUserUpdatePayload,
   AdminUsersQuery,
   AuditEventDto,
+  ContentBundleDto,
+  ContentResetPayload,
+  ContentSavePayload,
   PageDto,
+  PricingRuleDto,
+  PricingRulePayload,
   ResponseUserDto,
   UserStatus,
 } from '@/types';
@@ -70,5 +76,67 @@ export const adminApi = {
   deleteUser: async (id: string): Promise<ResponseUserDto> => {
     const { data } = await axiosClient.delete<{ user: ResponseUserDto }>(`/api/admin/users/${id}`);
     return data.user;
+  },
+
+  pricing: async (query: AdminPricingQuery): Promise<PageDto<PricingRuleDto>> => {
+    const params = new URLSearchParams();
+    if (query.page) params.set('page', String(query.page));
+    if (query.limit) params.set('limit', String(query.limit));
+    if (query.search) params.set('search', query.search);
+    if (query.sort) params.set('sort', query.sort);
+    if (query.status && query.status !== 'ALL') params.set('status', query.status);
+    const { data } = await axiosClient.get<PageDto<PricingRuleDto>>('/api/admin/pricing', {
+      params,
+    });
+    return data;
+  },
+
+  createPricingRule: async (payload: PricingRulePayload): Promise<PricingRuleDto> => {
+    const { data } = await axiosClient.post<{ rule: PricingRuleDto }>(
+      '/api/admin/pricing',
+      payload,
+    );
+    return data.rule;
+  },
+
+  updatePricingRule: async (
+    id: string,
+    payload: Partial<PricingRulePayload>,
+  ): Promise<PricingRuleDto> => {
+    const { data } = await axiosClient.patch<{ rule: PricingRuleDto }>(
+      `/api/admin/pricing/${id}`,
+      payload,
+    );
+    return data.rule;
+  },
+
+  deletePricingRule: async (id: string): Promise<PricingRuleDto> => {
+    const { data } = await axiosClient.delete<{ rule: PricingRuleDto }>(`/api/admin/pricing/${id}`);
+    return data.rule;
+  },
+
+  content: async (locale: 'en' | 'fr' | 'ar'): Promise<ContentBundleDto> => {
+    const { data } = await axiosClient.get<ContentBundleDto>('/api/admin/content', {
+      params: { locale },
+    });
+    return data;
+  },
+
+  saveContent: async (payload: ContentSavePayload): Promise<{ locale: string; saved: number }> => {
+    const { data } = await axiosClient.patch<{ locale: string; saved: number }>(
+      '/api/admin/content',
+      payload,
+    );
+    return data;
+  },
+
+  resetContent: async (
+    payload: ContentResetPayload,
+  ): Promise<{ locale: string; reset: number }> => {
+    const { data } = await axiosClient.patch<{ locale: string; reset: number }>(
+      '/api/admin/content?mode=reset',
+      payload,
+    );
+    return data;
   },
 };
