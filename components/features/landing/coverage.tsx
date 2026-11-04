@@ -24,7 +24,7 @@ const CITIES = [
   { code: 'KAI', name: 'KAIROUAN', note: 'CENTER SECTOR', seed: 'moveup-kairouan', rows: 1 },
 ];
 
-export function Coverage() {
+export function Coverage({ intro }: { intro?: string }) {
   const rootRef = useRef<HTMLElement>(null);
 
   useGSAP(
@@ -85,9 +85,8 @@ export function Coverage() {
           <div className="md:sticky md:top-28">
             <SectionHeading index="03 —" title="[ COVERAGE ]" className="mb-8" />
             <p className="max-w-[34ch] text-sm leading-relaxed text-ink-80">
-              Six operating centers, city rates, no distance guesswork. The estimator prices by
-              sector — surface, rooms, floors, elevator and address distance are all recorded per
-              request.
+              {intro ??
+                'Six operating centers, city rates, no distance guesswork. The estimator prices by sector — surface, rooms, floors, elevator and address distance are all recorded per request.'}
             </p>
             <p className="mono mt-6 text-[10px] text-hazard">V-02 ESTIMATOR — ROADMAP CH.9</p>
           </div>

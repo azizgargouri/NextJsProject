@@ -46,9 +46,16 @@ const STEPS = [
   },
 ];
 
-export function HowItWorks() {
+export function HowItWorks({ steps }: { steps?: { title: string; body: string }[] }) {
   const rootRef = useRef<HTMLElement>(null);
   const carrierRef = useRef<HTMLDivElement>(null);
+
+  // DB-managed copy (per-step title/body) overrides the designed defaults.
+  const copy = STEPS.map((step, index) => ({
+    ...step,
+    title: steps?.[index]?.title ?? step.title,
+    body: steps?.[index]?.body ?? step.body,
+  }));
 
   useGSAP(
     () => {
@@ -112,7 +119,7 @@ export function HowItWorks() {
         <div className="h-dvh overflow-hidden">
           <div className="flex h-full items-center pb-16">
             <div ref={carrierRef} className="flex gap-px bg-ink px-6">
-              {STEPS.map((step, index) => (
+              {copy.map((step, index) => (
                 <article
                   key={step.stage}
                   className="flex w-[68vw] max-w-[880px] shrink-0 gap-0 border bg-paper lg:w-[52vw]"
@@ -160,7 +167,7 @@ export function HowItWorks() {
       {/* Mobile stacked fallback */}
       <div className="px-4 pb-24 md:hidden">
         <div className="grid grid-cols-1 gap-px border border-ink bg-ink">
-          {STEPS.map((step) => (
+          {copy.map((step) => (
             <article key={step.stage} className="bg-paper p-6">
               <p className="mono text-[10px] text-hazard">
                 {step.stage} — {step.status}
