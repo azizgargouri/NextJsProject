@@ -114,7 +114,13 @@ Mongoose v9 specifics: no `FilterQuery` export (use `Record<string, unknown>`), 
 ## Current state (all committed and pushed)
 
 - Auth module complete (sign-up/sign-in/sign-out/refresh/me, JWT + refresh tokens, guards). Roles: ADMIN, CLIENT, MOVER (+ MOVER profile model).
-- Public landing: full Swiss-print AIDA page with GSAP; hero + how-it-works steps + coverage intro now come from managed content (Mongo override or in-code defaults, `force-dynamic`, DB failure falls back gracefully).
+- Public landing (rebuilt after the first impeccable critique, snapshot in `.impeccable/critique/`): Swiss-print AIDA page with GSAP + **Lenis** smooth scroll (`components/features/landing/smooth-scroll.tsx`, landing only, driven by `gsap.ticker`, off under reduced motion, same-page anchors offset for the 56px nav).
+  - Order: Nav → Hero → Marquee → Commitments → Services → How it works (desktop pin, one viewport tall, progress bar) → Manifesto → **Estimator** → Coverage → Movers → FAQ → Close → Footer.
+  - EN/FR: cookie `moveup_locale` (nav switch + `router.refresh()`), dictionaries `lib/i18n/landing/{en,fr}.ts` (plain strings, `fill()` for `{tokens}`); managed copy per locale via `contentDefaults(locale)` (Arabic falls back to English).
+  - Estimator reads the live ACTIVE pricing rule (`PricingService.findActivePublic()`) and uses the shared pure `lib/pricing/estimate.ts` (reuse it for real quotes). No live rule → honest "pricing being updated" state.
+  - Honesty rules: no invented metrics, registrations, dates or cities. Launch cities are Tunis, Sfax, Sousse only. Photos are openly licensed Wikimedia Commons files in `public/images/landing/` with credits in `components/features/landing/photos.ts` (rendered in the footer) — keep attribution when adding photos.
+  - Type floor: mono labels ≥11px; small red text uses `text-hazard-ink` on paper and `text-hazard-glow` on ink; muted text uses `text-ink-60` (not `ink-40`).
+  - Mover CTAs link to `/sign-up?role=MOVER` (preselects the role).
 - Back office shell (light/dark/system theme, one blue accent, 4px rhythm) + overview module (real counters) + Users CRUD + real Audit log portal.
 - Pricing rules module: complete CRUD, activation exclusivity (one ACTIVE rule; activation auto-retires others), versioning, soft delete, effective-window validation, seed rule "MoveUp Standard 2026".
 - Content module: 14 managed keys × 3 locales over the landing copy; save-per-section; restore defaults (removes DB overrides); seed writes defaults for en/fr/ar.
@@ -138,6 +144,7 @@ Mongoose v9 specifics: no `FilterQuery` export (use `Record<string, unknown>`), 
 4. Lint failures during `next build`: unused variables (`@typescript-eslint/no-unused-vars`) are build-breaking errors — clean imports before building.
 5. zod: `.partial()` on a schema that has `.refine()` throws at build ("page data collection") — restructure as base + refine (see `server/modules/pricing/pricing.schema.ts`).
 6. Prettier: pass explicit file paths; glob braces do not expand in this shell.
+6b. Display text with diacritics inside `overflow-hidden` reveal masks needs headroom (`pt-[0.2em] -mt-[0.2em]`) or French capitals lose their accents.
 7. Before committing UI work run the impeccable checker: `node /Users/Apple/.agents/skills/impeccable/scripts/detect.mjs --json <files>`.
 
 ## Git workflow
