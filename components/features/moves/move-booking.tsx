@@ -7,6 +7,7 @@ import { ArrowRight, Minus, Plus, Truck, WifiOff, Weight, Box, UserCheck, LogIn,
 import { Button } from '@/components/ui/button';
 import { LoadScan, type ScanSuggestion } from './load-scan';
 import { RouteMapPicker } from './route-map-picker';
+import { BookingSignatureModal } from './booking-signature-modal';
 import { useAuthStore } from '@/hooks/stores/auth-store';
 import { api, ensureAccessToken } from '@/lib/api';
 
@@ -53,6 +54,7 @@ export function MoveBooking() {
   const [scheduledSlot, setScheduledSlot] = useState<string>('TODAY_EXPRESS');
   const [floorLevel, setFloorLevel] = useState<number>(0);
   const [hasElevator, setHasElevator] = useState<boolean>(true);
+  const [showSignatureModal, setShowSignatureModal] = useState<boolean>(false);
 
   useEffect(() => {
     setMounted(true);
@@ -146,7 +148,7 @@ export function MoveBooking() {
     changeItem(scan, 1);
   }
 
-  async function submitRequest() {
+  function handleOpenSignature() {
     setError(null);
 
     // 1. Check if user is offline
@@ -171,11 +173,19 @@ export function MoveBooking() {
       return;
     }
 
+    if (items.length === 0) {
+      setError('Please add at least one item to your load inventory before booking.');
+      return;
+    }
+
+    // Open Electronic Signature Modal before finalizing!
+    setShowSignatureModal(true);
+  }
+
+  async function executeBookingSubmission(_signatureDataUrl: string) {
     setIsSubmitting(true);
 
     try {
-      // A reload can leave Zustand hydrated without its short-lived access
-      // token. Restore it from the secure refresh cookie before booking.
       if (!accessToken) {
         const token = await ensureAccessToken();
         if (!token) {
@@ -196,6 +206,7 @@ export function MoveBooking() {
         localStorage.removeItem(STORAGE_KEY);
       } catch {}
 
+      setShowSignatureModal(false);
       router.push(`/track/${response.move.id}?token=${response.move.trackingToken}`);
     } catch (submitError: unknown) {
       const axiosErr = submitError as {
@@ -207,7 +218,6 @@ export function MoveBooking() {
       const message = axiosErr?.response?.data?.message || axiosErr?.message;
 
       if (status === 401 || code === 'UNAUTHORIZED') {
-        // Session token expired or invalid and refresh failed
         useAuthStore.getState().logout();
         setError('Your session has expired. Please sign in again — your inventory and draft are safely saved.');
         router.push('/sign-in?redirect=/request');
@@ -592,14 +602,14 @@ export function MoveBooking() {
             variant="hazard"
             size="lg"
             disabled={items.length === 0 || isSubmitting}
-            onClick={submitRequest}
+            onClick={handleOpenSignature}
           >
             {isSubmitting ? (
               'CREATING MOVE…'
             ) : !isAuthenticated ? (
               <>SIGN IN TO REQUEST THIS VEHICLE <ArrowRight /></>
             ) : (
-              <>REQUEST THIS VEHICLE <ArrowRight /></>
+              <>SIGN &amp; REQUEST THIS VEHICLE <ArrowRight /></>
             )}
           </Button>
 
@@ -627,17 +637,32 @@ export function MoveBooking() {
             variant="hazard"
             size="sm"
             disabled={items.length === 0 || isSubmitting}
-            onClick={submitRequest}
+            onClick={handleOpenSignature}
             className="h-11 px-5 mono text-xs font-bold"
           >
             {isSubmitting
               ? 'CREATING…'
               : !isAuthenticated
               ? 'SIGN IN & BOOK'
-              : 'REQUEST MOVE'} <ArrowRight size={14} />
+              : 'SIGN & BOOK'} <ArrowRight size={14} />
           </Button>
         </div>
       </div>
+
+      {/* Mandatory Electronic Signature Modal Before Booking Confirmation */}
+      <BookingSignatureModal
+        open={showSignatureModal}
+        onClose={() => setShowSignatureModal(false)}
+        onConfirm={executeBookingSubmission}
+        pickupAddress={pickupAddress}
+        destinationAddress={destinationAddress}
+        vehicleName={vehicle.name}
+        volume={volume}
+        weight={weight}
+        itemCount={items.length}
+        price={price}
+        isSubmitting={isSubmitting}
+      />
     </main>
   );
 }
