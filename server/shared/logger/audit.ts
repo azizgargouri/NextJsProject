@@ -18,6 +18,10 @@ export enum EventType {
   USER_UPDATE = 'USER_UPDATE',
   USER_DELETE = 'USER_DELETE',
   USER_STATUS = 'USER_STATUS',
+  PRICING_CREATE = 'PRICING_CREATE',
+  PRICING_UPDATE = 'PRICING_UPDATE',
+  PRICING_DELETE = 'PRICING_DELETE',
+  CONTENT_UPDATE = 'CONTENT_UPDATE',
 }
 
 export const EVENT_TYPES = Object.values(EventType) as [EventType, ...EventType[]];
