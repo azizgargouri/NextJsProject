@@ -5,6 +5,7 @@ import { employeesApi } from './employees';
 import { leaveRequestsApi } from './leave-requests';
 import { reportsApi } from './reports';
 import { movesApi } from './moves';
+import { homesApi } from './homes';
 import { axiosClient, ensureAccessToken } from './client';
 
 /** API barrel endpoint (replicates `instanct-ui/src/api` with the Object.freeze directive). */
@@ -16,6 +17,7 @@ export const api = Object.freeze({
   leaveRequests: leaveRequestsApi,
   reports: reportsApi,
   moves: movesApi,
+  homes: homesApi,
 });
 
 export { axiosClient, ensureAccessToken };
