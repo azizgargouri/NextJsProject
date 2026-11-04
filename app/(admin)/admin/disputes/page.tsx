@@ -4,15 +4,5 @@ import { AdminModuleNotConnected } from '@/components/features/admin/admin-modul
 export const metadata: Metadata = { title: 'Disputes' };
 
 export default function AdminDisputesPage() {
-  return (
-    <AdminModuleNotConnected
-      label="Disputes"
-      description="Review opened disputes, gather the move record, and issue a resolution."
-      planned={[
-        'Dispute inbox by state: open, under review, resolved',
-        'Full move-record evidence panel per dispute',
-        'Resolution recording with both parties notified',
-      ]}
-    />
-  );
+  return <AdminModuleNotConnected module="disputes" />;
 }
