@@ -1,6 +1,6 @@
 import { NotFoundError, ValidationError } from '../../shared/database/errors';
 import {
-  CONTENT_DEFAULTS,
+  contentDefaults,
   CONTENT_KEYS,
   CONTENT_SECTIONS,
   type LandingCopy,
@@ -50,10 +50,10 @@ export class ContentService {
   async getLandingCopy(locale: string = 'en'): Promise<LandingCopy> {
     try {
       const values = await this.repository.mergedValues(locale);
-      return buildLandingCopy(values);
+      return buildLandingCopy(values, locale);
     } catch {
       // Landing copy is not critical data: keep the designed defaults on DB failure.
-      return buildLandingCopy({});
+      return buildLandingCopy({}, locale);
     }
   }
 
@@ -63,6 +63,7 @@ export class ContentService {
       this.repository.overriddenKeys(locale),
     ]);
 
+    const defaults = contentDefaults(locale);
     return CONTENT_SECTIONS.map((section) => ({
       section,
       ...SECTION_COPY[section],
@@ -72,7 +73,7 @@ export class ContentService {
           key,
           label: meta.label,
           value: values[key] ?? '',
-          default: CONTENT_DEFAULTS[key] ?? '',
+          default: defaults[key] ?? '',
           overridden: overridden.has(key),
           multiline: Boolean(meta.multiline),
         })),

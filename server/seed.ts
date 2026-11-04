@@ -6,7 +6,7 @@ import { MoverProfileModel } from './shared/database/models/mover-profile.model'
 import { PricingRuleModel } from './shared/database/models/pricing-rule.model';
 import { ContentEntryModel } from './shared/database/models/content-entry.model';
 import {
-  CONTENT_DEFAULTS,
+  contentDefaults,
   CONTENT_KEYS,
   CONTENT_LOCALES,
 } from './modules/content/content.constants';
@@ -131,15 +131,14 @@ async function seed() {
     { $set: { status: 'RETIRED' } },
   );
 
-  // Content entries — per-locale registry seeded with the in-code defaults.
+  // Content entries — per-locale registry seeded with that locale's in-code
+  // defaults. Insert-only, so re-seeding never overwrites copy edited in admin.
   for (const locale of CONTENT_LOCALES) {
+    const defaults = contentDefaults(locale);
     for (const key of Object.keys(CONTENT_KEYS)) {
-      await ContentEntryModel.findOneAndUpdate(
+      await ContentEntryModel.updateOne(
         { key, locale },
-        {
-          $set: { value: CONTENT_DEFAULTS[key] ?? '' },
-          $setOnInsert: { key, locale },
-        },
+        { $setOnInsert: { key, locale, value: defaults[key] ?? '' } },
         { upsert: true },
       );
     }

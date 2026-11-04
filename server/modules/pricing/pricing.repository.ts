@@ -102,6 +102,22 @@ export class PricingRepository extends AbstractRepository<PricingRuleResponse> {
     return this.count(where);
   }
 
+  /** The live rule: ACTIVE, not deleted, and inside its effective window right now. */
+  async findActive(now = new Date()): Promise<PricingRuleResponse | null> {
+    const doc = await (
+      await this.model()
+    )
+      .findOne({
+        status: 'ACTIVE',
+        deletedAt: null,
+        effectiveFrom: { $lte: now },
+        $or: [{ effectiveTo: null }, { effectiveTo: { $gt: now } }],
+      })
+      .sort({ updatedAt: -1 })
+      .lean<PricingRuleDoc>();
+    return doc ? serializePricingRule(doc) : null;
+  }
+
   async activeCount(): Promise<number> {
     return this.count({ status: 'ACTIVE' });
   }
