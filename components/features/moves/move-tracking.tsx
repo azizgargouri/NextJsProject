@@ -14,9 +14,12 @@ import {
   Play,
   Sparkles,
   Package,
+  MessageSquare,
+  Navigation,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MoveRouteMap } from './move-route-map';
+import { ProofOfDeliveryModal } from './proof-of-delivery-modal';
 import { useAuthStore } from '@/hooks/stores/auth-store';
 import { api } from '@/lib/api';
 import type { MoveDataDto, MoveStageDto } from '@/lib/api/moves';
@@ -69,6 +72,7 @@ export function MoveTracking({
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [minutes, setMinutes] = useState(14);
+  const [showPodModal, setShowPodModal] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   // Load user's active moves if signed in
@@ -136,9 +140,18 @@ export function MoveTracking({
 
   const handleAdvanceStage = async (nextStageKey: string) => {
     if (!move) return;
+    if (nextStageKey === 'COMPLETED') {
+      setShowPodModal(true);
+      return;
+    }
+    executeAdvanceStage(nextStageKey);
+  };
+
+  const executeAdvanceStage = async (stageKey: string) => {
+    if (!move) return;
     startTransition(async () => {
       try {
-        const res = await api.moves.advance(move.id, nextStageKey);
+        const res = await api.moves.advance(move.id, stageKey);
         setMove(res.move);
       } catch (err: unknown) {
         const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
@@ -319,24 +332,56 @@ export function MoveTracking({
               </div>
             )}
 
-            {/* Mover & Driver card */}
-            <div className="mt-5 flex items-center justify-between border-2 border-ink bg-paper-soft p-3">
-              <div>
-                <p className="mono text-[9px] text-ink-40">ASSIGNED OPERATOR &amp; VEHICLE</p>
-                <p className="mt-0.5 text-sm font-bold">
-                  {move?.mover?.name ?? 'Mehdi Transport'} &middot; {move?.vehicle?.name ?? 'Moving van (14 m³)'}
-                </p>
-                <p className="mono mt-0.5 text-[10px] text-ink-60">
-                  {move?.estimatedPrice ? `${move.estimatedPrice} TND ALL-INCLUSIVE` : '185 TND ALL-INCLUSIVE'}
-                </p>
+            {/* Mover & Driver card with 1-Click WhatsApp & GPS navigation */}
+            <div className="mt-5 border-2 border-ink bg-paper-soft p-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="mono text-[9px] text-ink-40">ASSIGNED OPERATOR &amp; VEHICLE</p>
+                  <p className="mt-0.5 text-sm font-bold">
+                    {move?.mover?.name ?? 'Mehdi Transport'} &middot; {move?.vehicle?.name ?? 'Moving van (14 m³)'}
+                  </p>
+                  <p className="mono mt-0.5 text-[10px] text-ink-60">
+                    {move?.estimatedPrice ? `${move.estimatedPrice} TND ALL-INCLUSIVE` : '185 TND ALL-INCLUSIVE'}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {/* WhatsApp Quick Message */}
+                  <a
+                    href={`https://wa.me/${(move?.mover?.phone ?? '+21698123456').replace(/\D/g, '')}?text=${encodeURIComponent(
+                      `Hello, I am tracking move ${move?.reference ?? ''}. What is your current status?`,
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="grid size-10 place-items-center border-2 border-ink bg-emerald-600 text-white hover:bg-emerald-700 transition"
+                    title="Chat on WhatsApp"
+                    aria-label="WhatsApp driver"
+                  >
+                    <MessageSquare size={16} />
+                  </a>
+
+                  {/* Direct Google Maps / Waze Route */}
+                  <a
+                    href="https://www.google.com/maps/dir/?api=1&destination=36.8782,10.3255"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="grid size-10 place-items-center border-2 border-ink bg-ink text-paper hover:bg-hazard transition"
+                    title="Open GPS Navigation"
+                    aria-label="GPS Navigation"
+                  >
+                    <Navigation size={16} />
+                  </a>
+
+                  {/* Phone Call */}
+                  <a
+                    href={move?.mover?.phone ? `tel:${move.mover.phone}` : 'tel:+21698123456'}
+                    className="grid size-10 place-items-center border-2 border-ink bg-paper hover:bg-ink hover:text-paper transition active:bg-hazard active:text-white"
+                    aria-label="Call driver"
+                  >
+                    <Phone size={16} />
+                  </a>
+                </div>
               </div>
-              <a
-                href={move?.mover?.phone ? `tel:${move.mover.phone}` : 'tel:+21698123456'}
-                className="grid size-11 shrink-0 place-items-center border-2 border-ink bg-paper hover:bg-ink hover:text-paper transition active:bg-hazard active:text-white"
-                aria-label="Call driver"
-              >
-                <Phone size={18} />
-              </a>
             </div>
 
             {/* Stage Progress Controller (For Mover, Admin, or Testing) */}
@@ -449,6 +494,17 @@ export function MoveTracking({
           </div>
         </aside>
       </div>
+
+      {/* Proof of Delivery Digital Signature Modal */}
+      <ProofOfDeliveryModal
+        open={showPodModal}
+        onClose={() => setShowPodModal(false)}
+        onConfirm={(_signatureDataUrl) => {
+          executeAdvanceStage('COMPLETED');
+        }}
+        moveReference={move?.reference ?? 'MU-2026-DEMO'}
+        moverName={move?.mover?.name ?? 'Mehdi Transport'}
+      />
     </main>
   );
 }

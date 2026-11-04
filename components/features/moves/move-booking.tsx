@@ -3,9 +3,10 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowRight, Minus, Plus, Truck, WifiOff, Weight, Box, UserCheck, LogIn, AlertTriangle } from 'lucide-react';
+import { ArrowRight, Minus, Plus, Truck, WifiOff, Weight, Box, UserCheck, LogIn, AlertTriangle, Calendar, Building, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { LoadScan, type ScanSuggestion } from './load-scan';
+import { RouteMapPicker } from './route-map-picker';
 import { useAuthStore } from '@/hooks/stores/auth-store';
 import { api, ensureAccessToken } from '@/lib/api';
 
@@ -49,6 +50,9 @@ export function MoveBooking() {
   const [destinationAddress, setDestinationAddress] = useState('8 Avenue Habib Bourguiba, La Marsa');
   const [isOffline, setIsOffline] = useState(false);
   const [chosenVehicle, setChosenVehicle] = useState<string>('AUTO');
+  const [scheduledSlot, setScheduledSlot] = useState<string>('TODAY_EXPRESS');
+  const [floorLevel, setFloorLevel] = useState<number>(0);
+  const [hasElevator, setHasElevator] = useState<boolean>(true);
 
   useEffect(() => {
     setMounted(true);
@@ -121,9 +125,10 @@ export function MoveBooking() {
       ? recommendedVehicle
       : VEHICLES.find((item) => item.name === chosenVehicle) ?? recommendedVehicle;
 
-  // Calibrated pricing: Base fee + km rate + volumetric fee + heavy cargo fee
+  // Calibrated pricing: Base fee + km rate + volumetric fee + heavy cargo fee + floor access fee
+  const floorSurcharge = !hasElevator && floorLevel > 0 ? floorLevel * 12 : 0;
   const price = Math.round(
-    vehicle.base + distance * 1.15 + volume * 4 + (weight > 400 ? (weight - 400) * 0.04 : 0),
+    vehicle.base + distance * 1.15 + volume * 4 + floorSurcharge + (weight > 400 ? (weight - 400) * 0.04 : 0),
   );
 
   function changeItem(source: { id: string; name: string; volume: number; weight: number }, change: number) {
@@ -397,47 +402,104 @@ export function MoveBooking() {
             </div>
           </div>
 
-          {/* Route distance slider */}
-          <div className="mt-10 border-2 border-ink bg-paper-soft p-4 md:p-6">
-            <div className="flex items-center justify-between">
-              <span className="mono text-[10px] text-ink-80 font-bold">ESTIMATED ROUTE DISTANCE</span>
-              <span className="mono text-xs font-bold text-hazard">{distance} KM</span>
-            </div>
-            <input
-              aria-label="Route distance in kilometers"
-              className="mt-4 block h-3 w-full cursor-pointer accent-[#e61919]"
-              type="range"
-              min="2"
-              max="80"
-              value={distance}
-              onChange={(event) => setDistance(Number(event.target.value))}
+          {/* Interactive Map Picker: Select Pickup from My Position + Destination Pin from Map */}
+          <div className="mt-10">
+            <RouteMapPicker
+              initialDistance={distance}
+              onLocationSelect={({ pickupAddress: pAddr, destinationAddress: dAddr, distanceKm }) => {
+                setPickupAddress(pAddr);
+                setDestinationAddress(dAddr);
+                setDistance(distanceKm);
+              }}
             />
-            <div className="mono mt-2 flex justify-between text-[9px] text-ink-40">
-              <span>2 KM (LOCAL INTRA-CITY)</span>
-              <span>80 KM (INTERCITY EXPRESS)</span>
-            </div>
           </div>
 
-          {/* Addresses */}
+          {/* Schedule Date & Access Configuration */}
           <div className="mt-8 grid gap-4 sm:grid-cols-2">
-            <label className="mono text-[10px] text-ink-80">
-              PICKUP ADDRESS
-              <input
-                value={pickupAddress}
-                onChange={(event) => setPickupAddress(event.target.value)}
-                placeholder="Street address, city"
-                className="mt-2 w-full border border-ink bg-paper px-3 py-3 text-sm normal-case tracking-normal text-ink focus:outline-none focus:ring-1 focus:ring-hazard"
-              />
-            </label>
-            <label className="mono text-[10px] text-ink-80">
-              DESTINATION ADDRESS
-              <input
-                value={destinationAddress}
-                onChange={(event) => setDestinationAddress(event.target.value)}
-                placeholder="Street address, city"
-                className="mt-2 w-full border border-ink bg-paper px-3 py-3 text-sm normal-case tracking-normal text-ink focus:outline-none focus:ring-1 focus:ring-hazard"
-              />
-            </label>
+            {/* 1. Schedule Time Slot */}
+            <div className="border-2 border-ink bg-paper-soft p-4">
+              <span className="mono text-[10px] text-hazard font-bold flex items-center gap-1.5 uppercase">
+                <Calendar size={13} /> MOVE SCHEDULE &amp; TIME SLOT
+              </span>
+              <p className="mt-1 font-bold text-sm">WHEN DO YOU NEED TO MOVE?</p>
+
+              <div className="mt-3 grid grid-cols-2 gap-1.5 mono text-[10px]">
+                {[
+                  { id: 'TODAY_EXPRESS', label: 'TODAY (EXPRESS)' },
+                  { id: 'TOMORROW_MORNING', label: 'TOMORROW 09:00' },
+                  { id: 'TOMORROW_AFTERNOON', label: 'TOMORROW 14:00' },
+                  { id: 'WEEKEND', label: 'SATURDAY 09:00' },
+                ].map((slot) => {
+                  const isSelected = scheduledSlot === slot.id;
+                  return (
+                    <button
+                      key={slot.id}
+                      type="button"
+                      onClick={() => setScheduledSlot(slot.id)}
+                      className={`border p-2 text-left font-semibold transition flex items-center justify-between ${
+                        isSelected
+                          ? 'border-hazard bg-hazard text-white font-bold'
+                          : 'border-ink bg-paper hover:bg-ink hover:text-paper'
+                      }`}
+                    >
+                      <span>{slot.label}</span>
+                      {isSelected && <Check size={11} strokeWidth={3} />}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* 2. Building Floor & Elevator */}
+            <div className="border-2 border-ink bg-paper-soft p-4">
+              <span className="mono text-[10px] text-ink-60 font-bold flex items-center gap-1.5 uppercase">
+                <Building size={13} className="text-hazard" /> BUILDING ACCESS &amp; FLOORS
+              </span>
+              <p className="mt-1 font-bold text-sm">STAIRS &amp; ELEVATOR ACCESS</p>
+
+              <div className="mt-3 space-y-3 mono text-xs">
+                {/* Floor Stepper */}
+                <div className="flex items-center justify-between border border-ink bg-paper p-2">
+                  <span className="text-ink-80">FLOOR LEVEL:</span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setFloorLevel((f) => Math.max(0, f - 1))}
+                      className="grid size-7 place-items-center border border-ink hover:bg-paper-soft"
+                    >
+                      <Minus size={12} />
+                    </button>
+                    <span className="w-14 text-center font-bold">
+                      {floorLevel === 0 ? 'RDC (0)' : `${floorLevel}E ÉTAGE`}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setFloorLevel((f) => Math.min(8, f + 1))}
+                      className="grid size-7 place-items-center border border-ink bg-ink text-paper hover:bg-hazard"
+                    >
+                      <Plus size={12} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Elevator Toggle */}
+                <label className="flex items-center justify-between border border-ink bg-paper p-2.5 cursor-pointer hover:bg-paper-soft transition">
+                  <span className="text-ink-80">ELEVATOR AVAILABLE?</span>
+                  <input
+                    type="checkbox"
+                    checked={hasElevator}
+                    onChange={(e) => setHasElevator(e.target.checked)}
+                    className="size-4 accent-[#e61919] cursor-pointer"
+                  />
+                </label>
+              </div>
+
+              {!hasElevator && floorLevel > 0 && (
+                <p className="mono mt-2 text-[9px] text-hazard font-bold">
+                  NOTICE: +{floorLevel * 12} TND MANUAL STAIRCASE CARRYING FEE
+                </p>
+              )}
+            </div>
           </div>
         </section>
 
