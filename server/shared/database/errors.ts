@@ -46,6 +46,18 @@ export class AlreadyExistsError extends DomainError {
   }
 }
 
+export class ServiceUnavailableError extends DomainError {
+  constructor(message = 'Service unavailable') {
+    super(message, 503, 'SERVICE_UNAVAILABLE');
+  }
+}
+
+export class PayloadTooLargeError extends DomainError {
+  constructor(message = 'Payload too large') {
+    super(message, 413, 'PAYLOAD_TOO_LARGE');
+  }
+}
+
 export class ValidationError extends DomainError {
   readonly details: unknown;
 
