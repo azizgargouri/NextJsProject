@@ -6,10 +6,16 @@ export const metadata: Metadata = {
   title: 'Create account',
 };
 
-export default function SignUpPage() {
+/** `?role=MOVER` preselects the crew account type (linked from the landing). */
+export default async function SignUpPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ role?: string }>;
+}) {
+  const { role } = await searchParams;
   return (
     <AuthLayout>
-      <SignUpForm />
+      <SignUpForm initialRole={role?.toUpperCase() === 'MOVER' ? 'MOVER' : 'CLIENT'} />
     </AuthLayout>
   );
 }

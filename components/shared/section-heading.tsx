@@ -4,56 +4,97 @@ import { useRef } from 'react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useGSAP } from '@gsap/react';
+import { cn } from '@/lib/utils';
 
 if (typeof window !== 'undefined') {
   gsap.registerPlugin(ScrollTrigger);
 }
 
-/** Functional bracket heading: "[ WHAT WE MOVE ]" — number + title + hairline rule that draws in. */
+/**
+ * Bracket heading: "01 [ WHAT WE MOVE ]" plus a hairline rule that draws in.
+ * The brackets are decorative and glued to the first and last word, so a
+ * narrow column can never leave a bracket alone on its own line.
+ */
 export function SectionHeading({
   index,
   title,
+  id,
   className,
+  tone = 'paper',
+  size = 'wide',
 }: {
   index: string;
   title: string;
+  id?: string;
   className?: string;
+  tone?: 'paper' | 'ink';
+  /** `column` for headings set in a narrow sidebar column. */
+  size?: 'wide' | 'column';
 }) {
   const rootRef = useRef<HTMLElement>(null);
 
   useGSAP(
     () => {
       if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-
+      const trigger = { trigger: rootRef.current, start: 'top 85%', once: true };
       gsap.from('[data-heading-line]', {
         scaleX: 0,
         transformOrigin: 'left center',
-        duration: 1,
-        scrollTrigger: { trigger: rootRef.current, start: 'top 85%', once: true },
+        duration: 1.2,
+        ease: 'expo.out',
+        scrollTrigger: trigger,
       });
-
       gsap.from('[data-heading-text]', {
-        y: 24,
-        autoAlpha: 0,
-        duration: 0.8,
-        stagger: 0.08,
-        scrollTrigger: { trigger: rootRef.current, start: 'top 85%', once: true },
+        yPercent: 100,
+        duration: 1,
+        ease: 'expo.out',
+        stagger: 0.06,
+        scrollTrigger: trigger,
       });
     },
     { scope: rootRef },
   );
 
+  const words = title.split(/\s+/).filter(Boolean);
+
   return (
     <header ref={rootRef} className={className}>
-      <div className="relative mb-2 flex items-baseline gap-4">
-        <span data-heading-text className="mono text-[11px] text-hazard">
+      <div className="mb-3 flex items-baseline gap-4">
+        <span
+          className={cn(
+            'mono shrink-0 text-[11px]',
+            tone === 'ink' ? 'text-hazard-glow' : 'text-hazard-ink',
+          )}
+        >
           {index}
         </span>
-        <h2 data-heading-text className="display text-4xl md:text-6xl">
-          {title}
+        <h2
+          id={id}
+          className={cn(
+            'display -mt-[0.2em] overflow-hidden pb-[0.04em] pt-[0.2em]',
+            size === 'column'
+              ? 'text-[clamp(1.75rem,2.4vw,2.25rem)]'
+              : 'text-[clamp(2.25rem,5.5vw,4rem)]',
+          )}
+        >
+          <span data-heading-text className="block">
+            {words.map((word, i) => (
+              <span key={i}>
+                <span className="whitespace-nowrap">
+                  {i === 0 ? <span aria-hidden>[&nbsp;</span> : null}
+                  {word}
+                  {i === words.length - 1 ? <span aria-hidden>&nbsp;]</span> : null}
+                </span>
+                {i < words.length - 1 ? ' ' : null}
+              </span>
+            ))}
+          </span>
         </h2>
       </div>
-      <div data-heading-line className="h-px w-full bg-ink" />
+      <div
+        data-heading-line
+        className={cn('h-px w-full', tone === 'ink' ? 'bg-paper/40' : 'bg-ink')}
+      />
     </header>
   );
 }

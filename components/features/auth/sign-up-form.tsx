@@ -42,7 +42,7 @@ const ROLE_OPTIONS = [
   { value: 'MOVER' as const, label: 'I AM A MOVER', hint: 'Requires verification' },
 ];
 
-export function SignUpForm() {
+export function SignUpForm({ initialRole = 'CLIENT' }: { initialRole?: 'CLIENT' | 'MOVER' }) {
   const router = useRouter();
   const { mutate, isPending, isError, error } = useSignUp();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -55,7 +55,7 @@ export function SignUpForm() {
     formState: { errors },
   } = useForm<SignUpFormValues>({
     resolver: zodResolver(SignUpFormSchema),
-    defaultValues: { name: '', email: '', phone: '', password: '', role: 'CLIENT' },
+    defaultValues: { name: '', email: '', phone: '', password: '', role: initialRole },
   });
 
   const role = watch('role');

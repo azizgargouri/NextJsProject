@@ -5,78 +5,64 @@ import Link from 'next/link';
 import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
 import { cn } from '@/lib/utils';
-import { Button, buttonVariants, type ButtonProps } from '@/components/ui/button';
+import { buttonVariants, type ButtonProps } from '@/components/ui/button';
 
 /**
- * Magnetic button — pulls subtly toward the cursor using gsap.quickTo()
- * (single reused tween per axis; no React state, no re-renders).
+ * Magnetic link — a real anchor (one tab stop, correct semantics) that pulls
+ * toward the cursor with gsap.quickTo. Inert under reduced motion and on touch.
  */
-export function MagneticButton({
-  children,
-  className,
-  strength = 0.35,
-  ...props
-}: ButtonProps & { strength?: number }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
-
-  useGSAP(
-    () => {
-      const el = buttonRef.current;
-      if (!el || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-
-      const xTo = gsap.quickTo(el, 'x', { duration: 0.4, ease: 'power3' });
-      const yTo = gsap.quickTo(el, 'y', { duration: 0.4, ease: 'power3' });
-
-      const container = containerRef.current;
-      if (!container) return;
-
-      const onMove = (event: MouseEvent) => {
-        const rect = container.getBoundingClientRect();
-        xTo((event.clientX - rect.left - rect.width / 2) * strength);
-        yTo((event.clientY - rect.top - rect.height / 2) * strength);
-      };
-
-      const onLeave = () => {
-        xTo(0);
-        yTo(0);
-      };
-
-      container.addEventListener('mousemove', onMove);
-      container.addEventListener('mouseleave', onLeave);
-      return () => {
-        container.removeEventListener('mousemove', onMove);
-        container.removeEventListener('mouseleave', onLeave);
-      };
-    },
-    { scope: containerRef },
-  );
-
-  return (
-    <div ref={containerRef} className="inline-block">
-      <Button ref={buttonRef} className={className} {...props}>
-        {children}
-      </Button>
-    </div>
-  );
-}
-
-/** Magnetic link variant for CTA anchors. */ export function MagneticLink({
+export function MagneticLink({
   href,
   children,
   className,
   variant,
   size,
+  strength = 0.3,
 }: {
   href: string;
   children: React.ReactNode;
   className?: string;
   variant?: NonNullable<ButtonProps['variant']>;
   size?: NonNullable<ButtonProps['size']>;
+  strength?: number;
 }) {
+  const zoneRef = useRef<HTMLDivElement>(null);
+  const linkRef = useRef<HTMLAnchorElement>(null);
+
+  useGSAP(
+    () => {
+      const zone = zoneRef.current;
+      const link = linkRef.current;
+      const fine = window.matchMedia('(pointer: fine)').matches;
+      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (!zone || !link || !fine || reduce) return;
+
+      const xTo = gsap.quickTo(link, 'x', { duration: 0.45, ease: 'power3' });
+      const yTo = gsap.quickTo(link, 'y', { duration: 0.45, ease: 'power3' });
+      const onMove = (event: PointerEvent) => {
+        const rect = zone.getBoundingClientRect();
+        xTo((event.clientX - rect.left - rect.width / 2) * strength);
+        yTo((event.clientY - rect.top - rect.height / 2) * strength);
+      };
+      const onLeave = () => {
+        xTo(0);
+        yTo(0);
+      };
+      zone.addEventListener('pointermove', onMove);
+      zone.addEventListener('pointerleave', onLeave);
+      return () => {
+        zone.removeEventListener('pointermove', onMove);
+        zone.removeEventListener('pointerleave', onLeave);
+      };
+    },
+    { scope: zoneRef },
+  );
+
   return (
-    <Link href={href} className={cn(buttonVariants({ variant, size }), className)}>
-      {children}
-    </Link>
+    <div ref={zoneRef} className="inline-block p-3 -m-3">
+      <Link ref={linkRef} href={href} className={cn(buttonVariants({ variant, size }), className)}>
+        {children}
+      </Link>
+    </div>
   );
 }
