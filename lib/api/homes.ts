@@ -8,6 +8,7 @@ import type {
   HomePayload,
   HomesQuery,
   HomeUpdatePayload,
+  LayoutItemUpdatePayload,
   LayoutPlanDto,
   RoomPayload,
 } from '@/types/homes';
@@ -95,6 +96,17 @@ export const homesApi = {
       `/api/homes/${homeId}/layout`,
       {},
       { timeout: LAYOUT_TIMEOUT_MS },
+    );
+    return data.plan;
+  },
+
+  updateLayoutItem: async (
+    homeId: string,
+    payload: LayoutItemUpdatePayload,
+  ): Promise<LayoutPlanDto> => {
+    const { data } = await axiosClient.patch<{ plan: LayoutPlanDto }>(
+      `/api/homes/${homeId}/layout`,
+      payload,
     );
     return data.plan;
   },

@@ -43,8 +43,11 @@ export interface PlacedUnit {
   y: number;
   w: number;
   h: number;
+  /** Turned 90° from the item's normal orientation (width along the wall). */
+  rotated: boolean;
   reason: string;
-  source: 'ai' | 'moveup';
+  /** ai = the assistant's choice, moveup = fallback room, client = moved by the client. */
+  source: 'ai' | 'moveup' | 'client';
   /** Set when the requested wall had no room and another spot was used. */
   requestedWall?: PlacementWall;
 }
@@ -57,7 +60,7 @@ export interface UnplacedUnit {
   reason: string;
 }
 
-interface Rect {
+export interface Rect {
   x: number;
   y: number;
   w: number;
@@ -93,18 +96,72 @@ const DEFAULT_ROOMS: Record<string, RoomType[]> = {
 const overlaps = (a: Rect, b: Rect, gap = 0) =>
   a.x < b.x + b.w + gap && b.x < a.x + a.w + gap && a.y < b.y + b.h + gap && b.y < a.y + a.h + gap;
 
+/** Door swing square, or the strip in front of a window (cm, room coordinates). */
+function openingZone(room: PackRoom, opening: PackRoom['openings'][number]): Rect {
+  const { widthCm: W, lengthCm: L } = room;
+  const { kind, wall, offsetCm: o, widthCm: s } = opening;
+  const d = kind === 'DOOR' ? s : WINDOW_DEPTH_CM;
+  if (wall === 'N') return { x: o, y: 0, w: s, h: d };
+  if (wall === 'S') return { x: o, y: L - d, w: s, h: d };
+  if (wall === 'W') return { x: 0, y: o, w: d, h: s };
+  return { x: W - d, y: o, w: d, h: s };
+}
+
 /** Door swing squares (+ window strips for tall items) that nothing may cover. */
 function obstacles(room: PackRoom, tall: boolean): Rect[] {
-  const { widthCm: W, lengthCm: L } = room;
   return room.openings
     .filter((opening) => opening.kind === 'DOOR' || tall)
-    .map(({ kind, wall, offsetCm: o, widthCm: s }) => {
-      const d = kind === 'DOOR' ? s : WINDOW_DEPTH_CM;
-      if (wall === 'N') return { x: o, y: 0, w: s, h: d };
-      if (wall === 'S') return { x: o, y: L - d, w: s, h: d };
-      if (wall === 'W') return { x: 0, y: o, w: d, h: s };
-      return { x: W - d, y: o, w: d, h: s };
-    });
+    .map((opening) => openingZone(room, opening));
+}
+
+/**
+ * Why an exact spot is not allowed (same rules as the packer), or null when it
+ * is free. Validates the client's drag-and-drop on the server.
+ */
+export function spotProblem(
+  room: PackRoom,
+  unit: Pick<PackUnit, 'itemId'>,
+  rect: Rect,
+  others: { name: string; rect: Rect }[],
+): string | null {
+  if (
+    rect.x < 0 ||
+    rect.y < 0 ||
+    rect.x + rect.w > room.widthCm ||
+    rect.y + rect.h > room.lengthCm
+  ) {
+    return `Outside ${room.name}.`;
+  }
+  for (const opening of room.openings) {
+    if (opening.kind === 'WINDOW' && !TALL.has(unit.itemId)) continue;
+    if (overlaps(rect, openingZone(room, opening))) {
+      return opening.kind === 'DOOR'
+        ? 'Blocks the door.'
+        : 'Too tall to stand in front of a window.';
+    }
+  }
+  const hit = others.find((other) => overlaps(rect, other.rect, GAP_CM));
+  if (hit) return `Too close to ${hit.name}.`;
+  return null;
+}
+
+/** The wall an exact spot stands against (or CENTER) and whether the item is turned. */
+export function describeSpot(
+  room: PackRoom,
+  unit: Pick<PackUnit, 'widthCm'>,
+  rect: Rect,
+): { wall: PlacementWall; rotated: boolean } {
+  const touches: Wall[] = [];
+  if (rect.y === 0) touches.push('N');
+  if (rect.y + rect.h === room.lengthCm) touches.push('S');
+  if (rect.x === 0) touches.push('W');
+  if (rect.x + rect.w === room.widthCm) touches.push('E');
+  // In a corner, prefer the wall the item's back (its width) runs along.
+  const alongWall = (wall: Wall) => (wall === 'N' || wall === 'S' ? rect.w : rect.h);
+  const wall =
+    touches.find((candidate) => alongWall(candidate) === unit.widthCm) ?? touches[0] ?? 'CENTER';
+  const rotated = wall === 'W' || wall === 'E' ? rect.h !== unit.widthCm : rect.w !== unit.widthCm;
+  return { wall, rotated };
 }
 
 function fits(rect: Rect, room: PackRoom, blocked: Rect[], placed: Rect[]) {
@@ -118,45 +175,71 @@ function fits(rect: Rect, room: PackRoom, blocked: Rect[], placed: Rect[]) {
   );
 }
 
-/** First free spot along a wall, back of the item against the wall. */
-function onWall(unit: PackUnit, wall: Wall, room: PackRoom, blocked: Rect[], placed: Rect[]) {
-  for (const [along, into] of [
-    [unit.widthCm, unit.depthCm],
-    [unit.depthCm, unit.widthCm],
-  ] as const) {
-    const horizontal = wall === 'N' || wall === 'S';
-    const span = horizontal ? room.widthCm : room.lengthCm;
-    for (let t = 0; t + along <= span; t += STEP_CM) {
-      const rect: Rect = horizontal
-        ? { x: t, y: wall === 'N' ? 0 : room.lengthCm - into, w: along, h: into }
-        : { x: wall === 'W' ? 0 : room.widthCm - into, y: t, w: into, h: along };
-      if (fits(rect, room, blocked, placed)) return rect;
-    }
-  }
-  return null;
-}
+/**
+ * 'normal' = the item's width runs along the wall (its back against it);
+ * 'rotated' = turned 90°. Free-standing items use the same two orientations.
+ */
+export type Orientation = 'normal' | 'rotated';
 
-/** Free-standing spot closest to the room centre, keeping a walkway to the walls. */
-function inCenter(unit: PackUnit, room: PackRoom, blocked: Rect[], placed: Rect[]) {
-  const candidates: Rect[] = [];
-  for (const [w, h] of [
-    [unit.widthCm, unit.depthCm],
-    [unit.depthCm, unit.widthCm],
-  ] as const) {
-    for (let x = CENTER_MARGIN_CM; x + w <= room.widthCm - CENTER_MARGIN_CM; x += STEP_CM) {
-      for (let y = CENTER_MARGIN_CM; y + h <= room.lengthCm - CENTER_MARGIN_CM; y += STEP_CM) {
-        candidates.push({ x, y, w, h });
+const distance = (rect: Rect, point: { x: number; y: number }) =>
+  Math.hypot(rect.x + rect.w / 2 - point.x, rect.y + rect.h / 2 - point.y);
+
+/** Every spot on one wall (scan from its start corner) or free-standing (closest to the centre first). */
+function candidates(unit: PackUnit, wall: PlacementWall, room: PackRoom, orientation: Orientation) {
+  const [along, into] =
+    orientation === 'normal' ? [unit.widthCm, unit.depthCm] : [unit.depthCm, unit.widthCm];
+  const spots: Rect[] = [];
+  if (wall === 'CENTER') {
+    for (let x = CENTER_MARGIN_CM; x + along <= room.widthCm - CENTER_MARGIN_CM; x += STEP_CM) {
+      for (let y = CENTER_MARGIN_CM; y + into <= room.lengthCm - CENTER_MARGIN_CM; y += STEP_CM) {
+        spots.push({ x, y, w: along, h: into });
       }
     }
+    const centre = { x: room.widthCm / 2, y: room.lengthCm / 2 };
+    return spots.sort((a, b) => distance(a, centre) - distance(b, centre));
   }
-  const cx = room.widthCm / 2;
-  const cy = room.lengthCm / 2;
-  candidates.sort(
-    (a, b) =>
-      Math.hypot(a.x + a.w / 2 - cx, a.y + a.h / 2 - cy) -
-      Math.hypot(b.x + b.w / 2 - cx, b.y + b.h / 2 - cy),
-  );
-  return candidates.find((rect) => fits(rect, room, blocked, placed)) ?? null;
+  const horizontal = wall === 'N' || wall === 'S';
+  const span = horizontal ? room.widthCm : room.lengthCm;
+  for (let t = 0; t + along <= span; t += STEP_CM) {
+    spots.push(
+      horizontal
+        ? { x: t, y: wall === 'N' ? 0 : room.lengthCm - into, w: along, h: into }
+        : { x: wall === 'W' ? 0 : room.widthCm - into, y: t, w: into, h: along },
+    );
+  }
+  return spots;
+}
+
+export interface PlaceOptions {
+  /** Orientations to try, in order (default: normal, then rotated). */
+  orientations?: Orientation[];
+  /** Prefer the free spot closest to this point (e.g. where the item was before). */
+  near?: { x: number; y: number };
+}
+
+/**
+ * Best valid spot for ONE item against `wall` (or free-standing) given what is
+ * already in the room, or null when nothing fits. Used by the full packer and
+ * by the client's manual edits (move / rotate).
+ */
+export function placeUnit(
+  room: PackRoom,
+  unit: PackUnit,
+  wall: PlacementWall,
+  taken: Rect[],
+  options: PlaceOptions = {},
+): { rect: Rect; rotated: boolean } | null {
+  const blocked = obstacles(room, TALL.has(unit.itemId));
+  for (const orientation of options.orientations ?? (['normal', 'rotated'] as const)) {
+    const free = candidates(unit, wall, room, orientation).filter((rect) =>
+      fits(rect, room, blocked, taken),
+    );
+    if (free.length === 0) continue;
+    const near = options.near;
+    if (near) free.sort((a, b) => distance(a, near) - distance(b, near));
+    return { rect: free[0]!, rotated: orientation === 'rotated' };
+  }
+  return null;
 }
 
 /** Walls without a door first, then the longest. */
@@ -192,7 +275,7 @@ export function packLayout(rooms: PackRoom[], units: PackUnit[], choices: WallCh
   for (const unit of ordered) {
     const choice = choiceOf.get(unit.unitId);
     let room = choice ? rooms.find((candidate) => candidate.id === choice.roomId) : undefined;
-    let source: PlacedUnit['source'] = 'ai';
+    let source: 'ai' | 'moveup' = 'ai';
     let reason = choice?.reason ?? '';
 
     if (!room) {
@@ -209,7 +292,6 @@ export function packLayout(rooms: PackRoom[], units: PackUnit[], choices: WallCh
     }
 
     const taken = takenByRoom.get(room.id) ?? [];
-    const blocked = obstacles(room, TALL.has(unit.itemId));
     const wanted: PlacementWall =
       choice && source === 'ai' && !(choice.wall === 'CENTER' && WALL_ONLY.has(unit.itemId))
         ? choice.wall
@@ -221,14 +303,11 @@ export function packLayout(rooms: PackRoom[], units: PackUnit[], choices: WallCh
       ...(WALL_ONLY.has(unit.itemId) || wanted === 'CENTER' ? [] : (['CENTER'] as const)),
     ];
 
-    let spot: { rect: Rect; wall: PlacementWall } | null = null;
+    let spot: { rect: Rect; rotated: boolean; wall: PlacementWall } | null = null;
     for (const wall of tries) {
-      const rect =
-        wall === 'CENTER'
-          ? inCenter(unit, room, blocked, taken)
-          : onWall(unit, wall, room, blocked, taken);
-      if (rect) {
-        spot = { rect, wall };
+      const found = placeUnit(room, unit, wall, taken);
+      if (found) {
+        spot = { ...found, wall };
         break;
       }
     }
@@ -254,6 +333,7 @@ export function packLayout(rooms: PackRoom[], units: PackUnit[], choices: WallCh
       roomId: room.id,
       wall: spot.wall,
       ...spot.rect,
+      rotated: spot.rotated,
       reason,
       source,
       ...(choice && source === 'ai' && spot.wall !== choice.wall

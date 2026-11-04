@@ -135,9 +135,11 @@ export interface LayoutPlacementDto {
   y: number;
   w: number;
   h: number;
+  /** Turned 90° from normal (normal = width along the wall). */
+  rotated: boolean;
   reason: string;
-  /** 'moveup' = the AI skipped the item and MoveUp chose a room. */
-  source: 'ai' | 'moveup';
+  /** ai = assistant, moveup = fallback room, client = moved by the client. */
+  source: 'ai' | 'moveup' | 'client';
   /** Wall the AI asked for when it had no space and another spot was used. */
   requestedWall?: PlacementWall;
 }
@@ -155,10 +157,21 @@ export interface LayoutPlanDto {
     name: string;
     roomId: string | null;
     reason: string;
+    /** The client took it out (vs. no space was found). */
+    removedByClient: boolean;
   }[];
   tips: string[];
   warnings: string[];
   /** Rooms or items changed after the plan was made. */
   stale: boolean;
+  /** Items the client moved, rotated or took out (regenerate replaces them). */
+  manualChanges: number;
   createdAt: string;
 }
+
+/** One manual change; `move` also places an item that was left out. */
+export type LayoutItemUpdatePayload =
+  | { action: 'move'; unitId: string; roomId: string; wall: PlacementWall }
+  | { action: 'place'; unitId: string; roomId: string; x: number; y: number; w: number; h: number }
+  | { action: 'rotate'; unitId: string }
+  | { action: 'remove'; unitId: string };

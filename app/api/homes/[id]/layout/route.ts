@@ -14,6 +14,11 @@ export async function POST(request: Request, { params }: RouteContext) {
   return layoutController.generate(request, (await params).id);
 }
 
+/** One manual change: move, rotate or take out an item. */
+export async function PATCH(request: Request, { params }: RouteContext) {
+  return layoutController.updateItem(request, (await params).id);
+}
+
 export async function DELETE(request: Request, { params }: RouteContext) {
   return layoutController.remove(request, (await params).id);
 }

@@ -15,8 +15,9 @@ export interface LayoutPlacementDoc {
   y: number;
   w: number;
   h: number;
+  rotated: boolean;
   reason: string;
-  source: 'ai' | 'moveup';
+  source: 'ai' | 'moveup' | 'client';
   requestedWall?: 'N' | 'E' | 'S' | 'W' | 'CENTER';
 }
 
@@ -26,6 +27,8 @@ export interface LayoutUnplacedDoc {
   name: string;
   roomId: string | null;
   reason: string;
+  /** The client took this item out of the layout (vs. no space found). */
+  removedByClient: boolean;
 }
 
 export interface LayoutAttemptDoc {
@@ -90,8 +93,9 @@ const LayoutPlanSchema = new Schema<LayoutPlanDoc>(
             y: { type: Number, required: true },
             w: { type: Number, required: true },
             h: { type: Number, required: true },
+            rotated: { type: Boolean, default: false },
             reason: { type: String, default: '' },
-            source: { type: String, enum: ['ai', 'moveup'], required: true },
+            source: { type: String, enum: ['ai', 'moveup', 'client'], required: true },
             requestedWall: { type: String, enum: WALL_VALUES },
           },
           { _id: false },
@@ -108,6 +112,7 @@ const LayoutPlanSchema = new Schema<LayoutPlanDoc>(
             name: { type: String, required: true },
             roomId: { type: String, default: null },
             reason: { type: String, required: true },
+            removedByClient: { type: Boolean, default: false },
           },
           { _id: false },
         ),

@@ -269,13 +269,76 @@ furniture so items sit flush against them; long Mongo room ids replaced by `R1�
 
 ---
 
-### Step 4 — Edit the layout
+### Step 4 — Edit the layout + drag and drop ✅ (tested by you)
 
-- Move an item to another room or wall, rotate it, with the packer re-checking the spot.
-- Simple furniture drawings (bed, sofa, table, chairs, fridge…) instead of plain rectangles.
-- `PATCH /api/homes/[id]/layout` for one item.
+**Backend**
 
-**You test:** move the sofa to another room → rotate the bed → regenerate → delete.
+- `layout-packer.ts` — new `placeUnit(room, unit, wall, taken, { orientations, near })`: the
+  single-item placement the full packer now uses too, so manual edits follow the same rules
+  (inside the room, no overlap, door swings free, tall items off windows). `near` keeps an item
+  close to where it was (turning in place). Placements now store `rotated`.
+- `layout.schema.ts` — one change per request:
+  `{ action: 'move', unitId, roomId, wall }` (also places a left-out item),
+  `{ action: 'rotate', unitId }`, `{ action: 'remove', unitId }`.
+- `layout.service.ts#updateItem` — 409 `LAYOUT_NO_SPACE` with a plain sentence when the spot is
+  full, 409 `LAYOUT_ITEM_GONE` when the item left the request, 404 unknown room / no plan, 400
+  rotating an item that is not placed. An edited item keeps its position in the list (its number
+  stays) and is marked `source: 'client'`; taken-out items stay in `unplaced` with
+  `removedByClient`. `manualChanges` counts them.
+
+| Method | Route                    | Action                                      |
+| ------ | ------------------------ | ------------------------------------------- |
+| PATCH  | `/api/homes/[id]/layout` | Move / turn 90° / take out / place one item |
+
+**Frontend**
+
+- `furniture-symbol.tsx` — top-down drawings: bed (pillows + blanket fold), sofa (backrest,
+  arms, cushions), chair, table, desk, fridge, washer (drum), wardrobe (rail + doors),
+  bookshelf, TV stand, box stack (×). Each faces the wall it stands on; a turned item's back
+  faces the next wall (a turned bed's headboard is on its short end). Unknown items stay plain.
+- Click an item in the drawing or its row in the list → editor under the room: Room, Position
+  (north/east/south/west wall, free-standing), **Move here**, **Turn 90°**, **Take out**; errors
+  shown in place; Esc / × closes. The selected item is highlighted in hazard red.
+- "Not in the layout" box: **Place it** for items that did not fit or were taken out.
+- **Regenerate** asks first when there are manual changes ("replace your 2 manual changes").
+- Meta line shows "N changes by you"; rows show "Moved by you" and "turned".
+
+**Drag and drop (added on request)**
+
+- Grab any item in a room drawing (or the dashed handle of an item that is "Not in the layout")
+  and drag it — inside its room or into another room's drawing. While dragging, the spot is
+  snapped to a 5 cm grid and pulled flush to a wall within 15 cm, then checked with the same
+  rules as the server: **green ghost + green room border** = free spot, **red** = not allowed
+  with the reason (blocks the door, too close to the sofa, too tall for a window, outside the
+  room). A status bar at the bottom of the screen says the same in words. **R** turns the item
+  while dragging, **Esc** cancels. Dropping on red changes nothing; dropping on green saves.
+- A plain click still opens the editor (the click that ends a drag is ignored).
+- Server: new action `{ action: 'place', unitId, roomId, x, y, w, h }` re-checked with
+  `spotProblem()`; the wall / turned flag are worked out with `describeSpot()` (both in
+  `layout-packer.ts`, covered by the self-check). Client mirror of the rules:
+  `components/features/homes/layout-geometry.ts`; drag logic: `use-layout-drag.ts`.
+- Verified: 10/10 drag API checks (exact free spot, turned on a wall, too close, door, tall item
+  at window, outside, wrong size 422, other client 404) · browser: real mouse drag bed bedroom →
+  living room, red over the door and refused drop with the reason, R turns the ghost
+  160×200 → 200×160, Esc cancels, click still opens the editor, dragging a left-out chair from
+  the list into the office · 375 px fits, `touch-action: none` on items, no console errors.
+  Fixed during verification: a very fast click was lost (selection now uses the normal click).
+
+**Verified by me (2026-11-04):** 14/14 step-4 API checks (edit before plan 404, move keeps the
+number, rotate 160×200 → 200×160 on the same wall, full room 409 with a clear sentence, take
+out → `removedByClient`, rotate a taken-out item 400, place it back, bad action 422, unknown
+item 409, unknown room 404, other client 404, mover 403, 0 overlaps after edits) · step-3 (11)
+and step-1 (16) API checks still green · packer self-check with place / rotate / full-wall /
+near cases · `tsc` + `eslint` + prettier clean · browser: furniture drawings, select bed →
+turn → move to the living room's west wall → take a chair out → place it back → regenerate
+warning → regenerate clears manual changes · 375 px: page fits, editor stacks, no errors.
+Fixed during verification: a turned bed drew its pillows along the wall; long position labels
+were cut off in the select.
+
+**You test:** open your house → **Layout.** → **drag** the sofa to another room (watch green/red,
+press R while dragging) → drop it on red once (nothing changes) and on green → click the bed →
+**Turn 90°** → take a chair out and drag it back from "Not in the layout" → **Regenerate** (you
+get the warning) → **Delete plan**.
 
 ---
 
@@ -307,5 +370,5 @@ furniture so items sit flush against them; long Mongo room ids replaced by `R1�
 | 1 — House & rooms CRUD     | ✅ done | ✅             | ✅            |
 | 2 — Static request + sizes | ✅ done | ✅             | ✅            |
 | 3 — AI layout + drawing    | ✅ done | ✅             | ✅            |
-| 4 — Edit the layout        |         |                |               |
+| 4 — Edit + drag and drop   | ✅ done | ✅             | ✅            |
 | 5 — Hardening & hand-off   |         |                |               |

@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { homesApi } from '@/lib/api/homes';
+import type { LayoutItemUpdatePayload, LayoutPlanDto } from '@/types/homes';
 import { homesKeys, useHomesUserId } from './use-homes';
 
 /** Saved AI layout of a house (null = none yet). Re-read when the house changes. */
@@ -27,5 +28,16 @@ export function useDeleteLayout(homeId: string) {
   return useMutation({
     mutationFn: () => homesApi.deleteLayout(homeId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: homesKeys.layout(userId, homeId) }),
+  });
+}
+
+/** Move / rotate / take out one item; the returned plan replaces the cached one. */
+export function useUpdateLayoutItem(homeId: string) {
+  const queryClient = useQueryClient();
+  const userId = useHomesUserId();
+  return useMutation({
+    mutationFn: (payload: LayoutItemUpdatePayload) => homesApi.updateLayoutItem(homeId, payload),
+    onSuccess: (plan: LayoutPlanDto) =>
+      queryClient.setQueriesData({ queryKey: homesKeys.layout(userId, homeId) }, plan),
   });
 }

@@ -13,6 +13,8 @@ interface RoomOutlineProps {
   className?: string;
   /** Extra shapes drawn in room coordinates (cm, origin = north-west corner). */
   children?: ReactNode;
+  /** Marks the drawing as a drag-and-drop target (`data-layout-room`). */
+  roomId?: string;
 }
 
 /** Where a wall starts, which way it runs, and which way points into the room. */
@@ -58,6 +60,7 @@ export function RoomOutline({
   label,
   className,
   children,
+  roomId,
 }: RoomOutlineProps) {
   const width = safe(widthCm, 100);
   const length = safe(lengthCm, 100);
@@ -71,6 +74,7 @@ export function RoomOutline({
       viewBox={`${-pad} ${-pad} ${width + pad * 2} ${length + pad * 2}`}
       role="img"
       aria-label={label}
+      data-layout-room={roomId}
       className={cn('block h-full w-full', className)}
     >
       <rect x={0} y={0} width={width} height={length} fill="var(--color-paper-soft)" />

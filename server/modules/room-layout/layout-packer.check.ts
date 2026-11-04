@@ -3,7 +3,15 @@
  *   yarn tsx server/modules/room-layout/layout-packer.check.ts
  */
 import assert from 'node:assert/strict';
-import { packLayout, type PackRoom, type PackUnit } from './layout-packer';
+import {
+  describeSpot,
+  packLayout,
+  placeUnit,
+  spotProblem,
+  type PackRoom,
+  type PackUnit,
+  type Rect,
+} from './layout-packer';
 
 const bedroom: PackRoom = {
   id: 'bed',
@@ -97,5 +105,77 @@ assert.match(result.unplaced[0]!.reason, /Too big for Kitchen/);
 assert.equal(byId['chair-1']!.source, 'moveup');
 assert.equal(byId['chair-1']!.roomId, 'kitchen');
 assert.equal(result.warnings.length, 1);
+
+// --- placeUnit (manual edits) ------------------------------------------------
+const bed = units[0]!;
+const bedSpot = byId['bed-1']!;
+const othersInBedroom: Rect[] = result.placed
+  .filter((unit) => unit.roomId === 'bed' && unit.unitId !== 'bed-1')
+  .map(({ x, y, w, h }) => ({ x, y, w, h }));
+
+// Normal orientation on a wall: width along the wall, not rotated.
+assert.equal(bedSpot.rotated, false);
+assert.equal(bedSpot.w, 160);
+
+// Rotate in place: same wall, 200 along / 160 deep, close to where it was.
+const rotated = placeUnit(bedroom, bed, 'N', othersInBedroom, {
+  orientations: ['rotated'],
+  near: { x: bedSpot.x + bedSpot.w / 2, y: bedSpot.y + bedSpot.h / 2 },
+});
+assert.ok(rotated, 'bed can rotate on the north wall');
+assert.equal(rotated.rotated, true);
+assert.deepEqual([rotated.rect.w, rotated.rect.h, rotated.rect.y], [200, 160, 0]);
+
+// A full wall refuses the item (null), it is never forced in.
+const fullEastWall: Rect[] = [{ x: 240, y: 0, w: 60, h: 300 }];
+assert.equal(placeUnit(bedroom, bed, 'E', fullEastWall), null);
+
+// "near" picks the free spot closest to a point: a chair asked near x=250 on the north wall.
+const chair = units[5]!;
+const nearSpot = placeUnit(bedroom, chair, 'N', [], { near: { x: 250, y: 0 } });
+assert.ok(nearSpot && nearSpot.rect.x >= 200, `chair near x=250, got x=${nearSpot?.rect.x}`);
+
+// Free-standing works and stays off the walls.
+const centre = placeUnit(bedroom, chair, 'CENTER', []);
+assert.ok(centre && centre.rect.x >= 40 && centre.rect.y >= 40);
+
+// --- spotProblem / describeSpot (drag and drop) -------------------------------
+const wardrobe = units[1]!;
+// Free spot against the east wall, away from the door and the window.
+assert.equal(spotProblem(bedroom, wardrobe, { x: 240, y: 100, w: 60, h: 120 }, []), null);
+// Outside the room.
+assert.match(
+  spotProblem(bedroom, wardrobe, { x: 260, y: 100, w: 60, h: 120 }, []) ?? '',
+  /Outside/,
+);
+// In the door swing (S wall, x 20–100, last 80 cm).
+assert.equal(spotProblem(bedroom, chair, { x: 30, y: 240, w: 50, h: 50 }, []), 'Blocks the door.');
+// Tall wardrobe in front of the north window; a low chair there is fine.
+assert.match(spotProblem(bedroom, wardrobe, { x: 120, y: 0, w: 120, h: 60 }, []) ?? '', /window/);
+assert.equal(spotProblem(bedroom, chair, { x: 120, y: 0, w: 50, h: 50 }, []), null);
+// Too close to another item (5 cm gap).
+assert.equal(
+  spotProblem(bedroom, chair, { x: 0, y: 0, w: 50, h: 50 }, [
+    { name: 'Double Bed', rect: { x: 52, y: 0, w: 160, h: 200 } },
+  ]),
+  'Too close to Double Bed.',
+);
+// Which wall a dropped rectangle stands against, and whether it is turned.
+assert.deepEqual(describeSpot(bedroom, bed, { x: 50, y: 0, w: 160, h: 200 }), {
+  wall: 'N',
+  rotated: false,
+});
+assert.deepEqual(describeSpot(bedroom, bed, { x: 0, y: 50, w: 200, h: 160 }), {
+  wall: 'W',
+  rotated: false,
+});
+assert.deepEqual(describeSpot(bedroom, bed, { x: 50, y: 0, w: 200, h: 160 }), {
+  wall: 'N',
+  rotated: true,
+});
+assert.deepEqual(describeSpot(bedroom, chair, { x: 120, y: 120, w: 50, h: 50 }), {
+  wall: 'CENTER',
+  rotated: false,
+});
 
 console.log('layout-packer: all checks passed');
