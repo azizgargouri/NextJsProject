@@ -16,12 +16,19 @@ export function connectMongo(): Promise<Mongoose> {
 
   // Lazy-import the validated env config to keep this module standalone.
   const { env } = require('../../config/env') as typeof import('../../config/env');
-  const uri = env().MONGODB_URI;
+  const { MONGODB_URI: uri, MONGODB_DB_NAME: dbName } = env();
 
-  globalForMongoose.__moveUpMongoose = mongoose.connect(uri, {
-    serverSelectionTimeoutMS: 5_000,
-    dbName: 'moveup',
-  });
+  // A failed attempt must not stay cached, or the server would keep failing
+  // after the database comes back, until someone restarts it.
+  globalForMongoose.__moveUpMongoose = mongoose
+    .connect(uri, {
+      serverSelectionTimeoutMS: 5_000,
+      dbName,
+    })
+    .catch((error: unknown) => {
+      globalForMongoose.__moveUpMongoose = undefined;
+      throw error;
+    });
 
   return globalForMongoose.__moveUpMongoose;
 }

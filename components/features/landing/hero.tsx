@@ -151,7 +151,7 @@ export function Hero({ copy = {} }: { copy?: HeroCopy }) {
         className="relative h-[38dvh] w-full overflow-hidden border-t-2 border-ink md:h-[46dvh]"
       >
         <img
-          src="https://picsum.photos/seed/moveup-van/1920/1080"
+          src="/images/landing/moveup-van.jpg"
           alt="Moving truck loaded with furniture, monochrome"
           className="size-full object-cover opacity-90 contrast-125 grayscale"
           fetchPriority="high"

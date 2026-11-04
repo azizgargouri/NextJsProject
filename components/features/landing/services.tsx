@@ -110,7 +110,7 @@ export function Services() {
                   className="relative mb-6 h-48 overflow-hidden border border-ink md:h-64"
                 >
                   <Image
-                    src={`https://picsum.photos/seed/${service.seed}/1200/800`}
+                    src={`/images/landing/${service.seed}.jpg`}
                     alt=""
                     fill
                     sizes="(min-width: 768px) 50vw, 100vw"

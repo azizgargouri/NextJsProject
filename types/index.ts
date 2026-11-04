@@ -194,3 +194,5 @@ export interface ContentResetPayload {
   locale: 'en' | 'fr' | 'ar';
   keys: string[];
 }
+
+export * from './mover';

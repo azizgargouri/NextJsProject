@@ -9,6 +9,7 @@ export interface MoverProfileDoc {
   id: string;
   userId: string;
   companyName: string;
+  taxId: string;
   bio: string;
   /** Ordered service zone codes, e.g. ["TUN","NBE"] (spec annex, city coder). */
   zones: string[];
@@ -25,6 +26,7 @@ const MoverProfileSchema = new Schema<MoverProfileDoc>(
   {
     userId: { type: String, required: true, unique: true, index: true },
     companyName: { type: String, required: true, trim: true },
+    taxId: { type: String, default: '', trim: true },
     bio: { type: String, default: '' },
     zones: { type: [String], default: [] },
     verificationStatus: {

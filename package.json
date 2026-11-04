@@ -6,10 +6,13 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "offline": "node scripts/offline.mjs",
     "lint": "next lint",
     "format": "prettier --write \"**/*.{ts,tsx,css,md}\" --ignore-path .gitignore",
     "db:seed": "tsx server/seed.ts",
-    "db:reset": "mongosh moveup --eval 'db.dropDatabase()' && yarn db:seed"
+    "db:reset": "mongosh moveup --eval 'db.dropDatabase()' && yarn db:seed",
+    "db:seed:mover": "tsx server/seed-mover.ts",
+    "test:mover": "tsx --test --test-concurrency=1 tests/mover/*.test.ts"
   },
   "dependencies": {
     "@gsap/react": "^2.1.2",

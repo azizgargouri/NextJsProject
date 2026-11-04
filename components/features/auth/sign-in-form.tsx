@@ -56,8 +56,11 @@ export function SignInForm() {
 
   const onSubmit = (values: SignInFormValues) => {
     mutate(values, {
-      onSuccess: (response) =>
-        router.push(response.user.role === 'ADMIN' ? '/admin' : '/dashboard'),
+      onSuccess: ({ user }) => {
+        // A real page load: the mover service worker can only control a page created under /mover.
+        if (user.role === 'MOVER') window.location.assign('/mover');
+        else router.push(user.role === 'ADMIN' ? '/admin' : '/dashboard');
+      },
     });
   };
 

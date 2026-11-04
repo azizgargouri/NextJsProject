@@ -127,7 +127,7 @@ export function HowItWorks({ steps }: { steps?: { title: string; body: string }[
                   <div className="relative w-1/2 shrink-0 overflow-hidden">
                     <div data-step-visual className="relative z-10 size-full">
                       <img
-                        src={`https://picsum.photos/seed/${step.seed}/900/1200`}
+                        src={`/images/landing/${step.seed}.jpg`}
                         alt=""
                         className="size-full object-cover grayscale contrast-125"
                         loading="lazy"

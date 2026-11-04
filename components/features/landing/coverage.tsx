@@ -105,7 +105,7 @@ export function Coverage({ intro }: { intro?: string }) {
               >
                 <div className={`relative ${city.rows === 2 ? 'h-full min-h-72' : 'h-40'}`}>
                   <img
-                    src={`https://picsum.photos/seed/${city.seed}/700/1000`}
+                    src={`/images/landing/${city.seed}.jpg`}
                     alt=""
                     className="absolute inset-0 size-full object-cover grayscale contrast-125 opacity-80 transition-all duration-700 group-hover:scale-105 group-hover:opacity-100"
                     loading="lazy"

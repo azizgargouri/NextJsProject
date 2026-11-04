@@ -1,5 +1,7 @@
 /node_modules
 /.next
+/.next-offline
+/.offline
 /out
 /build
 /coverage
@@ -20,6 +22,9 @@ next-env.d.ts
 .vercel
 *.log
 yarn-error.log
+
+# private mover uploads (local storage driver)
+/.uploads
 
 # local agent review artifacts
 /.impeccable
