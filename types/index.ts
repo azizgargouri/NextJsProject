@@ -15,6 +15,8 @@ export interface ResponseUserDto extends DatabaseEntity {
   role: UserRole;
   locale: string;
   status: UserStatus;
+  /** Same-origin avatar URL (versioned for cache busting) or null when none is set. */
+  avatarUrl: string | null;
 }
 
 export interface ApiUserResponse {
@@ -92,7 +94,12 @@ export type AuditEventType =
   | 'PRICING_CREATE'
   | 'PRICING_UPDATE'
   | 'PRICING_DELETE'
-  | 'CONTENT_UPDATE';
+  | 'CONTENT_UPDATE'
+  | 'PROFILE_UPDATE'
+  | 'AVATAR_UPDATE'
+  | 'PASSWORD_CHANGE'
+  | 'SESSION_REVOKE'
+  | 'STORAGE_DELETE';
 
 export interface AuditEventDto {
   id: string;
@@ -193,4 +200,75 @@ export interface ContentSavePayload {
 export interface ContentResetPayload {
   locale: 'en' | 'fr' | 'ar';
   keys: string[];
+}
+
+// ── Account (self-service) ─────────────────────────────────────────────
+
+export interface ProfileUpdatePayload {
+  name?: string;
+  phone?: string;
+  locale?: 'en' | 'fr' | 'ar';
+}
+
+export interface PasswordChangePayload {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+  signOutOtherSessions: boolean;
+}
+
+export interface AccountSessionDto {
+  id: string;
+  userAgent: string | null;
+  startedAt: string;
+  lastActiveAt: string;
+  expiresAt: string;
+  current: boolean;
+}
+
+export interface AccountNotificationDto {
+  id: string;
+  event: AuditEventType;
+  createdAt: string;
+  unread: boolean;
+  actor: { id: string; name: string; email: string } | null;
+  logInfo: Record<string, string | undefined>;
+}
+
+export interface AccountNotificationsPage {
+  data: AccountNotificationDto[];
+  unreadCount: number;
+  seenAt: string | null;
+  nextBefore: string | null;
+}
+
+// ── Object storage (admin) ─────────────────────────────────────────────
+
+export interface StorageStatusDto {
+  reachable: boolean;
+  bucket: string;
+  endpoint: string;
+  objectCount: number | null;
+  totalBytes: number | null;
+  prefixes: { prefix: string; objectCount: number; totalBytes: number }[];
+}
+
+export interface StorageObjectDto {
+  key: string;
+  size: number;
+  lastModified: string | null;
+  etag: string | null;
+  owner: { id: string; name: string; email: string } | null;
+  referenced: boolean;
+}
+
+export interface StorageObjectsPage {
+  data: StorageObjectDto[];
+  nextCursor: string | null;
+}
+
+export interface StorageObjectsQuery {
+  prefix?: string;
+  cursor?: string;
+  limit?: number;
 }

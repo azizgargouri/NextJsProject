@@ -4,6 +4,7 @@ import {
   FileText,
   Gauge,
   Gavel,
+  HardDrive,
   History,
   MessageSquareText,
   ShieldCheck,
@@ -11,9 +12,14 @@ import {
   Users,
   type LucideIcon,
 } from 'lucide-react';
+import type { AdminMessages } from '@/lib/i18n/admin';
+
+export type AdminNavKey = keyof AdminMessages['nav']['items'];
+export type AdminNavGroupKey = keyof AdminMessages['nav']['groups'];
 
 export interface AdminNavItem {
-  label: string;
+  /** Dictionary key under `nav.items` — labels are resolved per locale. */
+  key: AdminNavKey;
   href: string;
   icon: LucideIcon;
   /** True while the module's product domain is not connected to the back office. */
@@ -21,30 +27,30 @@ export interface AdminNavItem {
 }
 
 export interface AdminNavGroup {
-  label: string;
+  key: AdminNavGroupKey;
   items: AdminNavItem[];
 }
 
 export const adminNavGroups: AdminNavGroup[] = [
   {
-    label: 'Workspace',
-    items: [{ label: 'Overview', href: '/admin', icon: Gauge }],
+    key: 'workspace',
+    items: [{ key: 'overview', href: '/admin', icon: Gauge }],
   },
   {
-    label: 'Operations',
+    key: 'operations',
     items: [
-      { label: 'Move requests', href: '/admin/moves', icon: ClipboardList, upcoming: true },
-      { label: 'Assignments', href: '/admin/assignments', icon: Truck, upcoming: true },
-      { label: 'Disputes', href: '/admin/disputes', icon: Gavel, upcoming: true },
+      { key: 'moves', href: '/admin/moves', icon: ClipboardList, upcoming: true },
+      { key: 'assignments', href: '/admin/assignments', icon: Truck, upcoming: true },
+      { key: 'disputes', href: '/admin/disputes', icon: Gavel, upcoming: true },
     ],
   },
   {
-    label: 'Network',
+    key: 'network',
     items: [
-      { label: 'User accounts', href: '/admin/users', icon: Users },
-      { label: 'Mover reviews', href: '/admin/mover-reviews', icon: ShieldCheck, upcoming: true },
+      { key: 'users', href: '/admin/users', icon: Users },
+      { key: 'moverReviews', href: '/admin/mover-reviews', icon: ShieldCheck, upcoming: true },
       {
-        label: 'Customer reviews',
+        key: 'customerReviews',
         href: '/admin/customer-reviews',
         icon: MessageSquareText,
         upcoming: true,
@@ -52,11 +58,12 @@ export const adminNavGroups: AdminNavGroup[] = [
     ],
   },
   {
-    label: 'Control',
+    key: 'control',
     items: [
-      { label: 'Pricing rules', href: '/admin/pricing', icon: BadgeDollarSign },
-      { label: 'Content', href: '/admin/content', icon: FileText },
-      { label: 'Audit log', href: '/admin/audit', icon: History },
+      { key: 'pricing', href: '/admin/pricing', icon: BadgeDollarSign },
+      { key: 'content', href: '/admin/content', icon: FileText },
+      { key: 'storage', href: '/admin/storage', icon: HardDrive },
+      { key: 'audit', href: '/admin/audit', icon: History },
     ],
   },
 ];

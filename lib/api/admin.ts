@@ -14,6 +14,9 @@ import type {
   PricingRuleDto,
   PricingRulePayload,
   ResponseUserDto,
+  StorageObjectsPage,
+  StorageObjectsQuery,
+  StorageStatusDto,
   UserStatus,
 } from '@/types';
 
@@ -136,6 +139,41 @@ export const adminApi = {
     const { data } = await axiosClient.patch<{ locale: string; reset: number }>(
       '/api/admin/content?mode=reset',
       payload,
+    );
+    return data;
+  },
+
+  storageStatus: async (): Promise<StorageStatusDto> => {
+    const { data } = await axiosClient.get<StorageStatusDto>('/api/admin/storage');
+    return data;
+  },
+
+  storageObjects: async (query: StorageObjectsQuery): Promise<StorageObjectsPage> => {
+    const params = new URLSearchParams();
+    if (query.prefix) params.set('prefix', query.prefix);
+    if (query.cursor) params.set('cursor', query.cursor);
+    if (query.limit) params.set('limit', String(query.limit));
+    const { data } = await axiosClient.get<StorageObjectsPage>('/api/admin/storage/objects', {
+      params,
+    });
+    return data;
+  },
+
+  downloadStorageObject: async (key: string): Promise<Blob> => {
+    const { data } = await axiosClient.get<Blob>('/api/admin/storage/objects', {
+      params: { key },
+      responseType: 'blob',
+      timeout: 60000,
+    });
+    return data;
+  },
+
+  deleteStorageObject: async (
+    key: string,
+  ): Promise<{ key: string; detachedUserId: string | null }> => {
+    const { data } = await axiosClient.delete<{ key: string; detachedUserId: string | null }>(
+      '/api/admin/storage/objects',
+      { params: { key } },
     );
     return data;
   },
