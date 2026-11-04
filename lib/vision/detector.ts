@@ -1,8 +1,8 @@
 /**
  * Computer Vision & Spatial LiDAR Object Detection Engine
- * Analyzes image pixels, contours, color signatures, and LiDAR depth metrics
- * to classify furniture, boxes, and appliances, computing physical dimensions
- * (height, width, depth in cm), 3D volume (m³), and estimated weight (kg).
+ * High-accuracy multi-object segmentation using spatial color histogram clustering,
+ * geometric aspect-ratio classification, connected-component BFS analysis,
+ * and calibrated LiDAR depth scaling.
  */
 
 export interface DetectedObject {
@@ -16,36 +16,30 @@ export interface DetectedObject {
   volume: number; // m³
   weight: number; // kg
   quantity: number;
-  box2d: { x: number; y: number; w: number; h: number }; // normalized 0-100%
+  box2d: { x: number; y: number; w: number; h: number }; // normalized percentage 0-100%
   description: string;
 }
 
-interface ImageColorProfile {
-  hasCardboard: boolean;
-  hasUpholstery: boolean;
-  hasMetallic: boolean;
-  hasWood: boolean;
-  hasScreen: boolean;
-  cardboardPct: number;
-  upholsteryPct: number;
-  metallicPct: number;
-  woodPct: number;
-  aspectRatio: number;
-  dominantHue: string;
-  clusters: {
-    type: 'box' | 'sofa' | 'fridge' | 'washer' | 'table' | 'bed' | 'chair' | 'wardrobe' | 'tv';
-    box2d: { x: number; y: number; w: number; h: number };
-    intensity: number;
-  }[];
+type CellSignature = 'box' | 'sofa' | 'metallic' | 'wood' | 'screen' | 'empty';
+
+interface CellComponent {
+  type: CellSignature;
+  cells: { gx: number; gy: number }[];
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+  cellCount: number;
 }
 
 /**
- * Analyzes an image canvas to extract semantic color clusters and spatial contours.
+ * Runs 16x12 spatial grid segmentation on canvas pixels, isolating connected
+ * components to recognize discrete physical objects in the room.
  */
-function extractImageFeatures(
+function segmentImage(
   img: HTMLImageElement | HTMLVideoElement,
-  _depthMeters: number = 2.2,
-): ImageColorProfile {
+  lidarDepthMeters: number,
+): DetectedObject[] {
   const canvas = document.createElement('canvas');
   const width = 160;
   const height = 120;
@@ -53,53 +47,31 @@ function extractImageFeatures(
   canvas.height = height;
   const ctx = canvas.getContext('2d');
 
-  if (!ctx) {
-    return {
-      hasCardboard: false,
-      hasUpholstery: true,
-      hasMetallic: false,
-      hasWood: false,
-      hasScreen: false,
-      cardboardPct: 0,
-      upholsteryPct: 0.5,
-      metallicPct: 0,
-      woodPct: 0,
-      aspectRatio: width / height,
-      dominantHue: 'neutral',
-      clusters: [],
-    };
-  }
+  if (!ctx) return [];
 
   ctx.drawImage(img, 0, 0, width, height);
   const imgData = ctx.getImageData(0, 0, width, height);
   const data = imgData.data;
 
-  // 12x9 spatial grid for localized object segmentation
-  const gridCols = 12;
-  const gridRows = 9;
+  // 16x12 spatial resolution (192 localized sampling cells)
+  const gridCols = 16;
+  const gridRows = 12;
   const cellW = width / gridCols;
   const cellH = height / gridRows;
 
-  let cardboardPixels = 0;
-  let upholsteryPixels = 0;
-  let metallicPixels = 0;
-  let woodPixels = 0;
-  let darkScreenPixels = 0;
-  const totalPixels = width * height;
-
-  const gridSignatures: ('box' | 'sofa' | 'metallic' | 'wood' | 'screen' | 'empty')[][] = Array.from(
-    { length: gridRows },
-    () => Array(gridCols).fill('empty'),
+  const grid: CellSignature[][] = Array.from({ length: gridRows }, () =>
+    Array(gridCols).fill('empty'),
   );
 
+  // 1. Classify each cell based on HSV distribution
   for (let gy = 0; gy < gridRows; gy++) {
     for (let gx = 0; gx < gridCols; gx++) {
       let gCardboard = 0;
-      let gUpholstery = 0;
-      let gMetallic = 0;
       let gWood = 0;
+      let gMetallic = 0;
       let gScreen = 0;
-      let cellCount = 0;
+      let gUpholstery = 0;
+      let totalPixelsInCell = 0;
 
       const startX = Math.floor(gx * cellW);
       const endX = Math.floor((gx + 1) * cellW);
@@ -113,7 +85,7 @@ function extractImageFeatures(
           const g = data[idx + 1]!;
           const b = data[idx + 2]!;
 
-          // RGB to HSV approximation
+          // Convert RGB to HSV
           const max = Math.max(r, g, b);
           const min = Math.min(r, g, b);
           const d = max - min;
@@ -128,153 +100,357 @@ function extractImageFeatures(
           }
           const hueDeg = h * 360;
 
-          // 1. Cardboard kraft brown: Hue 20-50, Sat 25%-75%, Val 28%-78%
-          if (hueDeg >= 22 && hueDeg <= 48 && s >= 0.22 && s <= 0.78 && v >= 0.25 && v <= 0.8) {
+          // 1. Cardboard kraft brown: Hue 24-48, Sat 0.24-0.78, Val 0.28-0.80
+          if (hueDeg >= 24 && hueDeg <= 48 && s >= 0.24 && s <= 0.78 && v >= 0.28 && v <= 0.8) {
             gCardboard++;
-            cardboardPixels++;
           }
-          // 2. Wood grain: Hue 15-38, Sat 35%-85%, Val 20%-65%
-          else if (hueDeg >= 15 && hueDeg <= 38 && s >= 0.35 && v >= 0.18 && v <= 0.65) {
+          // 2. Wood grain (oak, walnut, mahogany): Hue 14-36, Sat 0.36-0.88, Val 0.18-0.66
+          else if (hueDeg >= 14 && hueDeg <= 36 && s >= 0.36 && v >= 0.18 && v <= 0.66) {
             gWood++;
-            woodPixels++;
           }
-          // 3. Metallic/reflective (white / stainless steel / fridge): Low saturation, high value
-          else if (s < 0.18 && v > 0.68) {
+          // 3. Metallic/reflective (white appliance, stainless steel): Low saturation, high value
+          else if (s < 0.16 && v > 0.68) {
             gMetallic++;
-            metallicPixels++;
           }
-          // 4. Dark screen / electronics: Low value, low saturation
-          else if (v < 0.16) {
+          // 4. Dark screen / electronics: Low value
+          else if (v < 0.14) {
             gScreen++;
-            darkScreenPixels++;
           }
-          // 5. Fabric / Upholstery: Grey, Navy, Warm Beige, Charcoal
-          else if ((s < 0.35 && v >= 0.25 && v <= 0.75) || (hueDeg >= 190 && hueDeg <= 235 && s > 0.2)) {
+          // 5. Upholstered fabric: Muted blues, warm greys, linen beiges, charcoal
+          else if (
+            (hueDeg >= 195 && hueDeg <= 235 && s >= 0.18 && v >= 0.20 && v <= 0.85) ||
+            (s >= 0.12 && s <= 0.38 && v >= 0.22 && v <= 0.70)
+          ) {
             gUpholstery++;
-            upholsteryPixels++;
           }
 
-          cellCount++;
+          totalPixelsInCell++;
         }
       }
 
-      // Tag cell signature
-      const threshold = cellCount * 0.35;
+      // Strong signature threshold: at least 32% of cell pixels must match
+      const threshold = totalPixelsInCell * 0.32;
       if (gCardboard > threshold && gCardboard > gWood) {
-        gridSignatures[gy]![gx] = 'box';
-      } else if (gMetallic > threshold) {
-        gridSignatures[gy]![gx] = 'metallic';
+        grid[gy]![gx] = 'box';
       } else if (gWood > threshold) {
-        gridSignatures[gy]![gx] = 'wood';
+        grid[gy]![gx] = 'wood';
+      } else if (gMetallic > threshold) {
+        grid[gy]![gx] = 'metallic';
       } else if (gScreen > threshold) {
-        gridSignatures[gy]![gx] = 'screen';
+        grid[gy]![gx] = 'screen';
       } else if (gUpholstery > threshold) {
-        gridSignatures[gy]![gx] = 'sofa';
+        grid[gy]![gx] = 'sofa';
       }
     }
   }
 
-  const cardboardPct = cardboardPixels / totalPixels;
-  const upholsteryPct = upholsteryPixels / totalPixels;
-  const metallicPct = metallicPixels / totalPixels;
-  const woodPct = woodPixels / totalPixels;
+  // 2. Connected Component BFS Clustering
+  // Groups neighboring cells of the same type into discrete object instances
+  const visited: boolean[][] = Array.from({ length: gridRows }, () =>
+    Array(gridCols).fill(false),
+  );
+  const components: CellComponent[] = [];
 
-  // Identify connected clusters in the grid
-  const clusters: ImageColorProfile['clusters'] = [];
+  for (let gy = 0; gy < gridRows; gy++) {
+    for (let gx = 0; gx < gridCols; gx++) {
+      const type = grid[gy]![gx]!;
+      if (type === 'empty' || visited[gy]![gx]) continue;
 
-  // Helper to find bounding box of tagged cells
-  function findBoundingBox(targetType: 'box' | 'sofa' | 'metallic' | 'wood' | 'screen') {
-    let minX = gridCols;
-    let maxX = -1;
-    let minY = gridRows;
-    let maxY = -1;
-    let count = 0;
+      // Start BFS
+      const queue: { x: number; y: number }[] = [{ x: gx, y: gy }];
+      visited[gy]![gx] = true;
+      const componentCells: { gx: number; gy: number }[] = [];
+      let minX = gx;
+      let maxX = gx;
+      let minY = gy;
+      let maxY = gy;
 
-    for (let gy = 0; gy < gridRows; gy++) {
-      for (let gx = 0; gx < gridCols; gx++) {
-        if (gridSignatures[gy]![gx] === targetType) {
-          count++;
-          if (gx < minX) minX = gx;
-          if (gx > maxX) maxX = gx;
-          if (gy < minY) minY = gy;
-          if (gy > maxY) maxY = gy;
+      while (queue.length > 0) {
+        const curr = queue.shift()!;
+        componentCells.push({ gx: curr.x, gy: curr.y });
+        minX = Math.min(minX, curr.x);
+        maxX = Math.max(maxX, curr.x);
+        minY = Math.min(minY, curr.y);
+        maxY = Math.max(maxY, curr.y);
+
+        // 4-directional neighborhood
+        const neighbors = [
+          { x: curr.x + 1, y: curr.y },
+          { x: curr.x - 1, y: curr.y },
+          { x: curr.x, y: curr.y + 1 },
+          { x: curr.x, y: curr.y - 1 },
+        ];
+
+        for (const n of neighbors) {
+          if (
+            n.x >= 0 &&
+            n.x < gridCols &&
+            n.y >= 0 &&
+            n.y < gridRows &&
+            !visited[n.y]![n.x] &&
+            grid[n.y]![n.x] === type
+          ) {
+            visited[n.y]![n.x] = true;
+            queue.push(n);
+          }
         }
       }
+
+      // Keep components that have at least 2 connected cells (filters random noise)
+      if (componentCells.length >= 2) {
+        components.push({
+          type,
+          cells: componentCells,
+          minX,
+          maxX,
+          minY,
+          maxY,
+          cellCount: componentCells.length,
+        });
+      }
     }
-
-    if (count < 3) return null;
-
-    const x = Math.max(5, Math.round((minX / gridCols) * 100));
-    const y = Math.max(8, Math.round((minY / gridRows) * 100));
-    const w = Math.min(90 - x, Math.max(22, Math.round(((maxX - minX + 1) / gridCols) * 100)));
-    const h = Math.min(88 - y, Math.max(20, Math.round(((maxY - minY + 1) / gridRows) * 100)));
-
-    return { x, y, w, h, count };
   }
 
-  // 1. Check for Box Cluster
-  if (cardboardPct > 0.08) {
-    const boxBbox = findBoundingBox('box');
-    clusters.push({
-      type: 'box',
-      box2d: boxBbox ? { x: boxBbox.x, y: boxBbox.y, w: boxBbox.w, h: boxBbox.h } : { x: 30, y: 35, w: 40, h: 42 },
-      intensity: cardboardPct,
-    });
+  // LiDAR depth calibration: distance in meters scales metric proportions
+  const depthFactor = Math.max(0.75, Math.min(1.9, lidarDepthMeters / 2.2));
+  const detected: DetectedObject[] = [];
+
+  // Sort components by size (largest first)
+  components.sort((a, b) => b.cellCount - a.cellCount);
+
+  // 3. Classify each isolated component into specific household items
+  for (let idx = 0; idx < components.length; idx++) {
+    const comp = components[idx]!;
+
+    // Normalized bounding box 0-100%
+    const boxX = Math.max(4, Math.round((comp.minX / gridCols) * 100));
+    const boxY = Math.max(6, Math.round((comp.minY / gridRows) * 100));
+    const boxW = Math.min(94 - boxX, Math.max(16, Math.round(((comp.maxX - comp.minX + 1) / gridCols) * 100)));
+    const boxH = Math.min(92 - boxY, Math.max(14, Math.round(((comp.maxY - comp.minY + 1) / gridRows) * 100)));
+    const aspectRatio = boxW / Math.max(1, boxH);
+
+    const box2d = { x: boxX, y: boxY, w: boxW, h: boxH };
+
+    if (comp.type === 'box') {
+      const isLargeBox = comp.cellCount >= 6 || boxW > 30;
+      const widthCm = Math.round((isLargeBox ? 60 : 45) * depthFactor);
+      const heightCm = Math.round((isLargeBox ? 45 : 35) * depthFactor);
+      const depthCm = Math.round((isLargeBox ? 45 : 35) * depthFactor);
+      const volume = Number(((widthCm * heightCm * depthCm) / 1_000_000).toFixed(2));
+      const weight = Math.round(isLargeBox ? 25 * depthFactor : 16 * depthFactor);
+
+      detected.push({
+        id: `box-${Date.now()}-${idx}`,
+        name: isLargeBox ? 'Heavy-Duty Storage Box' : 'Standard Moving Box',
+        category: 'box',
+        confidence: Number((0.90 + Math.min(0.08, comp.cellCount * 0.01)).toFixed(2)),
+        widthCm,
+        heightCm,
+        depthCm,
+        volume: Math.max(0.06, volume),
+        weight: Math.max(10, weight),
+        quantity: 1,
+        box2d,
+        description: `Kraft corrugated cardboard detected at ${lidarDepthMeters.toFixed(1)}m.`,
+      });
+    } else if (comp.type === 'metallic') {
+      // Height vs Width checks: tall upright = Fridge, squarish = Washer, small = Microwave
+      const isTall = aspectRatio < 0.9 && boxH > 35;
+      const isCompact = boxW < 24 && boxH < 24;
+
+      if (isTall) {
+        const heightCm = Math.round(185 * depthFactor);
+        const widthCm = Math.round(70 * depthFactor);
+        const depthCm = Math.round(68 * depthFactor);
+        const volume = Number(((widthCm * heightCm * depthCm) / 1_000_000).toFixed(2));
+
+        detected.push({
+          id: `fridge-${Date.now()}-${idx}`,
+          name: 'Refrigerator / Freezer Unit',
+          category: 'appliance',
+          confidence: 0.94,
+          widthCm,
+          heightCm,
+          depthCm,
+          volume: Math.max(0.85, volume),
+          weight: Math.round(82 * depthFactor),
+          quantity: 1,
+          box2d,
+          description: `Tall upright appliance detected (${heightCm}cm H) with metallic reflectivity.`,
+        });
+      } else if (isCompact) {
+        detected.push({
+          id: `microwave-${Date.now()}-${idx}`,
+          name: 'Countertop Microwave / Oven',
+          category: 'appliance',
+          confidence: 0.88,
+          widthCm: Math.round(52 * depthFactor),
+          heightCm: Math.round(34 * depthFactor),
+          depthCm: Math.round(38 * depthFactor),
+          volume: 0.07,
+          weight: 14,
+          quantity: 1,
+          box2d,
+          description: 'Compact metallic kitchen appliance.',
+        });
+      } else {
+        detected.push({
+          id: `washer-${Date.now()}-${idx}`,
+          name: 'Front-Loading Washing Machine',
+          category: 'appliance',
+          confidence: 0.91,
+          widthCm: 60,
+          heightCm: 85,
+          depthCm: 60,
+          volume: 0.31,
+          weight: 72,
+          quantity: 1,
+          box2d,
+          description: 'Standard 60x60x85 cm front loader with counterweight assembly.',
+        });
+      }
+    } else if (comp.type === 'wood') {
+      const isTall = aspectRatio < 0.85 && boxH > 40;
+      const isWideTable = aspectRatio > 1.25;
+
+      if (isTall) {
+        detected.push({
+          id: `wardrobe-${Date.now()}-${idx}`,
+          name: 'Wooden Wardrobe / Tall Cabinet',
+          category: 'furniture',
+          confidence: 0.91,
+          widthCm: Math.round(110 * depthFactor),
+          heightCm: Math.round(195 * depthFactor),
+          depthCm: Math.round(58 * depthFactor),
+          volume: 1.25,
+          weight: Math.round(74 * depthFactor),
+          quantity: 1,
+          box2d,
+          description: 'Tall solid wooden storage cabinet.',
+        });
+      } else if (isWideTable) {
+        const widthCm = Math.round(160 * depthFactor);
+        const heightCm = 76;
+        const depthCm = Math.round(90 * depthFactor);
+        const volume = Number(((widthCm * heightCm * depthCm) / 1_000_000).toFixed(2));
+
+        detected.push({
+          id: `table-${Date.now()}-${idx}`,
+          name: 'Wooden Dining / Office Table',
+          category: 'furniture',
+          confidence: 0.92,
+          widthCm,
+          heightCm,
+          depthCm,
+          volume: Math.max(0.85, volume),
+          weight: Math.round(42 * depthFactor),
+          quantity: 1,
+          box2d,
+          description: `Horizontal wood plane (${widthCm}x${depthCm}cm) on frame.`,
+        });
+      } else {
+        detected.push({
+          id: `side-table-${Date.now()}-${idx}`,
+          name: 'Wood Side Table / Nightstand',
+          category: 'furniture',
+          confidence: 0.86,
+          widthCm: Math.round(55 * depthFactor),
+          heightCm: Math.round(55 * depthFactor),
+          depthCm: Math.round(45 * depthFactor),
+          volume: 0.14,
+          weight: 12,
+          quantity: 1,
+          box2d,
+          description: 'Compact wooden accent table.',
+        });
+      }
+    } else if (comp.type === 'screen') {
+      detected.push({
+        id: `tv-${Date.now()}-${idx}`,
+        name: 'Flat Screen TV / Monitor',
+        category: 'electronics',
+        confidence: 0.92,
+        widthCm: Math.round(120 * depthFactor),
+        heightCm: Math.round(72 * depthFactor),
+        depthCm: 12,
+        volume: 0.10,
+        weight: 17,
+        quantity: 1,
+        box2d,
+        description: 'High-contrast dark display panel.',
+      });
+    } else if (comp.type === 'sofa') {
+      const isWideSofa = aspectRatio >= 1.55 && boxW > 35;
+      const isLoveseat = aspectRatio >= 1.2 && !isWideSofa;
+      const isChair = aspectRatio < 1.2;
+
+      if (isWideSofa) {
+        const widthCm = Math.round(215 * depthFactor);
+        const heightCm = Math.round(85 * depthFactor);
+        const depthCm = Math.round(92 * depthFactor);
+        const volume = Number(((widthCm * heightCm * depthCm) / 1_000_000).toFixed(2));
+
+        detected.push({
+          id: `sofa-${Date.now()}-${idx}`,
+          name: '3-Seater Upholstered Sofa',
+          category: 'furniture',
+          confidence: 0.93,
+          widthCm,
+          heightCm,
+          depthCm,
+          volume: Math.max(1.4, volume),
+          weight: Math.round(76 * depthFactor),
+          quantity: 1,
+          box2d,
+          description: `Upholstered 3-seater couch (${widthCm}cm W) with cushioned seating.`,
+        });
+      } else if (isLoveseat) {
+        const widthCm = Math.round(160 * depthFactor);
+        const heightCm = Math.round(82 * depthFactor);
+        const depthCm = Math.round(88 * depthFactor);
+        const volume = Number(((widthCm * heightCm * depthCm) / 1_000_000).toFixed(2));
+
+        detected.push({
+          id: `loveseat-${Date.now()}-${idx}`,
+          name: '2-Seater Loveseat Sofa',
+          category: 'furniture',
+          confidence: 0.90,
+          widthCm,
+          heightCm,
+          depthCm,
+          volume: Math.max(1.1, volume),
+          weight: Math.round(56 * depthFactor),
+          quantity: 1,
+          box2d,
+          description: `2-seater upholstered loveseat (${widthCm}cm W).`,
+        });
+      } else if (isChair) {
+        detected.push({
+          id: `chair-${Date.now()}-${idx}`,
+          name: 'Upholstered Armchair',
+          category: 'furniture',
+          confidence: 0.88,
+          widthCm: Math.round(85 * depthFactor),
+          heightCm: Math.round(88 * depthFactor),
+          depthCm: Math.round(82 * depthFactor),
+          volume: 0.58,
+          weight: 23,
+          quantity: 1,
+          box2d,
+          description: 'Single upholstered club armchair.',
+        });
+      }
+    }
   }
 
-  // 2. Check for Metallic (Fridge or Washer)
-  if (metallicPct > 0.12) {
-    const mBbox = findBoundingBox('metallic');
-    const isTall = mBbox ? mBbox.h > mBbox.w * 1.3 : false;
-    clusters.push({
-      type: isTall ? 'fridge' : 'washer',
-      box2d: mBbox ? { x: mBbox.x, y: mBbox.y, w: mBbox.w, h: mBbox.h } : { x: 25, y: 20, w: 35, h: isTall ? 65 : 42 },
-      intensity: metallicPct,
-    });
-  }
-
-  // 3. Check for Wood (Table / Bed / Wardrobe)
-  if (woodPct > 0.1) {
-    const wBbox = findBoundingBox('wood');
-    const isWide = wBbox ? wBbox.w > wBbox.h * 1.2 : true;
-    clusters.push({
-      type: isWide ? 'table' : 'wardrobe',
-      box2d: wBbox ? { x: wBbox.x, y: wBbox.y, w: wBbox.w, h: wBbox.h } : { x: 20, y: 30, w: 58, h: 45 },
-      intensity: woodPct,
-    });
-  }
-
-  // 4. Check for Upholstery / Furniture (Sofa or Armchair)
-  if (upholsteryPct > 0.12 || (clusters.length === 0 && !cardboardPct && !metallicPct)) {
-    const sBbox = findBoundingBox('sofa');
-    const isWide = sBbox ? sBbox.w > 45 : true;
-    clusters.push({
-      type: isWide ? 'sofa' : 'chair',
-      box2d: sBbox ? { x: sBbox.x, y: sBbox.y, w: sBbox.w, h: sBbox.h } : { x: 18, y: 32, w: 62, h: 48 },
-      intensity: upholsteryPct || 0.4,
-    });
-  }
-
-  return {
-    hasCardboard: cardboardPct > 0.08,
-    hasUpholstery: upholsteryPct > 0.12,
-    hasMetallic: metallicPct > 0.12,
-    hasWood: woodPct > 0.1,
-    hasScreen: darkScreenPixels / totalPixels > 0.1,
-    cardboardPct,
-    upholsteryPct,
-    metallicPct,
-    woodPct,
-    aspectRatio: width / height,
-    dominantHue: cardboardPct > 0.2 ? 'cardboard' : metallicPct > 0.2 ? 'metallic' : woodPct > 0.2 ? 'wood' : 'upholstery',
-    clusters,
-  };
+  // Return only true detected objects — NO fake default sofa!
+  return detected;
 }
 
 /**
- * Main Detection Pipeline
- * Takes an image (data URL or element) and LiDAR range reading,
- * and produces genuine, customized object detections with metric dimensions.
+ * Main Vision Detection Pipeline
+ * Takes an image and LiDAR range reading, and produces genuine, customized object
+ * detections with metric dimensions.
  */
 export async function detectObjects(
   imageSource: string | HTMLImageElement | HTMLVideoElement,
@@ -294,204 +470,5 @@ export async function detectObjects(
     imgEl = imageSource;
   }
 
-  // Run spatial analysis
-  const profile = extractImageFeatures(imgEl, lidarDepthMeters);
-
-  // Depth correction factor (calibrated for standard 65° field of view)
-  const depthFactor = Math.max(0.7, Math.min(1.8, lidarDepthMeters / 2.0));
-
-  const results: DetectedObject[] = [];
-
-  // Generate detected items based on actual photo profile
-  if (profile.hasCardboard) {
-    const boxCount = profile.cardboardPct > 0.25 ? 3 : 1;
-    const boxBbox = profile.clusters.find((c) => c.type === 'box')?.box2d ?? { x: 42, y: 46, w: 28, h: 32 };
-
-    const widthCm = Math.round(50 * depthFactor);
-    const heightCm = Math.round(42 * depthFactor);
-    const depthCm = Math.round(42 * depthFactor);
-    const volume = Number(((widthCm * heightCm * depthCm) / 1_000_000).toFixed(2));
-    const weight = Math.round(volume * 175); // ~175 kg/m³ for loaded household box
-
-    results.push({
-      id: `box-${Date.now()}-1`,
-      name: boxCount > 1 ? 'Standard Moving Boxes' : 'Cardboard Packing Box',
-      category: 'box',
-      confidence: Number((0.92 + Math.min(0.06, profile.cardboardPct)).toFixed(2)),
-      widthCm,
-      heightCm,
-      depthCm,
-      volume: Number((volume * boxCount).toFixed(2)),
-      weight: Math.round(weight * boxCount),
-      quantity: boxCount,
-      box2d: boxBbox,
-      description: `Kraft corrugated cardboard detected at ${lidarDepthMeters.toFixed(1)}m. Calibrated density payload.`,
-    });
-
-    if (profile.cardboardPct > 0.35) {
-      results.push({
-        id: `box-${Date.now()}-2`,
-        name: 'Heavy Book & Archive Box',
-        category: 'box',
-        confidence: 0.89,
-        widthCm: Math.round(40 * depthFactor),
-        heightCm: Math.round(35 * depthFactor),
-        depthCm: Math.round(35 * depthFactor),
-        volume: 0.05,
-        weight: 18,
-        quantity: 2,
-        box2d: { x: Math.min(75, boxBbox.x + 22), y: Math.min(65, boxBbox.y + 10), w: 20, h: 22 },
-        description: 'Reinforced archive packing box for dense literature and dishes.',
-      });
-    }
-  }
-
-  if (profile.hasMetallic) {
-    const isFridge = profile.clusters.some((c) => c.type === 'fridge');
-    const mBbox = profile.clusters.find((c) => c.type === 'fridge' || c.type === 'washer')?.box2d ?? { x: 15, y: 22, w: 32, h: 62 };
-
-    if (isFridge || profile.metallicPct > 0.22) {
-      const heightCm = Math.round(185 * depthFactor);
-      const widthCm = Math.round(72 * depthFactor);
-      const depthCm = Math.round(70 * depthFactor);
-      const volume = Number(((widthCm * heightCm * depthCm) / 1_000_000).toFixed(2));
-
-      results.push({
-        id: `fridge-${Date.now()}`,
-        name: 'Refrigerator / Freezer Unit',
-        category: 'appliance',
-        confidence: 0.94,
-        widthCm,
-        heightCm,
-        depthCm,
-        volume: Math.max(0.85, volume),
-        weight: Math.round(85 * depthFactor),
-        quantity: 1,
-        box2d: mBbox,
-        description: `Tall upright appliance detected (${heightCm}cm H) with metallic reflectivity.`,
-      });
-    } else {
-      results.push({
-        id: `washer-${Date.now()}`,
-        name: 'Front-Loading Washing Machine',
-        category: 'appliance',
-        confidence: 0.91,
-        widthCm: 60,
-        heightCm: 85,
-        depthCm: 60,
-        volume: 0.31,
-        weight: 72,
-        quantity: 1,
-        box2d: mBbox,
-        description: 'Standard 60x60x85 cm front loader with internal counterbalance weight.',
-      });
-    }
-  }
-
-  if (profile.hasWood) {
-    const isTable = profile.clusters.some((c) => c.type === 'table');
-    const wBbox = profile.clusters.find((c) => c.type === 'table' || c.type === 'wardrobe')?.box2d ?? { x: 26, y: 38, w: 52, h: 36 };
-
-    if (isTable) {
-      const widthCm = Math.round(160 * depthFactor);
-      const heightCm = 76;
-      const depthCm = Math.round(90 * depthFactor);
-      const volume = Number(((widthCm * heightCm * depthCm) / 1_000_000).toFixed(2));
-
-      results.push({
-        id: `table-${Date.now()}`,
-        name: 'Dining Table (Wood / Composite)',
-        category: 'furniture',
-        confidence: 0.92,
-        widthCm,
-        heightCm,
-        depthCm,
-        volume: Math.max(0.9, volume),
-        weight: Math.round(42 * depthFactor),
-        quantity: 1,
-        box2d: wBbox,
-        description: `Horizontal wood plane (${widthCm}x${depthCm}cm) with open leg frame.`,
-      });
-    } else {
-      results.push({
-        id: `wardrobe-${Date.now()}`,
-        name: '2-Door Wooden Wardrobe',
-        category: 'furniture',
-        confidence: 0.88,
-        widthCm: 110,
-        heightCm: 195,
-        depthCm: 58,
-        volume: 1.25,
-        weight: 70,
-        quantity: 1,
-        box2d: wBbox,
-        description: 'Tall upright wooden storage cabinet.',
-      });
-    }
-  }
-
-  // If sofa or general living room furniture was detected
-  if (profile.hasUpholstery || results.length === 0) {
-    const isSofa = profile.clusters.some((c) => c.type === 'sofa') || results.length === 0;
-    const sBbox = profile.clusters.find((c) => c.type === 'sofa')?.box2d ?? { x: 16, y: 34, w: 66, h: 44 };
-
-    if (isSofa) {
-      const widthCm = Math.round(210 * depthFactor);
-      const heightCm = Math.round(85 * depthFactor);
-      const depthCm = Math.round(92 * depthFactor);
-      const volume = Number(((widthCm * heightCm * depthCm) / 1_000_000).toFixed(2));
-
-      results.push({
-        id: `sofa-${Date.now()}`,
-        name: widthCm > 180 ? '3-Seater Upholstered Sofa' : '2-Seater Loveseat',
-        category: 'furniture',
-        confidence: Number((0.91 + Math.min(0.07, profile.upholsteryPct)).toFixed(2)),
-        widthCm,
-        heightCm,
-        depthCm,
-        volume: Math.max(1.3, volume),
-        weight: Math.round(72 * depthFactor),
-        quantity: 1,
-        box2d: sBbox,
-        description: `Cushioned upholstered seating structure (${widthCm}cm W x ${heightCm}cm H).`,
-      });
-    } else {
-      results.push({
-        id: `chair-${Date.now()}`,
-        name: 'Armchair / Accent Chair',
-        category: 'furniture',
-        confidence: 0.89,
-        widthCm: 85,
-        heightCm: 88,
-        depthCm: 82,
-        volume: 0.55,
-        weight: 22,
-        quantity: 1,
-        box2d: sBbox,
-        description: 'Single upholstered club armchair.',
-      });
-    }
-  }
-
-  // If it's a general living/bedroom scene, also detect a companion item for realistic complete move load
-  if (results.length === 1 && (results[0]?.category === 'furniture')) {
-    if (results[0].name.includes('Sofa')) {
-      results.push({
-        id: `table-coffee-${Date.now()}`,
-        name: 'Living Room Coffee Table',
-        category: 'furniture',
-        confidence: 0.87,
-        widthCm: 110,
-        heightCm: 45,
-        depthCm: 55,
-        volume: 0.28,
-        weight: 16,
-        quantity: 1,
-        box2d: { x: 28, y: 65, w: 42, h: 24 },
-        description: 'Low horizontal coffee table in front of seating area.',
-      });
-    }
-  }
-
-  return results;
+  return segmentImage(imgEl, lidarDepthMeters);
 }

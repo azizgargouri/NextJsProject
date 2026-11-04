@@ -353,60 +353,69 @@ export function LidarScannerModal({
                   </div>
 
                   <div className="mt-3 space-y-2.5 max-h-60 overflow-y-auto pr-1">
-                    {detectedItems.map((item) => (
-                      <div
-                        key={item.id}
-                        className="border border-ink bg-paper-soft p-3"
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <div className="flex items-center gap-1.5">
-                              <p className="font-bold text-xs text-ink">{item.name}</p>
-                              <span className="mono text-[8px] bg-ink text-paper px-1 uppercase">
-                                {item.category}
-                              </span>
-                            </div>
-                            <p className="mt-0.5 text-[10px] text-ink-80">{item.description}</p>
-                          </div>
-
-                          {/* Quantity control */}
-                          <div className="flex items-center border border-ink bg-paper shrink-0">
-                            <button
-                              type="button"
-                              onClick={() => updateItemQuantity(item.id, -1)}
-                              className="grid size-7 place-items-center hover:bg-paper-soft"
-                            >
-                              <Minus size={12} />
-                            </button>
-                            <span className="mono grid w-7 place-items-center text-xs font-bold">
-                              {item.quantity}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => updateItemQuantity(item.id, 1)}
-                              className="grid size-7 place-items-center border-l border-ink bg-ink text-paper hover:bg-hazard"
-                            >
-                              <Plus size={12} />
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="mt-2 grid grid-cols-3 gap-1 border-t border-ink/20 pt-1.5 mono text-[9px] text-ink-80">
-                          <div className="flex items-center gap-1">
-                            <Ruler size={11} className="text-hazard" />
-                            <span>{item.widthCm}&times;{item.heightCm} cm</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Box size={11} className="text-ink-40" />
-                            <span>{item.volume} m&sup3;</span>
-                          </div>
-                          <div className="flex items-center gap-1 font-bold text-hazard">
-                            <Weight size={11} />
-                            <span>{item.weight} kg</span>
-                          </div>
-                        </div>
+                    {detectedItems.length === 0 ? (
+                      <div className="border border-dashed border-ink/40 p-5 text-center bg-paper-soft">
+                        <p className="mono text-xs font-bold text-hazard">NO OBJECTS DETECTED</p>
+                        <p className="mt-1 text-[11px] text-ink-80">
+                          The camera could not isolate distinct furniture or boxes in this frame. Ensure the area is illuminated and point directly at items.
+                        </p>
                       </div>
-                    ))}
+                    ) : (
+                      detectedItems.map((item) => (
+                        <div
+                          key={item.id}
+                          className="border border-ink bg-paper-soft p-3"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <p className="font-bold text-xs text-ink">{item.name}</p>
+                                <span className="mono text-[8px] bg-ink text-paper px-1 uppercase">
+                                  {item.category}
+                                </span>
+                              </div>
+                              <p className="mt-0.5 text-[10px] text-ink-80">{item.description}</p>
+                            </div>
+
+                            {/* Quantity control */}
+                            <div className="flex items-center border border-ink bg-paper shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => updateItemQuantity(item.id, -1)}
+                                className="grid size-7 place-items-center hover:bg-paper-soft"
+                              >
+                                <Minus size={12} />
+                              </button>
+                              <span className="mono grid w-7 place-items-center text-xs font-bold">
+                                {item.quantity}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => updateItemQuantity(item.id, 1)}
+                                className="grid size-7 place-items-center border-l border-ink bg-ink text-paper hover:bg-hazard"
+                              >
+                                <Plus size={12} />
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="mt-2 grid grid-cols-3 gap-1 border-t border-ink/20 pt-1.5 mono text-[9px] text-ink-80">
+                            <div className="flex items-center gap-1">
+                              <Ruler size={11} className="text-hazard" />
+                              <span>{item.widthCm}&times;{item.heightCm} cm</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Box size={11} className="text-ink-40" />
+                              <span>{item.volume} m&sup3;</span>
+                            </div>
+                            <div className="flex items-center gap-1 font-bold text-hazard">
+                              <Weight size={11} />
+                              <span>{item.weight} kg</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
 
@@ -422,6 +431,7 @@ export function LidarScannerModal({
                     size="sm"
                     className="w-full mono font-bold"
                     onClick={handleApply}
+                    disabled={detectedItems.length === 0}
                   >
                     <Check size={14} className="mr-1.5" /> APPLY TO MANIFEST
                   </Button>

@@ -8,7 +8,12 @@ import { PageTitle } from '@/components/features/workspace/workspace-blocks';
 export const metadata: Metadata = { title: 'New claim' };
 
 /** Server Component loads the mover list and passes it as props to the Client form. */
-export default async function NewClaimPage() {
+export default async function NewClaimPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ moveRef?: string; moverId?: string }>;
+}) {
+  const { moveRef, moverId } = await searchParams;
   await requirePageUser(['CLIENT']);
   await connectMongo();
   const movers = await UserModel.find({ role: 'MOVER', status: 'ACTIVE', deletedAt: null })
@@ -23,7 +28,11 @@ export default async function NewClaimPage() {
         Tell us what went wrong. Your claim is triaged automatically so urgent cases reach a MoveUp
         agent first. You can follow every step and talk with the team on the claim page.
       </p>
-      <ClaimForm movers={movers.map((mover) => ({ id: String(mover._id), name: mover.name }))} />
+      <ClaimForm
+        movers={movers.map((mover) => ({ id: String(mover._id), name: mover.name }))}
+        defaultMoveReference={moveRef}
+        defaultMoverId={moverId}
+      />
     </div>
   );
 }

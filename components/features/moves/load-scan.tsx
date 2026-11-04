@@ -302,49 +302,65 @@ export function LoadScan({ onAdd }: { onAdd: (item: ScanSuggestion) => void }) {
               </div>
 
               <div className="mt-3 space-y-2.5 max-h-72 overflow-y-auto pr-1">
-                {detectedItems.map((item) => (
-                  <div
-                    key={item.id}
-                    className="border border-ink bg-paper-soft p-3 transition hover:border-hazard"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <p className="font-bold text-xs text-ink">{item.name}</p>
-                          <span className="mono text-[8px] bg-ink text-paper px-1 uppercase">
-                            {item.category}
-                          </span>
-                        </div>
-                        <p className="mt-1 text-[11px] text-ink-80">
-                          {item.description}
-                        </p>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => onAdd(item)}
-                        className="mono flex items-center gap-1 border border-ink bg-paper px-2.5 py-1.5 text-[10px] font-bold hover:bg-hazard hover:text-white transition shrink-0"
-                      >
-                        <Plus size={12} /> ADD
-                      </button>
-                    </div>
-
-                    <div className="mt-2.5 grid grid-cols-3 gap-1 border-t border-ink/20 pt-2 mono text-[9px] text-ink-80">
-                      <div className="flex items-center gap-1">
-                        <Ruler size={11} className="text-hazard" />
-                        <span>{item.widthCm}&times;{item.heightCm}&times;{item.depthCm} cm</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Box size={11} className="text-ink-40" />
-                        <span>{item.volume} m&sup3;</span>
-                      </div>
-                      <div className="flex items-center gap-1 font-bold text-hazard">
-                        <Weight size={11} />
-                        <span>{item.weight} kg</span>
-                      </div>
-                    </div>
+                {detectedItems.length === 0 ? (
+                  <div className="border border-dashed border-ink/40 p-5 text-center bg-paper-soft">
+                    <p className="mono text-xs font-bold text-hazard">NO CLEAR OBJECT SIGNATURE DETECTED</p>
+                    <p className="mt-1 text-[11px] text-ink-80">
+                      The vision model could not isolate furniture, boxes, or appliances in this angle. Please point directly at the items with adequate lighting.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleReset}
+                      className="mono mt-3 inline-flex items-center gap-1 border border-ink bg-paper px-3 py-1.5 text-xs font-bold hover:bg-hazard hover:text-white transition"
+                    >
+                      <RefreshCw size={12} /> SCAN AGAIN
+                    </button>
                   </div>
-                ))}
+                ) : (
+                  detectedItems.map((item) => (
+                    <div
+                      key={item.id}
+                      className="border border-ink bg-paper-soft p-3 transition hover:border-hazard"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <p className="font-bold text-xs text-ink">{item.name}</p>
+                            <span className="mono text-[8px] bg-ink text-paper px-1 uppercase">
+                              {item.category}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-[11px] text-ink-80">
+                            {item.description}
+                          </p>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => onAdd(item)}
+                          className="mono flex items-center gap-1 border border-ink bg-paper px-2.5 py-1.5 text-[10px] font-bold hover:bg-hazard hover:text-white transition shrink-0"
+                        >
+                          <Plus size={12} /> ADD
+                        </button>
+                      </div>
+
+                      <div className="mt-2.5 grid grid-cols-3 gap-1 border-t border-ink/20 pt-2 mono text-[9px] text-ink-80">
+                        <div className="flex items-center gap-1">
+                          <Ruler size={11} className="text-hazard" />
+                          <span>{item.widthCm}&times;{item.heightCm}&times;{item.depthCm} cm</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Box size={11} className="text-ink-40" />
+                          <span>{item.volume} m&sup3;</span>
+                        </div>
+                        <div className="flex items-center gap-1 font-bold text-hazard">
+                          <Weight size={11} />
+                          <span>{item.weight} kg</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
 
@@ -362,6 +378,7 @@ export function LoadScan({ onAdd }: { onAdd: (item: ScanSuggestion) => void }) {
                 size="sm"
                 className="w-full mono font-bold"
                 onClick={handleAddAll}
+                disabled={detectedItems.length === 0}
               >
                 <Check size={14} className="mr-1.5" /> ADD ALL {detectedItems.length} ITEMS TO LOAD
               </Button>

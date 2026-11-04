@@ -33,8 +33,8 @@ export const adminNavGroups: AdminNavGroup[] = [
   {
     label: 'Operations',
     items: [
-      { label: 'Move requests', href: '/admin/moves', icon: ClipboardList, upcoming: true },
-      { label: 'Assignments', href: '/admin/assignments', icon: Truck, upcoming: true },
+      { label: 'Move requests', href: '/admin/moves', icon: ClipboardList },
+      { label: 'Assignments', href: '/admin/assignments', icon: Truck },
       { label: 'Disputes', href: '/admin/disputes', icon: Gavel },
     ],
   },

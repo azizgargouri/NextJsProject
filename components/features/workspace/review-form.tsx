@@ -8,7 +8,15 @@ import { initialActionState } from '@/lib/actions/action-state';
 import { FormMessage, NativeSelect, StarInput, SubmitButton, Textarea } from './workspace-ui';
 
 /** Client review of a mover — Server Action + useActionState + useFormStatus (course ch.5). */
-export function ReviewForm({ movers }: { movers: { id: string; name: string }[] }) {
+export function ReviewForm({
+  movers,
+  defaultMoverId,
+  defaultMoveReference,
+}: {
+  movers: { id: string; name: string }[];
+  defaultMoverId?: string;
+  defaultMoveReference?: string;
+}) {
   const [state, formAction] = useActionState(createReviewAction, initialActionState);
   const formRef = useRef<HTMLFormElement>(null);
   const [formKey, setFormKey] = useState(0);
@@ -34,7 +42,7 @@ export function ReviewForm({ movers }: { movers: { id: string; name: string }[] 
           <NativeSelect
             id="review-mover"
             name="moverId"
-            defaultValue={values.moverId ?? ''}
+            defaultValue={values.moverId ?? defaultMoverId ?? ''}
             aria-invalid={Boolean(errors.moverId)}
             required
           >
@@ -54,7 +62,7 @@ export function ReviewForm({ movers }: { movers: { id: string; name: string }[] 
           <Input
             id="review-move"
             name="moveReference"
-            defaultValue={values.moveReference}
+            defaultValue={values.moveReference ?? defaultMoveReference ?? ''}
             placeholder="MV-2026-0142"
             aria-invalid={Boolean(errors.moveReference)}
             required

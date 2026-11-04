@@ -19,7 +19,12 @@ import type { RatingSummaryDto, ReviewDto } from '@/types';
 export const metadata: Metadata = { title: 'Reviews' };
 
 /** One route, two experiences: clients write reviews, movers read and answer theirs. */
-export default async function ReviewsPage() {
+export default async function ReviewsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ moveRef?: string; moverId?: string }>;
+}) {
+  const { moveRef, moverId } = (await searchParams) ?? {};
   const user = await requirePageUser();
   const page = await reviewsService.listForParty(user, { page: 1, limit: 30 });
 
@@ -62,7 +67,11 @@ export default async function ReviewsPage() {
   return (
     <div className="space-y-10">
       <PageTitle kicker="AFTER YOUR MOVE" title="RATE YOUR MOVER." />
-      <ReviewForm movers={movers.map((mover) => ({ id: String(mover._id), name: mover.name }))} />
+      <ReviewForm
+        movers={movers.map((mover) => ({ id: String(mover._id), name: mover.name }))}
+        defaultMoverId={moverId}
+        defaultMoveReference={moveRef}
+      />
       <section className="space-y-4">
         <h2 className="mono text-[11px]">My reviews ({page.meta.itemCount})</h2>
         {page.data.length === 0 ? (

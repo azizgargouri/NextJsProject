@@ -15,7 +15,15 @@ import { FormMessage, NativeSelect, SubmitButton, Textarea } from './workspace-u
  * useActionState gives back validation errors; useFormStatus drives the button.
  * Works even before JavaScript loads (progressive enhancement).
  */
-export function ClaimForm({ movers }: { movers: { id: string; name: string }[] }) {
+export function ClaimForm({
+  movers,
+  defaultMoveReference,
+  defaultMoverId,
+}: {
+  movers: { id: string; name: string }[];
+  defaultMoveReference?: string;
+  defaultMoverId?: string;
+}) {
   const router = useRouter();
   const [state, formAction] = useActionState(createClaimAction, initialActionState);
   const errors = state.fieldErrors ?? {};
@@ -61,7 +69,7 @@ export function ClaimForm({ movers }: { movers: { id: string; name: string }[] }
         <NativeSelect
           id="moverId"
           name="moverId"
-          defaultValue={values.moverId ?? ''}
+          defaultValue={values.moverId ?? defaultMoverId ?? ''}
           aria-invalid={Boolean(errors.moverId)}
         >
           <option value="">— Not sure / not applicable —</option>
@@ -79,7 +87,7 @@ export function ClaimForm({ movers }: { movers: { id: string; name: string }[] }
         <Input
           id="moveReference"
           name="moveReference"
-          defaultValue={values.moveReference}
+          defaultValue={values.moveReference ?? defaultMoveReference ?? ''}
           placeholder="MV-2026-0142"
           aria-invalid={Boolean(errors.moveReference)}
         />

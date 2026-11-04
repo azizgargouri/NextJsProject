@@ -426,7 +426,7 @@ export function MoveTracking({
           <div className="mt-8 border-t-2 border-ink pt-5 space-y-2">
             <p className="mono text-[10px] text-ink-40 font-bold uppercase mb-2">QUALITY &amp; ASSISTANCE</p>
             <Link
-              href={`/dashboard/claims/new?moveRef=${encodeURIComponent(move?.reference ?? '')}`}
+              href={`/dashboard/claims/new?moveRef=${encodeURIComponent(move?.reference ?? '')}&moverId=${encodeURIComponent(move?.mover?.userId ?? '')}`}
               className="mono flex items-center justify-between border border-ink p-3 text-xs hover:bg-ink hover:text-paper transition"
             >
               <span className="flex items-center gap-2">
@@ -437,7 +437,7 @@ export function MoveTracking({
             </Link>
 
             <Link
-              href={`/dashboard/reviews`}
+              href={`/dashboard/reviews?moveRef=${encodeURIComponent(move?.reference ?? '')}&moverId=${encodeURIComponent(move?.mover?.userId ?? '')}`}
               className="mono flex items-center justify-between border border-ink p-3 text-xs hover:bg-ink hover:text-paper transition"
             >
               <span className="flex items-center gap-2">

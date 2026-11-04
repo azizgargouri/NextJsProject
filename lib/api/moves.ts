@@ -49,6 +49,7 @@ export interface MoveDataDto {
     payload: number;
   };
   mover: {
+    userId?: string;
     name: string;
     phone: string;
     companyName: string;
