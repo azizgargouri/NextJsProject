@@ -23,6 +23,13 @@ const EVENT_LABELS: Record<AuditEventType, string> = {
   PRICING_UPDATE: 'Pricing rule updated',
   PRICING_DELETE: 'Pricing rule deleted',
   CONTENT_UPDATE: 'Content updated',
+  CLAIM_CREATE: 'Claim opened',
+  CLAIM_MESSAGE: 'Claim message',
+  CLAIM_STATUS: 'Claim updated',
+  REVIEW_CREATE: 'Review posted',
+  REVIEW_REPLY: 'Mover replied',
+  REVIEW_MODERATE: 'Review moderated',
+  AI_REQUEST: 'AI request',
 };
 
 const EVENT_VARIANTS: Record<AuditEventType, 'default' | 'secondary' | 'destructive'> = {
@@ -38,6 +45,13 @@ const EVENT_VARIANTS: Record<AuditEventType, 'default' | 'secondary' | 'destruct
   PRICING_UPDATE: 'default',
   PRICING_DELETE: 'destructive',
   CONTENT_UPDATE: 'default',
+  CLAIM_CREATE: 'default',
+  CLAIM_MESSAGE: 'secondary',
+  CLAIM_STATUS: 'default',
+  REVIEW_CREATE: 'secondary',
+  REVIEW_REPLY: 'secondary',
+  REVIEW_MODERATE: 'destructive',
+  AI_REQUEST: 'secondary',
 };
 
 const eventOptions = [

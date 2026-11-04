@@ -6,23 +6,17 @@ import '@/styles/globals.css';
 
 const APP_NAME = 'MoveUp';
 const APP_DESCRIPTION =
-  'One request. Vetted movers. Every step tracked. MoveUp matches you with a qualified mover and follows your move from quote to delivery.';
+  'MoveUp matches you with vetted movers and tracks every step from quote to delivery.';
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://moveup.local'),
-  applicationName: APP_NAME,
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: 'default',
-    title: APP_NAME,
-  },
-  manifest: '/manifest.webmanifest',
   title: {
-    default: `${APP_NAME} — Moves, tracked to the millimetre`,
-    template: `%s — ${APP_NAME}`,
+    template: '%s | MoveUp',
+    default: APP_NAME,
   },
   description: APP_DESCRIPTION,
   keywords: ['moving', 'movers', 'Tunisia', 'Tunis', 'Sfax', 'relocation', 'freight'],
+  applicationName: APP_NAME,
+  appleWebApp: { capable: true, title: APP_NAME, statusBarStyle: 'black-translucent' },
   icons: [
     { rel: 'icon', url: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
     { rel: 'icon', url: '/icons/icon-192.svg', type: 'image/svg+xml' },
@@ -34,7 +28,7 @@ export const viewport: Viewport = {
   themeColor: '#f2f1ec',
   width: 'device-width',
   initialScale: 1,
-  viewportFit: 'cover',
+  maximumScale: 5,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

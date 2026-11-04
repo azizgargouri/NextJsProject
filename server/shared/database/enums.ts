@@ -12,6 +12,9 @@ export type PricingStatus = (typeof PRICING_STATUSES)[number];
 export const VERIFICATION_STATUSES = ['PENDING', 'APPROVED', 'REJECTED', 'SUSPENDED'] as const;
 export type VerificationStatus = (typeof VERIFICATION_STATUSES)[number];
 
+// Quality domain (claims / reviews) — single source of truth lives in lib/quality.
+export * from '../../../lib/quality/constants';
+
 /* --- RH / employee-tracking domain (ported from the Employee & HR module) --- */
 
 export const EMPLOYEE_ROLES = ['hr', 'manager', 'employee'] as const;

@@ -16,6 +16,7 @@ import { AdminCard } from '@/components/ui/admin-card';
 import { AdminSkeleton } from '@/components/ui/admin-skeleton';
 import { useAdminOverview } from '@/hooks/content/admin';
 import { useAdminShell } from '../shell/admin-shell-context';
+import { QualityOverview } from './quality-overview';
 
 export function AdminOverviewPortal() {
   const { setPage, clearPage, clearFooter } = useAdminShell();
@@ -134,6 +135,8 @@ export function AdminOverviewPortal() {
         </AdminCard>
       </div>
 
+      <QualityOverview />
+
       <AdminCard className="overflow-hidden">
         <div className="border-b border-border px-6 py-5">
           <div className="flex items-center gap-2 text-sm font-semibold">
@@ -160,7 +163,6 @@ export function AdminOverviewPortal() {
                 ['Moves in progress', 'MoveRequest status timeline'],
                 ['Completed moves', 'MoveRequest completion state'],
                 ['Revenue', 'Payment and commission records'],
-                ['Average rating', 'Published review records'],
               ].map(([label, source]) => (
                 <tr key={label} className="hover:bg-muted/50">
                   <td className="px-4 py-3 font-medium">{label}</td>
