@@ -19,6 +19,14 @@ const AddEmployeeSchema = z.object({
   fullName: z.string().trim().min(2, 'Name must be at least 2 characters'),
   email: z.string().email('Invalid email address'),
   role: z.enum(['employee', 'manager', 'hr']),
+  walletAddress: z
+    .string()
+    .trim()
+    .optional()
+    .refine(
+      (value) => !value || /^0x[a-fA-F0-9]{40}$/.test(value),
+      'Wallet must be 0x + 40 hex characters',
+    ),
 });
 
 type AddEmployeeValues = z.infer<typeof AddEmployeeSchema>;
@@ -36,7 +44,13 @@ export function AddEmployeeForm() {
     formState: { errors },
   } = useForm<AddEmployeeValues>({
     resolver: zodResolver(AddEmployeeSchema),
-    defaultValues: { employeeRef: 'EMP', fullName: '', email: '', role: 'employee' },
+    defaultValues: {
+      employeeRef: 'EMP',
+      fullName: '',
+      email: '',
+      role: 'employee',
+      walletAddress: '',
+    },
   });
 
   const onSubmit = (values: AddEmployeeValues) => {
@@ -108,6 +122,20 @@ export function AddEmployeeForm() {
               <option value="hr">hr</option>
             </Select>
             <FieldError message={errors.role?.message} />
+          </FieldRow>
+
+          <FieldRow>
+            <Label htmlFor="walletAddress">METAMASK WALLET (OPTIONAL)</Label>
+            <Input
+              id="walletAddress"
+              placeholder="0x…"
+              autoComplete="off"
+              {...register('walletAddress')}
+            />
+            <FieldError message={errors.walletAddress?.message} />
+            <p className="mono mt-1 text-[9px] normal-case tracking-normal text-ink-40">
+              Required before an employment contract can be issued on-chain.
+            </p>
           </FieldRow>
 
           {serverError && (

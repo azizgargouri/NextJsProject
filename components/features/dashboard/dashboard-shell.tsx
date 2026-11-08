@@ -12,9 +12,13 @@ const HR_NAV = [
   { href: '/employees', label: 'Employees' },
   { href: '/attendance', label: 'Attendance' },
   { href: '/leave', label: 'Leave' },
+  { href: '/contracts', label: 'Contracts' },
 ];
 
-const SELF_NAV = [{ href: '/me', label: 'My workspace' }];
+const SELF_NAV = [
+  { href: '/me', label: 'My workspace' },
+  { href: '/contracts', label: 'My contracts' },
+];
 
 /**
  * Protected shell — the authenticated app layout.

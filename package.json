@@ -20,6 +20,7 @@
     "bcryptjs": "^3.0.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "ethers": "6.13.4",
     "gsap": "^3.13.0",
     "jose": "^6.1.0",
     "leaflet": "^1.9.4",
@@ -35,8 +36,8 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
-    "@types/leaflet": "^1.9.22",
     "@tailwindcss/postcss": "^4.1.14",
+    "@types/leaflet": "^1.9.22",
     "@types/node": "^24",
     "@types/react": "^19",
     "@types/react-dom": "^19",

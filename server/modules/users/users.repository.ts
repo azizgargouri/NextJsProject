@@ -54,7 +54,7 @@ export class UserRepository extends AbstractRepository<UserRow> {
 
   async findByEmail(email: string): Promise<UserRow | null> {
     const doc = await (await this.model())
-      .findOne({ email: email.toLowerCase(), deletedAt: null })
+      .findOne({ email: email.trim().toLowerCase(), deletedAt: null })
       .lean();
     return doc ? toUserRow(doc as unknown as UserDoc) : null;
   }

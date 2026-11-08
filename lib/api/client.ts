@@ -11,6 +11,12 @@ export const axiosClient: AxiosInstance = axios.create({
   baseURL: BASE_URL,
   withCredentials: true,
   timeout: 15000,
+  headers: {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With, Accept',
+    'Access-Control-Allow-Credentials': 'true',
+  },
 });
 
 let refreshing: Promise<string | null> | null = null;
@@ -50,7 +56,11 @@ axiosClient.interceptors.response.use(
     const original = error.config as
       (NonNullable<AxiosError['config']> & { _retry?: boolean }) | undefined;
 
-    if (error.response?.status === 401 && original && !original._retry) {
+    // A 401 from the auth endpoints is a bad credential, not an expired token:
+    // retrying it through refresh-token would only fail again (and log the user out).
+    const isAuthEndpoint = authEndpoints.some((endpoint) => original?.url?.includes(endpoint));
+
+    if (error.response?.status === 401 && original && !original._retry && !isAuthEndpoint) {
       original._retry = true;
 
       refreshing = refreshing ?? refreshAccessToken();

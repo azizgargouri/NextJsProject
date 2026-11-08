@@ -3,7 +3,7 @@ import type { z } from 'zod';
 import { env } from '../../config/env';
 import { errorResponse } from '../../shared/auth/guards';
 import { logEvent, EventType } from '../../shared/logger/audit';
-import { ValidationError } from '../../shared/database/errors';
+import { UnauthorizedError, ValidationError } from '../../shared/database/errors';
 import { authService } from './auth.service';
 import { serializeAuthSession, type AuthSessionResponse } from './auth.serializer';
 import { RefreshTokenSchema, SignInSchema, SignUpSchema } from './auth.schema';
@@ -61,8 +61,9 @@ class AuthController {
         request.cookies.get(REFRESH_COOKIE)?.value ??
         (bodyToken.success ? bodyToken.data.refreshToken : null);
 
+      // Missing cookie/token is an authentication failure (401), not a bad payload (422).
       if (!rawToken) {
-        throw new ValidationError('Missing refresh token');
+        throw new UnauthorizedError('Missing refresh token');
       }
 
       const session = await authService.refreshToken(rawToken);

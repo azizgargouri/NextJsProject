@@ -1,3 +1,5 @@
+import { createEmployeeAction, updateEmployeeAction } from '@/app/actions/hr';
+import { actionAccessToken, unwrapActionResult } from '@/lib/actions/client';
 import { axiosClient } from './client';
 import type { EmployeeDto, EmployeeRole, EmployeeStatus } from '@/types';
 
@@ -7,6 +9,7 @@ export interface CreateEmployeePayload {
   email: string;
   role?: EmployeeRole;
   status?: EmployeeStatus;
+  walletAddress?: string | null;
 }
 
 export type UpdateEmployeePayload = Partial<Omit<CreateEmployeePayload, 'employeeRef'>>;
@@ -21,15 +24,8 @@ export const employeesApi = {
     const { data } = await axiosClient.get<{ employee: EmployeeDto | null }>('/api/employees/me');
     return data.employee;
   },
-  create: async (payload: CreateEmployeePayload): Promise<EmployeeDto> => {
-    const { data } = await axiosClient.post<{ employee: EmployeeDto }>('/api/employees', payload);
-    return data.employee;
-  },
-  update: async (id: string, payload: UpdateEmployeePayload): Promise<EmployeeDto> => {
-    const { data } = await axiosClient.patch<{ employee: EmployeeDto }>(
-      `/api/employees/${id}`,
-      payload,
-    );
-    return data.employee;
-  },
+  create: async (payload: CreateEmployeePayload): Promise<EmployeeDto> =>
+    unwrapActionResult(await createEmployeeAction(actionAccessToken(), payload)),
+  update: async (id: string, payload: UpdateEmployeePayload): Promise<EmployeeDto> =>
+    unwrapActionResult(await updateEmployeeAction(actionAccessToken(), id, payload)),
 };

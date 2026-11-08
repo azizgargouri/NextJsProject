@@ -17,6 +17,7 @@ import {
   useCheckIn,
   useCreateLeaveRequest,
   useLeaveRequests,
+  useLocationTracking,
   useMyEmployee,
 } from '@/hooks/content/hr';
 import { extractErrorMessage } from '@/lib/api/errors';
@@ -102,6 +103,9 @@ export function MyWorkspaceView() {
   const checkedIn = Boolean(today?.clockIn);
   const checkingIn = checkIn.isPending;
 
+  // Keep sending location samples while checked in and this workspace is open.
+  useLocationTracking(checkedIn);
+
   const submitCheckIn = useCallback(
     async (shareLocation: boolean) => {
       setCheckInError(null);
@@ -134,34 +138,25 @@ export function MyWorkspaceView() {
         }
       }
 
-      checkIn.mutate(
-        {
-          updateLocationOnly: Boolean(today?.clockIn),
-          ...(coords ?? {}),
+      checkIn.mutate(coords ?? {}, {
+        onSuccess: (response) => {
+          const punches = response.attendance.punches ?? [];
+          const lastPunch = punches[punches.length - 1];
+          const at = formatTime(lastPunch?.at ?? response.attendance.clockIn);
+          const suffix = lastPunch?.location ? ' — location recorded for HR.' : '.';
+
+          setCheckInOk(
+            response.alreadyCheckedIn
+              ? `Check-in registered again at ${at}${suffix}`
+              : `Checked in at ${at}${suffix}`,
+          );
         },
-        {
-          onSuccess: (response) => {
-            if (response.updatedLocation) {
-              setCheckInOk('Location updated. HR can see you on the team map.');
-            } else if (response.alreadyCheckedIn) {
-              setCheckInOk(
-                `You were already checked in at ${formatTime(response.attendance.clockIn)}`,
-              );
-            } else {
-              setCheckInOk(
-                `Checked in at ${formatTime(response.attendance.clockIn)}${
-                  coords ? ' — location shared with HR.' : '.'
-                }`,
-              );
-            }
-          },
-          onError: (error) => {
-            setCheckInError(extractErrorMessage(error, 'Failed to check in. Please try again.'));
-          },
+        onError: (error) => {
+          setCheckInError(extractErrorMessage(error, 'Failed to check in. Please try again.'));
         },
-      );
+      });
     },
-    [checkIn, today?.clockIn],
+    [checkIn],
   );
 
   const {
@@ -253,25 +248,23 @@ export function MyWorkspaceView() {
                     {todayQuery.isLoading
                       ? 'LOADING…'
                       : checkedIn
-                        ? `CHECKED IN AT ${formatTime(today?.clockIn)}`
+                        ? `CHECKED IN AT ${formatTime(today?.clockIn)} · ${
+                            (today?.punches?.length ?? 1)
+                          } REGISTRATION${(today?.punches?.length ?? 1) === 1 ? '' : 'S'} TODAY`
                         : 'NOT CHECKED IN YET'}
                   </p>
                 </div>
                 <Button
                   variant={checkedIn ? 'outline' : 'hazard'}
                   size="sm"
-                  disabled={checkingIn || checkedIn}
+                  disabled={checkingIn}
                   onClick={() => void submitCheckIn(true)}
-                  title={
-                    checkedIn
-                      ? 'You are already checked in today'
-                      : 'Check in and share your location'
-                  }
+                  title="Register a check-in now — each press is timestamped and records where you are"
                 >
                   {checkingIn ? (
                     <Loader2 className="animate-spin" size={14} />
                   ) : checkedIn ? (
-                    'Checked in'
+                    'Check in again'
                   ) : (
                     'Check in'
                   )}
@@ -281,12 +274,12 @@ export function MyWorkspaceView() {
               <p className="mono mt-3 text-[9px] text-ink-40">
                 {checkedIn
                   ? today?.location
-                    ? 'YOUR LOCATION WAS CAPTURED WHEN YOU CHECKED IN.'
-                    : 'YOU CHECKED IN WITHOUT SHARING A LOCATION.'
+                    ? 'EACH CHECK-IN IS TIMESTAMPED AND STORES WHERE IT WAS REGISTERED.'
+                    : 'YOU CHECKED IN WITHOUT SHARING A LOCATION — PRESS AGAIN TO SHARE IT.'
                   : 'CHECK IN WITH ONE CLICK — YOUR BROWSER WILL ASK FOR YOUR LOCATION.'}
               </p>
 
-              {!checkedIn && allowWithoutLocation && (
+              {allowWithoutLocation && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -317,6 +310,27 @@ export function MyWorkspaceView() {
                   LOCATION SHARED: {today.location.lat.toFixed(5)}, {today.location.lng.toFixed(5)}
                   {today.location.accuracy ? ` (±${today.location.accuracy}M)` : ''}
                 </p>
+              )}
+
+              {(today?.punches?.length ?? 0) > 0 && (
+                <div className="mt-6 border-t border-ink/15 pt-4">
+                  <h3 className="mono text-[10px] text-ink-40">TODAY&apos;S CHECK-INS</h3>
+                  <ul className="mt-3">
+                    {(today?.punches ?? []).map((punch, index) => (
+                      <li
+                        key={`${punch.at}-${index}`}
+                        className="flex flex-wrap items-center justify-between gap-2 border-b border-ink/10 py-2 last:border-0"
+                      >
+                        <span className="mono text-[10px]">{formatTime(punch.at)}</span>
+                        <span className="mono text-[10px] text-ink-40">
+                          {punch.location
+                            ? `${punch.location.lat.toFixed(5)}, ${punch.location.lng.toFixed(5)}`
+                            : 'NO LOCATION SHARED'}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               )}
 
               <div className="mt-6 border-t border-ink/15 pt-4">

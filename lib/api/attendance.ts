@@ -1,3 +1,5 @@
+import { checkInAction } from '@/app/actions/hr';
+import { actionAccessToken, unwrapActionResult } from '@/lib/actions/client';
 import { axiosClient } from './client';
 import type { AttendanceDto, CheckInPayload, CheckInResponse } from '@/types';
 
@@ -16,8 +18,6 @@ export const attendanceApi = {
     });
     return data.attendance;
   },
-  checkIn: async (payload: CheckInPayload): Promise<CheckInResponse> => {
-    const { data } = await axiosClient.post<CheckInResponse>('/api/attendance/checkin', payload);
-    return data;
-  },
+  checkIn: async (payload: CheckInPayload): Promise<CheckInResponse> =>
+    unwrapActionResult(await checkInAction(actionAccessToken(), payload)),
 };

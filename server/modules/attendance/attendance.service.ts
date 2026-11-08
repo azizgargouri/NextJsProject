@@ -2,6 +2,8 @@ import { ForbiddenError, NotFoundError } from '../../shared/database/errors';
 import type { AccessTokenPayload } from '../../shared/auth/jwt';
 import { addDays, startOfDay } from '../../shared/date';
 import { employeesService } from '../employees/employees.service';
+import { trackingService } from '../tracking/tracking.service';
+import type { TrackingSessionResponse } from '../tracking/tracking.serializer';
 import { AttendanceRepository, type AttendanceRow } from './attendance.repository';
 import type { AttendanceQuery, CheckInInput } from './attendance.schema';
 import { serializeAttendance, type AttendanceResponse } from './attendance.serializer';
@@ -11,7 +13,7 @@ export interface CheckInResult {
   attendance: AttendanceRow;
   created: boolean;
   alreadyCheckedIn?: boolean;
-  updatedLocation?: boolean;
+  tracking: TrackingSessionResponse;
 }
 
 interface GeoFix {
@@ -48,7 +50,11 @@ export class AttendanceService {
     return rows.map(serializeAttendance);
   }
 
-  /** Check-in (or location refresh) for the profile linked to the session. */
+  /**
+   * Check-in for the profile linked to the session. The button is always
+   * available, so every call appends a punch (timestamp + optional geo fix);
+   * the first punch of the day becomes `clockIn`.
+   */
   async checkIn(user: AccessTokenPayload, input: CheckInInput): Promise<CheckInResult> {
     const employee = await employeesService.findMyProfile(user.email);
     if (!employee) throw new NotFoundError('Employee profile');
@@ -71,31 +77,55 @@ export class AttendanceService {
 
     const existing = await this.repository.findByDay(employee.id, dayStart, dayEnd);
 
-    if (existing?.clockIn) {
-      if (input.updateLocationOnly && location) {
-        const attendance = await this.repository.update(existing.id, { location });
-        return { attendance, created: false, updatedLocation: true };
-      }
-      return { attendance: existing, created: false, alreadyCheckedIn: true };
-    }
+    // Append-only punch log: each press keeps its own timestamp + location so HR
+    // can see every registration, not just the first one of the day.
+    const punch = { at: now, location: location ?? null };
 
     const fields: Record<string, unknown> = {
-      clockIn: now,
-      status: 'present',
+      punches: [...(existing?.punches ?? []), punch],
       ...(location ? { location } : {}),
     };
+
+    if (!existing?.clockIn) {
+      Object.assign(fields, { clockIn: now, status: 'present' });
+    }
 
     try {
       const attendance = existing
         ? await this.repository.update(existing.id, fields)
         : await this.repository.create({ employee: employee.id, workDate: dayStart, ...fields });
-      return { attendance, created: !existing };
+      const tracking = await trackingService.startForCheckIn({
+        organization: employee.organization ?? user.sub,
+        employeeId: employee.id,
+        attendanceId: attendance.id,
+        at: now,
+        location: location ?? null,
+      });
+      return {
+        attendance,
+        created: !existing,
+        ...(existing?.clockIn ? { alreadyCheckedIn: true } : {}),
+        tracking,
+      };
     } catch (error) {
-      // Two requests raced for the same day (unique index) — return the stored record.
+      // Two requests raced for the same day (unique index) — register on the stored row.
       if (isDuplicateKey(error)) {
         const raced = await this.repository.findByDay(employee.id, dayStart, dayEnd);
         if (raced) {
-          return { attendance: raced, created: false, alreadyCheckedIn: Boolean(raced.clockIn) };
+          const attendance = await this.repository.update(raced.id, fields);
+          const tracking = await trackingService.startForCheckIn({
+            organization: employee.organization ?? user.sub,
+            employeeId: employee.id,
+            attendanceId: attendance.id,
+            at: now,
+            location: location ?? null,
+          });
+          return {
+            attendance,
+            created: false,
+            alreadyCheckedIn: Boolean(raced.clockIn),
+            tracking,
+          };
         }
       }
       throw error;

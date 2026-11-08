@@ -48,8 +48,8 @@ class AttendanceController {
         {
           success: true,
           ...(result.alreadyCheckedIn ? { alreadyCheckedIn: true } : {}),
-          ...(result.updatedLocation ? { updatedLocation: true } : {}),
           attendance: serializeAttendance(result.attendance),
+          tracking: result.tracking,
         },
         { status: result.created ? 201 : 200 },
       );

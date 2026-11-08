@@ -10,6 +10,7 @@ export interface EmployeeResponse {
   status: EmployeeStatus;
   hireDate: string | null;
   organization: string | null;
+  walletAddress: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -23,6 +24,7 @@ export function serializeEmployee(row: {
   role: EmployeeRole;
   status: EmployeeStatus;
   hireDate: Date | null;
+  walletAddress: string | null;
   organization: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -36,6 +38,7 @@ export function serializeEmployee(row: {
     status: row.status,
     hireDate: row.hireDate ? row.hireDate.toISOString() : null,
     organization: row.organization,
+    walletAddress: row.walletAddress,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };

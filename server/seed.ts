@@ -8,6 +8,16 @@ import { AttendanceModel } from './shared/database/models/attendance.model';
 import { LeaveRequestModel } from './shared/database/models/leave-request.model';
 import { WorkScheduleModel } from './shared/database/models/work-schedule.model';
 
+/**
+ * Employee role → platform auth role. Only `users` rows can sign in, so every
+ * RH staff member needs a real account whose role matches their HR role.
+ */
+const AUTH_ROLE_BY_EMPLOYEE_ROLE: Record<'hr' | 'manager' | 'employee', 'ADMIN' | 'MOVER' | 'CLIENT'> = {
+  hr: 'ADMIN',
+  manager: 'MOVER',
+  employee: 'CLIENT',
+};
+
 // Load .env for standalone execution (Next.js pipelines export it in server runtime).
 try {
   process.loadEnvFile();
@@ -52,7 +62,7 @@ async function seed() {
     { upsert: true, returnDocument: 'after' },
   );
   if (!adminDoc) throw new Error('Admin upsert failed');
-  await seedHr(String(adminDoc._id), adminEmail.toLowerCase());
+  await seedHr();
 
   // Demo client
   await UserModel.findOneAndUpdate(
@@ -112,24 +122,88 @@ async function seed() {
  * the admin's own HR record + 5 staff, a week of shifts, today's attendance
  * and two leave requests. Everything is an idempotent upsert.
  */
-async function seedHr(organization: string, adminEmail: string) {
+async function seedHr() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
   const staff = [
-    { employeeRef: 'HR001', fullName: 'HR Administrator', email: adminEmail, role: 'hr' },
+    {
+      employeeRef: 'HR001',
+      fullName: 'HR Administrator',
+      email: 'hr@moveup.tn',
+      phone: '+216710000001',
+      role: 'hr' as const,
+      password: 'Hr#2026!',
+    },
     {
       employeeRef: 'EMP001',
       fullName: 'Alice Johnson',
       email: 'alice@moveup.tn',
-      role: 'employee',
+      phone: '+216710000002',
+      role: 'employee' as const,
+      password: 'Demo#2026!',
     },
-    { employeeRef: 'EMP002', fullName: 'Bob Smith', email: 'bob@moveup.tn', role: 'employee' },
-    { employeeRef: 'EMP003', fullName: 'Carol Davis', email: 'carol@moveup.tn', role: 'employee' },
-    { employeeRef: 'EMP004', fullName: 'Dave Wilson', email: 'dave@moveup.tn', role: 'employee' },
-    { employeeRef: 'EMP005', fullName: 'Eve Brown', email: 'eve@moveup.tn', role: 'employee' },
+    {
+      employeeRef: 'EMP002',
+      fullName: 'Bob Smith',
+      email: 'bob@moveup.tn',
+      phone: '+216710000003',
+      role: 'employee' as const,
+      password: 'Demo#2026!',
+    },
+    {
+      employeeRef: 'EMP003',
+      fullName: 'Carol Davis',
+      email: 'carol@moveup.tn',
+      phone: '+216710000004',
+      role: 'employee' as const,
+      password: 'Demo#2026!',
+    },
+    {
+      employeeRef: 'EMP004',
+      fullName: 'Dave Wilson',
+      email: 'dave@moveup.tn',
+      phone: '+216710000005',
+      role: 'employee' as const,
+      password: 'Demo#2026!',
+    },
+    {
+      employeeRef: 'EMP005',
+      fullName: 'Eve Brown',
+      email: 'eve@moveup.tn',
+      phone: '+216710000006',
+      role: 'employee' as const,
+      password: 'Demo#2026!',
+    },
   ];
 
+  // 1. Auth accounts first — sign-in reads `users`, so the RH directory alone is not enough.
+  for (const member of staff) {
+    await UserModel.findOneAndUpdate(
+      { email: member.email },
+      {
+        $set: {
+          passwordHash: await bcrypt.hash(member.password, 10),
+          name: member.fullName,
+          phone: member.phone,
+          role: AUTH_ROLE_BY_EMPLOYEE_ROLE[member.role],
+          locale: 'en',
+          status: 'ACTIVE',
+          deletedAt: null,
+        },
+        $setOnInsert: { email: member.email },
+      },
+      { upsert: true },
+    );
+  }
+
+  // Every RH query is scoped to `organization === user.sub` (see resolveReadScope),
+  // so the HR account has to own the organisation the records point at.
+  const hrAccount = await UserModel.findOne({ email: 'hr@moveup.tn' }).lean();
+  if (!hrAccount) throw new Error('HR auth account missing');
+  const organization = String(hrAccount._id);
+
+  // 2. RH directory rows for the same organisation.
   const ids: Record<string, string> = {};
   for (const member of staff) {
     const doc = await EmployeeModel.findOneAndUpdate(
@@ -150,6 +224,11 @@ async function seedHr(organization: string, adminEmail: string) {
     ids[member.employeeRef] = String(doc._id);
   }
   console.log('Employees seeded:', staff.map((member) => member.employeeRef).join(', '));
+  for (const member of staff) {
+    console.log(
+      `  ${member.employeeRef}  ${member.email}  ${member.password}  → ${AUTH_ROLE_BY_EMPLOYEE_ROLE[member.role]}`,
+    );
+  }
 
   const employees = Object.values(ids);
 

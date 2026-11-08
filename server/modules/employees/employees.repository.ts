@@ -13,6 +13,7 @@ export interface EmployeeRow {
   role: EmployeeRole;
   status: EmployeeStatus;
   hireDate: Date | null;
+  walletAddress: string | null;
   organization: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -28,6 +29,7 @@ export function toEmployeeRow(doc: EmployeeDoc): EmployeeRow {
     role: doc.role,
     status: doc.status,
     hireDate: doc.hireDate ?? null,
+    walletAddress: doc.walletAddress ?? null,
     organization: doc.organization ? String(doc.organization) : null,
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt,

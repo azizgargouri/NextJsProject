@@ -8,7 +8,6 @@ export const CheckInSchema = z.object({
   latitude: z.coerce.number().min(-90).max(90).optional(),
   longitude: z.coerce.number().min(-180).max(180).optional(),
   accuracy: z.coerce.number().min(0).optional(),
-  updateLocationOnly: z.boolean().default(false),
 });
 
 export type CheckInInput = z.infer<typeof CheckInSchema>;

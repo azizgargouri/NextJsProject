@@ -1,3 +1,8 @@
+import {
+  createLeaveRequestAction,
+  decideLeaveRequestAction,
+} from '@/app/actions/hr';
+import { actionAccessToken, unwrapActionResult } from '@/lib/actions/client';
 import { axiosClient } from './client';
 import type { LeaveRequestDto, LeaveStatus, LeaveType } from '@/types';
 
@@ -23,18 +28,10 @@ export const leaveRequestsApi = {
     );
     return data.leaveRequests;
   },
-  create: async (payload: CreateLeavePayload): Promise<LeaveRequestDto> => {
-    const { data } = await axiosClient.post<{ leaveRequest: LeaveRequestDto }>(
-      '/api/leave-requests',
-      payload,
-    );
-    return data.leaveRequest;
-  },
-  decide: async (id: string, status: 'approved' | 'rejected'): Promise<LeaveRequestDto> => {
-    const { data } = await axiosClient.patch<{ leaveRequest: LeaveRequestDto }>(
-      `/api/leave-requests/${id}`,
-      { status },
-    );
-    return data.leaveRequest;
-  },
+  create: async (payload: CreateLeavePayload): Promise<LeaveRequestDto> =>
+    unwrapActionResult(await createLeaveRequestAction(actionAccessToken(), payload)),
+  decide: async (id: string, status: 'approved' | 'rejected'): Promise<LeaveRequestDto> =>
+    unwrapActionResult(
+      await decideLeaveRequestAction(actionAccessToken(), id, { status }),
+    ),
 };
