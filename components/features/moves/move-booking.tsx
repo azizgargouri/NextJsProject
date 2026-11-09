@@ -51,7 +51,9 @@ export function MoveBooking() {
   const [destinationAddress, setDestinationAddress] = useState('8 Avenue Habib Bourguiba, La Marsa');
   const [isOffline, setIsOffline] = useState(false);
   const [chosenVehicle, setChosenVehicle] = useState<string>('AUTO');
-  const [scheduledSlot, setScheduledSlot] = useState<string>('TODAY_EXPRESS');
+  const [moveDate, setMoveDate] = useState<string>(() => new Date().toISOString().split('T')[0]!);
+  const [timeSlot, setTimeSlot] = useState<string>('09:00 - 12:00');
+  const [scheduleMode, setScheduleMode] = useState<'TODAY' | 'TOMORROW' | 'CUSTOM'>('TODAY');
   const [floorLevel, setFloorLevel] = useState<number>(0);
   const [hasElevator, setHasElevator] = useState<boolean>(true);
   const [showSignatureModal, setShowSignatureModal] = useState<boolean>(false);
@@ -75,6 +77,9 @@ export function MoveBooking() {
         if (parsed.pickupAddress) setPickupAddress(parsed.pickupAddress);
         if (parsed.destinationAddress) setDestinationAddress(parsed.destinationAddress);
         if (parsed.chosenVehicle) setChosenVehicle(parsed.chosenVehicle);
+        if (parsed.moveDate) setMoveDate(parsed.moveDate);
+        if (parsed.timeSlot) setTimeSlot(parsed.timeSlot);
+        if (parsed.scheduleMode) setScheduleMode(parsed.scheduleMode);
       }
     } catch {
       // Ignore storage errors
@@ -97,12 +102,12 @@ export function MoveBooking() {
     try {
       localStorage.setItem(
         STORAGE_KEY,
-        JSON.stringify({ items, distance, pickupAddress, destinationAddress, chosenVehicle }),
+        JSON.stringify({ items, distance, pickupAddress, destinationAddress, chosenVehicle, moveDate, timeSlot, scheduleMode }),
       );
     } catch {
       // Ignore storage errors
     }
-  }, [items, distance, pickupAddress, destinationAddress, chosenVehicle, mounted]);
+  }, [items, distance, pickupAddress, destinationAddress, chosenVehicle, moveDate, timeSlot, scheduleMode, mounted]);
 
   const volume = useMemo(
     () => items.reduce((total, item) => total + item.volume * item.quantity, 0),
@@ -426,37 +431,104 @@ export function MoveBooking() {
 
           {/* Schedule Date & Access Configuration */}
           <div className="mt-8 grid gap-4 sm:grid-cols-2">
-            {/* 1. Schedule Time Slot */}
-            <div className="border-2 border-ink bg-paper-soft p-4">
+            {/* 1. Flexible Schedule & Calendar Date Picker */}
+            <div className="border-2 border-ink bg-paper-soft p-4 space-y-3">
               <span className="mono text-[10px] text-hazard font-bold flex items-center gap-1.5 uppercase">
                 <Calendar size={13} /> MOVE SCHEDULE &amp; TIME SLOT
               </span>
-              <p className="mt-1 font-bold text-sm">WHEN DO YOU NEED TO MOVE?</p>
+              <p className="font-bold text-sm">WHEN DO YOU NEED TO MOVE?</p>
 
-              <div className="mt-3 grid grid-cols-2 gap-1.5 mono text-[10px]">
-                {[
-                  { id: 'TODAY_EXPRESS', label: 'TODAY (EXPRESS)' },
-                  { id: 'TOMORROW_MORNING', label: 'TOMORROW 09:00' },
-                  { id: 'TOMORROW_AFTERNOON', label: 'TOMORROW 14:00' },
-                  { id: 'WEEKEND', label: 'SATURDAY 09:00' },
-                ].map((slot) => {
-                  const isSelected = scheduledSlot === slot.id;
-                  return (
-                    <button
-                      key={slot.id}
-                      type="button"
-                      onClick={() => setScheduledSlot(slot.id)}
-                      className={`border p-2 text-left font-semibold transition flex items-center justify-between ${
-                        isSelected
-                          ? 'border-hazard bg-hazard text-white font-bold'
-                          : 'border-ink bg-paper hover:bg-ink hover:text-paper'
-                      }`}
-                    >
-                      <span>{slot.label}</span>
-                      {isSelected && <Check size={11} strokeWidth={3} />}
-                    </button>
-                  );
-                })}
+              {/* Quick shortcut pills */}
+              <div className="grid grid-cols-3 gap-1.5 mono text-[10px]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const today = new Date().toISOString().split('T')[0]!;
+                    setMoveDate(today);
+                    setTimeSlot('ASAP Express');
+                    setScheduleMode('TODAY');
+                  }}
+                  className={`border p-2 text-center font-semibold transition ${
+                    scheduleMode === 'TODAY'
+                      ? 'border-hazard bg-hazard text-white font-bold'
+                      : 'border-ink bg-paper hover:bg-ink hover:text-paper'
+                  }`}
+                >
+                  TODAY (EXPRESS)
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0]!;
+                    setMoveDate(tomorrow);
+                    setTimeSlot('09:00 - 12:00');
+                    setScheduleMode('TOMORROW');
+                  }}
+                  className={`border p-2 text-center font-semibold transition ${
+                    scheduleMode === 'TOMORROW'
+                      ? 'border-hazard bg-hazard text-white font-bold'
+                      : 'border-ink bg-paper hover:bg-ink hover:text-paper'
+                  }`}
+                >
+                  TOMORROW
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setScheduleMode('CUSTOM')}
+                  className={`border p-2 text-center font-semibold transition ${
+                    scheduleMode === 'CUSTOM'
+                      ? 'border-hazard bg-hazard text-white font-bold'
+                      : 'border-ink bg-paper hover:bg-ink hover:text-paper'
+                  }`}
+                >
+                  CUSTOM DATE
+                </button>
+              </div>
+
+              {/* Flexible Calendar Input & Time Slot Selection */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 mono text-xs">
+                <div>
+                  <label className="text-[9px] text-ink-60 uppercase font-bold block mb-1">
+                    PICK MOVE DATE:
+                  </label>
+                  <input
+                    type="date"
+                    min={new Date().toISOString().split('T')[0]}
+                    value={moveDate}
+                    onChange={(e) => {
+                      setMoveDate(e.target.value);
+                      setScheduleMode('CUSTOM');
+                    }}
+                    className="w-full border-2 border-ink bg-paper px-2.5 py-1.5 text-xs font-semibold focus:outline-none focus:border-hazard"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[9px] text-ink-60 uppercase font-bold block mb-1">
+                    TIME WINDOW:
+                  </label>
+                  <select
+                    value={timeSlot}
+                    onChange={(e) => setTimeSlot(e.target.value)}
+                    className="w-full border-2 border-ink bg-paper px-2.5 py-1.5 text-xs font-semibold focus:outline-none focus:border-hazard"
+                  >
+                    <option value="ASAP Express (Next available)">ASAP Express (Next available)</option>
+                    <option value="08:00 - 11:00 (Early Morning)">08:00 - 11:00 (Early Morning)</option>
+                    <option value="09:00 - 12:00 (Morning Slot)">09:00 - 12:00 (Morning Slot)</option>
+                    <option value="11:00 - 14:00 (Midday Slot)">11:00 - 14:00 (Midday Slot)</option>
+                    <option value="14:00 - 17:00 (Afternoon Slot)">14:00 - 17:00 (Afternoon Slot)</option>
+                    <option value="17:00 - 20:00 (Evening Slot)">17:00 - 20:00 (Evening Slot)</option>
+                    <option value="Flexible All-Day">Flexible All-Day</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Active scheduled feedback */}
+              <div className="border border-hazard bg-hazard/5 p-2 mono text-[10px] text-hazard flex items-center justify-between font-bold">
+                <span>SCHEDULED: {moveDate}</span>
+                <span>{timeSlot}</span>
               </div>
             </div>
 
@@ -661,6 +733,8 @@ export function MoveBooking() {
         weight={weight}
         itemCount={items.length}
         price={price}
+        scheduledDate={moveDate}
+        scheduledTime={timeSlot}
         isSubmitting={isSubmitting}
       />
     </main>

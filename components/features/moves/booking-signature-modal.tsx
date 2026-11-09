@@ -15,6 +15,8 @@ interface BookingSignatureModalProps {
   weight: number;
   itemCount: number;
   price: number;
+  scheduledDate?: string;
+  scheduledTime?: string;
   isSubmitting?: boolean;
 }
 
@@ -29,6 +31,8 @@ export function BookingSignatureModal({
   weight,
   itemCount,
   price,
+  scheduledDate,
+  scheduledTime,
   isSubmitting = false,
 }: BookingSignatureModalProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -137,6 +141,15 @@ export function BookingSignatureModal({
             </span>
             <span className="font-bold text-ink">{vehicleName}</span>
           </div>
+
+          {scheduledDate && (
+            <div className="flex items-center justify-between border-b border-ink/20 pb-1 text-hazard font-semibold">
+              <span className="text-ink-60 flex items-center gap-1">
+                SCHEDULED DATE &amp; TIME
+              </span>
+              <span>{scheduledDate} &middot; {scheduledTime || 'Morning'}</span>
+            </div>
+          )}
 
           <div className="flex items-center justify-between border-b border-ink/20 pb-1">
             <span className="text-ink-60 flex items-center gap-1">

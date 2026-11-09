@@ -16,6 +16,10 @@ import {
   Package,
   MessageSquare,
   Navigation,
+  Share2,
+  Printer,
+  CheckSquare,
+  Square,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MoveRouteMap } from './move-route-map';
@@ -73,6 +77,8 @@ export function MoveTracking({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [minutes, setMinutes] = useState(14);
   const [showPodModal, setShowPodModal] = useState(false);
+  const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
+  const [copiedLink, setCopiedLink] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   // Load user's active moves if signed in
@@ -138,6 +144,30 @@ export function MoveTracking({
     router.push(`/track/${encodeURIComponent(searchInput.trim())}`);
   };
 
+  const toggleItemCheck = (itemIdx: number) => {
+    setCheckedItems((prev) => ({
+      ...prev,
+      [itemIdx]: !prev[itemIdx],
+    }));
+  };
+
+  const handleShareTracking = () => {
+    if (typeof window === 'undefined') return;
+    const url = window.location.href;
+    navigator.clipboard?.writeText(url).catch(() => {});
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2500);
+
+    // Also offer direct WhatsApp sharing
+    const shareText = `Track my MoveUp relocation in real-time (Ref: ${move?.reference ?? ''}): ${url}`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, '_blank');
+  };
+
+  const handlePrintContract = () => {
+    if (typeof window === 'undefined') return;
+    window.print();
+  };
+
   const handleAdvanceStage = async (nextStageKey: string) => {
     if (!move) return;
     if (nextStageKey === 'COMPLETED') {
@@ -199,21 +229,44 @@ export function MoveTracking({
             <span className="mono text-[10px] text-ink-40">/ LIVE TELEMETRY</span>
           </div>
 
-          {/* Reference Search input */}
-          <form onSubmit={handleSearch} className="flex items-center border-2 border-ink bg-paper">
-            <input
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="ENTER MOVE REF (e.g. MU-2026-XXXXXX)"
-              className="mono px-3 py-1.5 text-xs focus:outline-none w-56 sm:w-72"
-            />
+          {/* Quick Actions: Share, Print Waybill & Reference Search */}
+          <div className="flex flex-wrap items-center gap-2">
             <button
-              type="submit"
-              className="mono bg-ink text-paper px-3 py-1.5 text-xs font-bold hover:bg-hazard transition flex items-center gap-1 shrink-0"
+              type="button"
+              onClick={handleShareTracking}
+              className="mono flex items-center gap-1.5 border border-ink bg-paper px-2.5 py-1.5 text-xs font-semibold hover:bg-ink hover:text-paper transition"
+              title="Share live tracking via WhatsApp / Link"
             >
-              <Search size={13} /> TRACK
+              <Share2 size={13} className="text-hazard" />
+              <span>{copiedLink ? 'COPIED & SHARING!' : 'SHARE'}</span>
             </button>
-          </form>
+
+            <button
+              type="button"
+              onClick={handlePrintContract}
+              className="mono flex items-center gap-1.5 border border-ink bg-paper px-2.5 py-1.5 text-xs font-semibold hover:bg-ink hover:text-paper transition"
+              title="Print waybill & contract"
+            >
+              <Printer size={13} />
+              <span>PRINT / PDF</span>
+            </button>
+
+            {/* Reference Search input */}
+            <form onSubmit={handleSearch} className="flex items-center border-2 border-ink bg-paper">
+              <input
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                placeholder="ENTER REF (MU-2026-XXXXXX)"
+                className="mono px-2.5 py-1.5 text-xs focus:outline-none w-44 sm:w-60"
+              />
+              <button
+                type="submit"
+                className="mono bg-ink text-paper px-3 py-1.5 text-xs font-bold hover:bg-hazard transition flex items-center gap-1 shrink-0"
+              >
+                <Search size={13} /> TRACK
+              </button>
+            </form>
+          </div>
         </div>
       </header>
 
@@ -294,12 +347,28 @@ export function MoveTracking({
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mono text-xs">
                 {move.items.map((item, idx) => (
-                  <div key={idx} className="flex justify-between border border-ink/40 bg-paper p-2">
-                    <span className="font-semibold">{item.name} &times; {item.quantity}</span>
-                    <span className="text-ink-60">{(item.volume * item.quantity).toFixed(2)}m&sup3; &middot; {item.weight * item.quantity}kg</span>
-                  </div>
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => toggleItemCheck(idx)}
+                    className={`flex items-center gap-2 border p-2 text-left transition ${
+                      checkedItems[idx]
+                        ? 'border-emerald-600 bg-emerald-50 line-through text-ink-40'
+                        : 'border-ink/40 bg-paper'
+                    }`}
+                  >
+                    {checkedItems[idx]
+                      ? <CheckSquare size={14} className="shrink-0 text-emerald-600" />
+                      : <Square size={14} className="shrink-0 text-ink-40" />
+                    }
+                    <span className="font-semibold flex-1">{item.name} × {item.quantity}</span>
+                    <span className="text-ink-60">{(item.volume * item.quantity).toFixed(2)}m³ · {item.weight * item.quantity}kg</span>
+                  </button>
                 ))}
               </div>
+              <p className="mono text-[10px] text-ink-40 mt-2">
+                {Object.values(checkedItems).filter(Boolean).length}/{move.items.length} LOADED &amp; VERIFIED
+              </p>
             </div>
           )}
         </section>
