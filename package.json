@@ -17,7 +17,8 @@
     "db:playground": "tsx server/seeds/playground.seed.ts",
     "test": "tsx --test tests/*.test.ts",
     "test:e2e": "node tests/e2e/smart-room.e2e.mjs",
-    "test:api": "node scripts/api-smoke.mjs"
+    "test:api": "node scripts/api-smoke.mjs",
+    "test:flow": "node scripts/flow-sync-check.mjs"
   },
   "dependencies": {
     "@ai-sdk/google": "^2.0.0",
