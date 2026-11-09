@@ -49,7 +49,9 @@ export interface LinkedMoveRequestResponse {
 export class MoveRequestsService {
   async listForClient(client: ClientRef): Promise<ClientMoveRequest[]> {
     await connectMongo();
-    const moves = await MoveModel.find({ clientId: client.id }).sort({ createdAt: -1 }).lean<MoveDoc[]>();
+    const moves = await MoveModel.find({ clientId: client.id })
+      .sort({ createdAt: -1 })
+      .lean<MoveDoc[]>();
     return moves.map(toRequest);
   }
 

@@ -166,6 +166,8 @@ export interface LayoutPlanDto {
   stale: boolean;
   /** Items the client moved, rotated or took out (regenerate replaces them). */
   manualChanges: number;
+  /** Rooms the client chose for given pieces before generating. */
+  roomChoices: { unitId: string; roomId: string }[];
   createdAt: string;
 }
 

@@ -18,7 +18,8 @@ export function useGenerateLayout(homeId: string) {
   const queryClient = useQueryClient();
   const userId = useHomesUserId();
   return useMutation({
-    mutationFn: () => homesApi.generateLayout(homeId),
+    mutationFn: (roomChoices: { unitId: string; roomId: string }[] = []) =>
+      homesApi.generateLayout(homeId, roomChoices),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: homesKeys.layout(userId, homeId) }),
   });
 }

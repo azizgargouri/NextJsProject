@@ -36,6 +36,7 @@ import { NativeSelect } from './form-controls';
 import { FurnitureSymbol } from './furniture-symbol';
 import { apiErrorMessage, WALL_LABELS } from './home-schemas';
 import { RoomOutline } from './room-outline';
+import { RoomChoicesPanel, type RoomChoices } from './room-choices-panel';
 import { useLayoutDrag, type DragState, type DragTarget } from './use-layout-drag';
 
 /** Drag feedback: green = free spot, red = not allowed (the only non-ink status colour). */
@@ -62,6 +63,19 @@ export function LayoutPanel({ home }: { home: HomeDetailDto }) {
   const generate = useGenerateLayout(home.id);
   const remove = useDeleteLayout(home.id);
   const [confirm, setConfirm] = useState<'delete' | 'regenerate' | null>(null);
+  const [choices, setChoices] = useState<RoomChoices>({});
+  const [syncedPlan, setSyncedPlan] = useState<string | null>(null);
+
+  // Start from the room choices saved with the current plan (once per plan, not on every edit).
+  const planStamp = plan ? plan.createdAt : null;
+  if (planStamp !== syncedPlan) {
+    setSyncedPlan(planStamp);
+    if (plan) {
+      setChoices(
+        Object.fromEntries(plan.roomChoices.map((choice) => [choice.unitId, choice.roomId])),
+      );
+    }
+  }
 
   const missing = !home.moveRequest
     ? 'Link a move request above first: the assistant places its items.'
@@ -71,7 +85,8 @@ export function LayoutPanel({ home }: { home: HomeDetailDto }) {
 
   const run = () => {
     setConfirm(null);
-    generate.mutate(undefined, {
+    const roomChoices = Object.entries(choices).map(([unitId, roomId]) => ({ unitId, roomId }));
+    generate.mutate(roomChoices, {
       onSuccess: (result) =>
         toast.success(`Layout ready — planned by ${PROVIDER_LABELS[result.provider]}`),
     });
@@ -123,6 +138,16 @@ export function LayoutPanel({ home }: { home: HomeDetailDto }) {
         <p className="mono mt-6 border border-dashed border-ink-40 px-4 py-5 text-[11px] text-ink-80">
           {missing}
         </p>
+      )}
+
+      {!missing && home.moveRequest && (
+        <RoomChoicesPanel
+          items={home.moveRequest.items}
+          rooms={home.rooms}
+          value={choices}
+          onChange={setChoices}
+          disabled={generate.isPending}
+        />
       )}
 
       {generate.isPending && <Generating />}

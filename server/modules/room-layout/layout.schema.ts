@@ -24,3 +24,13 @@ export const LayoutItemUpdateSchema = z.discriminatedUnion('action', [
 ]);
 
 export type LayoutItemUpdateInput = z.infer<typeof LayoutItemUpdateSchema>;
+
+/** Generate: optional room per piece, chosen by the client; the rest is up to the assistant. */
+export const LayoutGenerateSchema = z.object({
+  roomChoices: z
+    .array(z.object({ unitId, roomId: z.string().trim().min(1).max(40) }))
+    .max(500)
+    .default([]),
+});
+
+export type LayoutGenerateInput = z.infer<typeof LayoutGenerateSchema>;
