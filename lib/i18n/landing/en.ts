@@ -7,6 +7,11 @@ export const landingEn = {
   meta: {
     skip: 'Skip to content',
   },
+  preloader: {
+    label: 'LOADING THE TRUCK. EVERY STAGE ON THE RECORD.',
+    stages: ['DISASSEMBLY', 'PACKING', 'LOADING', 'IN TRANSIT', 'DELIVERY', 'REASSEMBLY'],
+    skip: 'ESC OR CLICK TO SKIP',
+  },
   nav: {
     home: 'MoveUp home',
     links: {

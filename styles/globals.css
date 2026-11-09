@@ -403,6 +403,48 @@ html.lenis body {
   transform: scale(1.15);
 }
 
+/* Preloader: shown only when JavaScript runs (boot script sets data-js), never
+   on repeat visits, deep links or under reduced motion (data-preloaded); a
+   failsafe lifts it if hydration never takes over. */
+.preloader {
+  display: none;
+}
+
+html[data-js] .preloader {
+  display: block;
+  animation: preloader-failsafe 0s linear 7s forwards;
+}
+
+html[data-preloaded] .preloader {
+  display: none;
+}
+
+/* Start states for the entrance, so the first paint matches the first frame */
+.preloader [data-rise] {
+  transform: translateY(110%);
+}
+
+.preloader [data-rail] {
+  transform: scaleX(0);
+}
+
+/* The page cannot shift when the preloader releases the scrollbar */
+html:has(.landing) {
+  scrollbar-gutter: stable;
+}
+
+@keyframes preloader-failsafe {
+  to {
+    visibility: hidden;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-js] .preloader {
+    display: none;
+  }
+}
+
 /* Inventory assistant: indeterminate scan bar while the local model works */
 .inventory-scan {
   animation: inventory-scan 1.4s cubic-bezier(0.65, 0, 0.35, 1) infinite;

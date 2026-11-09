@@ -13,6 +13,7 @@ import { Faq } from '@/components/features/landing/faq';
 import { CloseCta } from '@/components/features/landing/close-cta';
 import { Footer } from '@/components/features/landing/footer';
 import { SmoothScroll } from '@/components/features/landing/smooth-scroll';
+import { Preloader, PRELOADER_BOOT_SCRIPT } from '@/components/features/landing/preloader';
 import { ContentService } from '@/server/modules/content/content.service';
 import { PricingService } from '@/server/modules/pricing/pricing.service';
 import { LOCALE_COOKIE, landingMessages, toLandingLocale } from '@/lib/i18n/landing';
@@ -54,13 +55,20 @@ export default async function HomePage() {
 
   return (
     <SmoothScroll>
+      <script dangerouslySetInnerHTML={{ __html: PRELOADER_BOOT_SCRIPT }} />
+      <Preloader t={t.preloader} locale={locale} />
       <a
+        data-preloader-behind
         href="#main"
         className="mono fixed left-4 top-2 z-[60] -translate-y-20 bg-ink px-4 py-3 text-xs text-paper focus:translate-y-0"
       >
         {t.meta.skip}
       </a>
-      <div lang={locale} className="landing w-full max-w-full overflow-x-clip">
+      <div
+        data-preloader-behind
+        lang={locale}
+        className="landing w-full max-w-full overflow-x-clip"
+      >
         <Nav t={t} locale={locale} />
         <main id="main" tabIndex={-1} className="outline-none">
           <Hero
