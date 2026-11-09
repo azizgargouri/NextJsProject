@@ -8,6 +8,7 @@ import { useGSAP } from '@gsap/react';
 import { SectionHeading } from '@/components/shared/section-heading';
 import { fill, type LandingLocale, type LandingMessages } from '@/lib/i18n/landing';
 import { estimateQuote } from '@/lib/pricing/estimate';
+import { InventoryAssistant } from './inventory-assistant';
 import { cn } from '@/lib/utils';
 
 if (typeof window !== 'undefined') {
@@ -26,8 +27,8 @@ export interface EstimatorRule {
   effectiveFrom: string;
 }
 
-const DISTANCE = { min: 1, max: 400, initial: 14 };
-const VOLUME = { min: 1, max: 60, initial: 18 };
+const DISTANCE = { min: 1, max: 400, initial: 14, step: 1 };
+const VOLUME = { min: 1, max: 60, initial: 18, step: 0.1 };
 
 /**
  * Estimator — Desire → Action. Reads the live ACTIVE pricing rule and prints
@@ -47,6 +48,14 @@ export function Estimator({
   const [distanceKm, setDistanceKm] = useState(DISTANCE.initial);
   const [volumeM3, setVolumeM3] = useState(VOLUME.initial);
   const [express, setExpress] = useState(false);
+  // An AI inventory can exceed the slider's usual range; the range grows to fit it.
+  const [volumeMax, setVolumeMax] = useState(VOLUME.max);
+
+  function applyInventory(m3: number) {
+    const value = Math.max(VOLUME.min, Math.round(m3 * 10) / 10);
+    setVolumeMax(Math.max(VOLUME.max, Math.ceil(value)));
+    setVolumeM3(value);
+  }
 
   const tag = locale === 'fr' ? 'fr-FR' : 'en-GB';
   const money = useMemo(
@@ -117,6 +126,7 @@ export function Estimator({
                   value={volumeM3}
                   onChange={setVolumeM3}
                   {...VOLUME}
+                  max={volumeMax}
                 />
                 <ExpressSwitch
                   label={t.express}
@@ -124,13 +134,14 @@ export function Estimator({
                   checked={express}
                   onChange={setExpress}
                 />
+                <InventoryAssistant t={t.ai} locale={locale} onApply={applyInventory} />
               </div>
             </div>
 
             <div className="lg:col-span-7">
               <div
                 data-slip
-                className="relative border-2 border-ink bg-paper shadow-[10px_10px_0_0_var(--color-ink)]"
+                className="relative border-2 border-ink bg-paper shadow-[10px_10px_0_0_var(--color-ink)] lg:sticky lg:top-24"
               >
                 <div className="flex items-start justify-between gap-4 border-b-2 border-dashed border-ink/40 px-6 py-5 md:px-8">
                   <div>
@@ -218,6 +229,7 @@ function RangeControl({
   value,
   min,
   max,
+  step,
   onChange,
 }: {
   label: string;
@@ -226,6 +238,7 @@ function RangeControl({
   value: number;
   min: number;
   max: number;
+  step: number;
   initial: number;
   onChange: (value: number) => void;
 }) {
@@ -249,7 +262,7 @@ function RangeControl({
         type="range"
         min={min}
         max={max}
-        step={1}
+        step={step}
         value={value}
         onChange={(event) => onChange(Number(event.target.value))}
         aria-valuetext={`${value} ${unit}`}

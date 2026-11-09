@@ -403,6 +403,20 @@ html.lenis body {
   transform: scale(1.15);
 }
 
+/* Inventory assistant: indeterminate scan bar while the local model works */
+.inventory-scan {
+  animation: inventory-scan 1.4s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+
+@keyframes inventory-scan {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(300%);
+  }
+}
+
 /* Hide scrollbars for horizontal carriers */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
@@ -412,7 +426,8 @@ html.lenis body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .marquee-track {
+  .marquee-track,
+  .inventory-scan {
     animation: none !important;
   }
 
