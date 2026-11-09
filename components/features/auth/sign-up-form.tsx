@@ -5,8 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Link from 'next/link';
-import { AuthHeader } from './back-home';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import type { AxiosError } from 'axios';
 import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
@@ -43,8 +42,11 @@ const ROLE_OPTIONS = [
   { value: 'MOVER' as const, label: 'I AM A MOVER', hint: 'Requires verification' },
 ];
 
-export function SignUpForm({ initialRole = 'CLIENT' }: { initialRole?: 'CLIENT' | 'MOVER' }) {
+export function SignUpForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTarget = searchParams.get('redirect') || searchParams.get('next') || searchParams.get('callbackUrl');
+
   const { mutate, isPending, isError, error } = useSignUp();
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -56,7 +58,7 @@ export function SignUpForm({ initialRole = 'CLIENT' }: { initialRole?: 'CLIENT' 
     formState: { errors },
   } = useForm<SignUpFormValues>({
     resolver: zodResolver(SignUpFormSchema),
-    defaultValues: { name: '', email: '', phone: '', password: '', role: initialRole },
+    defaultValues: { name: '', email: '', phone: '', password: '', role: 'CLIENT' },
   });
 
   const role = watch('role');
@@ -78,10 +80,16 @@ export function SignUpForm({ initialRole = 'CLIENT' }: { initialRole?: 'CLIENT' 
     mutate(
       { ...values, locale: 'en' },
       {
-        // A real page load: the mover service worker can only control a page created under /mover.
-        onSuccess: () => {
-          if (values.role === 'MOVER') window.location.assign('/mover');
-          else router.push('/dashboard');
+        onSuccess: (response) => {
+          if (redirectTarget) {
+            router.push(redirectTarget);
+          } else if (response.user.role === 'ADMIN') {
+            router.push('/dashboard');
+          } else if (response.user.role === 'MOVER') {
+            router.push('/me');
+          } else {
+            router.push('/request');
+          }
         },
       },
     );
@@ -92,7 +100,14 @@ export function SignUpForm({ initialRole = 'CLIENT' }: { initialRole?: 'CLIENT' 
       ref={rootRef}
       className="flex min-h-dvh flex-col justify-between bg-paper px-6 py-10 md:px-12"
     >
-      <AuthHeader />
+      {/* Header */}
+      <div data-form-reveal className="flex items-center justify-between">
+        <Link href="/" className="mono flex items-center gap-2 text-sm font-bold lg:hidden">
+          <span className="inline-block size-2.5 bg-hazard" aria-hidden />
+          MOVE<span className="text-hazard">UP</span>
+        </Link>
+        <p className="mono text-[10px] text-ink-40">ENDPOINT / SIGN-UP</p>
+      </div>
 
       {/* Form */}
       <form
@@ -106,7 +121,7 @@ export function SignUpForm({ initialRole = 'CLIENT' }: { initialRole?: 'CLIENT' 
           SESSION.
         </h1>
         <p data-form-reveal className="mt-4 text-sm text-ink-80">
-          Movers apply here and are verified by MoveUp within two working days.
+          Movers apply here and are verified by the society within 48 hours.
         </p>
 
         {/* Role selector — segmented control */}
@@ -196,7 +211,7 @@ export function SignUpForm({ initialRole = 'CLIENT' }: { initialRole?: 'CLIENT' 
         <p className="mono text-center text-[10px] text-ink-40">ALREADY REGISTERED?</p>
         <p className="mt-3 text-center">
           <Link
-            href="/sign-in"
+            href={redirectTarget ? `/sign-in?redirect=${encodeURIComponent(redirectTarget)}` : '/sign-in'}
             className="mono border-b-2 border-ink pb-0.5 text-[11px] hover:border-hazard hover:text-hazard"
           >
             GO TO LOGIN &gt;&gt;&gt;

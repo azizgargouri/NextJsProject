@@ -7,11 +7,37 @@ import { AdminButton } from '@/components/ui/admin-button';
 import { AdminCard } from '@/components/ui/admin-card';
 import { AdminSelect } from '@/components/ui/admin-select';
 import { useAdminAudit } from '@/hooks/content/admin';
-import { useAdminI18n } from '@/lib/i18n/admin';
 import type { AuditEventType } from '@/types';
 import { useAdminShell } from '../shell/admin-shell-context';
 
-const EVENT_VARIANTS: Record<AuditEventType, 'default' | 'secondary' | 'destructive'> = {
+const EVENT_LABELS: Partial<Record<AuditEventType, string>> = {
+  SIGNIN: 'Sign in',
+  SIGNOUT: 'Sign out',
+  SIGNUP: 'Sign up',
+  REFRESH_TOKEN: 'Session refresh',
+  USER_CREATE: 'User created',
+  USER_UPDATE: 'User updated',
+  USER_DELETE: 'User deleted',
+  USER_STATUS: 'User status changed',
+  PRICING_CREATE: 'Pricing rule created',
+  PRICING_UPDATE: 'Pricing rule updated',
+  PRICING_DELETE: 'Pricing rule deleted',
+  CONTENT_UPDATE: 'Content updated',
+  CLAIM_CREATE: 'Claim opened',
+  CLAIM_MESSAGE: 'Claim message',
+  CLAIM_STATUS: 'Claim updated',
+  REVIEW_CREATE: 'Review posted',
+  REVIEW_REPLY: 'Mover replied',
+  REVIEW_MODERATE: 'Review moderated',
+  AI_REQUEST: 'AI request',
+  EMPLOYEE_CREATE: 'Employee created',
+  EMPLOYEE_UPDATE: 'Employee updated',
+  ATTENDANCE_CHECKIN: 'Attendance check-in',
+  LEAVE_CREATE: 'Leave requested',
+  LEAVE_DECIDE: 'Leave decision',
+};
+
+const EVENT_VARIANTS: Partial<Record<AuditEventType, 'default' | 'secondary' | 'destructive'>> = {
   SIGNIN: 'secondary',
   SIGNOUT: 'secondary',
   SIGNUP: 'secondary',
@@ -24,12 +50,32 @@ const EVENT_VARIANTS: Record<AuditEventType, 'default' | 'secondary' | 'destruct
   PRICING_UPDATE: 'default',
   PRICING_DELETE: 'destructive',
   CONTENT_UPDATE: 'default',
-  PROFILE_UPDATE: 'secondary',
-  AVATAR_UPDATE: 'secondary',
-  PASSWORD_CHANGE: 'default',
-  SESSION_REVOKE: 'secondary',
-  STORAGE_DELETE: 'destructive',
+  CLAIM_CREATE: 'default',
+  CLAIM_MESSAGE: 'secondary',
+  CLAIM_STATUS: 'default',
+  REVIEW_CREATE: 'secondary',
+  REVIEW_REPLY: 'secondary',
+  REVIEW_MODERATE: 'destructive',
+  AI_REQUEST: 'secondary',
+  EMPLOYEE_CREATE: 'default',
+  EMPLOYEE_UPDATE: 'default',
+  ATTENDANCE_CHECKIN: 'secondary',
+  LEAVE_CREATE: 'secondary',
+  LEAVE_DECIDE: 'default',
 };
+
+const eventOptions = [
+  { value: 'ALL', label: 'All events' },
+  ...(Object.keys(EVENT_LABELS) as AuditEventType[]).map((event) => ({
+    value: event,
+    label: EVENT_LABELS[event] ?? event,
+  })),
+];
+
+const timeFormatter = new Intl.DateTimeFormat('en-GB', {
+  dateStyle: 'medium',
+  timeStyle: 'medium',
+});
 
 export function AuditPortal() {
   const { setPage: publishPage, clearPage, clearFooter } = useAdminShell();
@@ -37,27 +83,19 @@ export function AuditPortal() {
   const [page, setPage] = useState(1);
   const limit = 20;
   const audit = useAdminAudit({ page, limit, event });
-  const { m, fmt } = useAdminI18n();
-  const eventOptions = [
-    { value: 'ALL', label: m.audit.allEvents },
-    ...(Object.keys(EVENT_VARIANTS) as AuditEventType[]).map((value) => ({
-      value,
-      label: m.audit.events[value],
-    })),
-  ];
 
   useEffect(() => {
     publishPage({
-      breadcrumbs: [{ label: m.common.admin, href: '/admin' }, { label: m.audit.title }],
-      title: m.audit.title,
-      description: m.audit.description,
+      breadcrumbs: [{ label: 'Admin', href: '/admin' }, { label: 'Audit log' }],
+      title: 'Audit log',
+      description: 'Security and administration trail recorded by the platform server.',
     });
     clearFooter();
     return () => {
       clearPage();
       clearFooter();
     };
-  }, [clearFooter, clearPage, m, publishPage]);
+  }, [clearFooter, clearPage, publishPage]);
 
   useEffect(() => setPage(1), [event]);
 
@@ -69,18 +107,18 @@ export function AuditPortal() {
         <div className="flex flex-col gap-4 border-b border-border px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2 text-sm font-semibold">
             <History className="size-4 text-primary" />
-            {m.audit.recorded}
+            Recorded events
           </div>
           <div className="flex items-center gap-3">
             <label htmlFor="audit-event-filter" className="sr-only">
-              {m.audit.filter}
+              Filter by event type
             </label>
             <AdminSelect
               id="audit-event-filter"
               value={event}
               onValueChange={(value) => setEvent(value as AuditEventType | 'ALL')}
               options={eventOptions}
-              ariaLabel={m.audit.filter}
+              ariaLabel="Filter by event type"
             />
           </div>
         </div>
@@ -96,10 +134,12 @@ export function AuditPortal() {
         {audit.isError ? (
           <div className="px-6 py-12 text-center">
             <CircleAlert className="mx-auto size-5 text-destructive" />
-            <p className="mt-3 font-semibold">{m.audit.loadFailed}</p>
-            <p className="mt-1 text-xs text-muted-foreground">{m.audit.loadFailedBody}</p>
+            <p className="mt-3 font-semibold">Audit trail could not be loaded.</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Check the MongoDB connection, then retry this request.
+            </p>
             <AdminButton className="mt-4" size="sm" onClick={() => audit.refetch()}>
-              <RotateCcw /> {m.common.retry}
+              <RotateCcw /> Retry
             </AdminButton>
           </div>
         ) : null}
@@ -107,8 +147,10 @@ export function AuditPortal() {
         {empty ? (
           <div className="px-6 py-12 text-center">
             <History className="mx-auto size-6 text-muted-foreground" />
-            <p className="mt-3 font-semibold">{m.audit.empty}</p>
-            <p className="mt-1 text-xs text-muted-foreground">{m.audit.emptyBody}</p>
+            <p className="mt-3 font-semibold">No events recorded yet.</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Every sign-in and account action appends here automatically.
+            </p>
           </div>
         ) : null}
 
@@ -117,21 +159,19 @@ export function AuditPortal() {
             <table className="w-full min-w-[760px] text-left text-xs">
               <thead className="bg-muted text-muted-foreground">
                 <tr>
-                  <th className="h-10 px-6 font-semibold">{m.audit.columns.event}</th>
-                  <th className="h-10 px-3 font-semibold">{m.audit.columns.actor}</th>
-                  <th className="h-10 px-3 font-semibold">{m.audit.columns.action}</th>
-                  <th className="h-10 px-3 font-semibold">{m.audit.columns.target}</th>
-                  <th className="h-10 px-6 text-right font-semibold">
-                    {m.audit.columns.recordedAt}
-                  </th>
+                  <th className="h-10 px-6 font-semibold">Event</th>
+                  <th className="h-10 px-3 font-semibold">Actor</th>
+                  <th className="h-10 px-3 font-semibold">Action</th>
+                  <th className="h-10 px-3 font-semibold">Target</th>
+                  <th className="h-10 px-6 text-right font-semibold">Recorded at</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {audit.data.data.map((eventRow) => (
                   <tr key={eventRow.id} className="text-foreground">
                     <td className="px-6 py-2.5">
-                      <AdminBadge variant={EVENT_VARIANTS[eventRow.event]}>
-                        {m.audit.events[eventRow.event] ?? eventRow.event}
+                      <AdminBadge variant={EVENT_VARIANTS[eventRow.event] ?? 'secondary'}>
+                        {EVENT_LABELS[eventRow.event] ?? eventRow.event}
                       </AdminBadge>
                     </td>
                     <td className="px-3 py-2.5">
@@ -143,7 +183,7 @@ export function AuditPortal() {
                           </span>
                         </span>
                       ) : (
-                        <span className="text-muted-foreground">{m.audit.system}</span>
+                        <span className="text-muted-foreground">System / unsaved user</span>
                       )}
                     </td>
                     <td className="px-3 py-2.5 font-mono text-[11px]">
@@ -153,7 +193,7 @@ export function AuditPortal() {
                       {targetSummary(eventRow.logInfo)}
                     </td>
                     <td className="whitespace-nowrap px-6 py-2.5 text-right text-muted-foreground">
-                      {fmt.dateTimeSeconds(eventRow.createdAt)}
+                      {timeFormatter.format(new Date(eventRow.createdAt))}
                     </td>
                   </tr>
                 ))}
@@ -165,8 +205,8 @@ export function AuditPortal() {
         {audit.data && audit.data.meta.pageCount > 1 ? (
           <div className="flex items-center justify-between border-t border-border px-6 py-3">
             <p className="text-xs text-muted-foreground">
-              {m.common.pageOf(audit.data.meta.page, audit.data.meta.pageCount)} ·{' '}
-              {m.audit.eventCount(audit.data.meta.itemCount)}
+              Page {audit.data.meta.page} of {audit.data.meta.pageCount} ·{' '}
+              {audit.data.meta.itemCount} events
             </p>
             <div className="flex items-center gap-2">
               <AdminButton
@@ -174,18 +214,18 @@ export function AuditPortal() {
                 size="sm"
                 onClick={() => setPage((current) => Math.max(1, current - 1))}
                 disabled={page <= 1}
-                aria-label={m.audit.previousPage}
+                aria-label="Previous audit page"
               >
-                <ChevronLeft /> {m.common.previous}
+                <ChevronLeft /> Previous
               </AdminButton>
               <AdminButton
                 variant="outline"
                 size="sm"
                 onClick={() => setPage((current) => current + 1)}
                 disabled={!audit.data.meta.hasNextPage}
-                aria-label={m.audit.nextPage}
+                aria-label="Next audit page"
               >
-                {m.common.next} <ChevronRight />
+                Next <ChevronRight />
               </AdminButton>
             </div>
           </div>

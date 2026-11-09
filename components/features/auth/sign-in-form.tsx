@@ -5,8 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Link from 'next/link';
-import { AuthHeader } from './back-home';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import type { AxiosError } from 'axios';
 import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
@@ -22,7 +21,8 @@ if (typeof window !== 'undefined') {
 }
 
 const SignInFormSchema = z.object({
-  email: z.string().email('Invalid email address'),
+  // Mirrors the server schema: autofilled emails often carry a trailing space.
+  email: z.string().trim().toLowerCase().email('Invalid email address'),
   password: z.string().min(1, 'Password is required'),
 });
 
@@ -30,12 +30,16 @@ type SignInFormValues = z.infer<typeof SignInFormSchema>;
 
 export function SignInForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTarget = searchParams.get('redirect') || searchParams.get('next') || searchParams.get('callbackUrl');
+
   const { mutate, isPending, error, isError } = useSignIn();
   const rootRef = useRef<HTMLDivElement>(null);
 
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors },
   } = useForm<SignInFormValues>({
     resolver: zodResolver(SignInFormSchema),
@@ -57,17 +61,35 @@ export function SignInForm() {
 
   const onSubmit = (values: SignInFormValues) => {
     mutate(values, {
-      onSuccess: ({ user }) => {
-        // A real page load: the mover service worker can only control a page created under /mover.
-        if (user.role === 'MOVER') window.location.assign('/mover');
-        else router.push(user.role === 'ADMIN' ? '/admin' : '/dashboard');
+      onSuccess: (response) => {
+        if (redirectTarget) {
+          router.push(redirectTarget);
+        } else if (response.user.role === 'ADMIN') {
+          router.push('/admin');
+        } else if (response.user.role === 'MOVER') {
+          router.push('/me');
+        } else {
+          router.push('/request');
+        }
       },
     });
   };
 
+  const fillDemoClient = () => {
+    setValue('email', 'client@moveup.tn');
+    setValue('password', 'Demo#2026!');
+  };
+
   return (
     <div ref={rootRef} className="flex min-h-dvh flex-col justify-between px-6 py-10 md:px-12">
-      <AuthHeader />
+      {/* Header */}
+      <div data-form-reveal className="flex items-center justify-between">
+        <Link href="/" className="mono flex items-center gap-2 text-sm font-bold lg:hidden">
+          <span className="inline-block size-2.5 bg-hazard" aria-hidden />
+          MOVE<span className="text-hazard">UP</span>
+        </Link>
+        <p className="mono text-[10px] text-ink-40">ENDPOINT / SIGN-IN</p>
+      </div>
 
       {/* Form */}
       <form
@@ -80,11 +102,29 @@ export function SignInForm() {
           <br />
           BACK.
         </h1>
-        <p data-form-reveal className="mt-4 text-sm text-ink-80">
-          Log in to request a move, follow your job or manage your crew.
-        </p>
 
-        <div data-form-reveal className="mt-10 space-y-6">
+        {redirectTarget ? (
+          <div data-form-reveal className="mt-4 border border-hazard bg-hazard/10 p-3 mono text-xs text-ink">
+            <span className="text-hazard font-bold">AUTHENTICATION REQUIRED:</span> Please log in to complete your move booking. Your draft items and LiDAR calculations are preserved.
+          </div>
+        ) : (
+          <p data-form-reveal className="mt-4 text-sm text-ink-80">
+            Log in to request a move, follow your job or manage your crew.
+          </p>
+        )}
+
+        {/* Demo filler */}
+        <div data-form-reveal className="mt-4">
+          <button
+            type="button"
+            onClick={fillDemoClient}
+            className="mono text-[10px] text-hazard underline hover:text-ink transition"
+          >
+            FILL DEMO CLIENT (client@moveup.tn)
+          </button>
+        </div>
+
+        <div data-form-reveal className="mt-8 space-y-6">
           <FieldRow>
             <Label htmlFor="email">EMAIL</Label>
             <Input
@@ -130,7 +170,7 @@ export function SignInForm() {
         </div>
         <div className="mt-6 text-center">
           <Link
-            href="/sign-up"
+            href={redirectTarget ? `/sign-up?redirect=${encodeURIComponent(redirectTarget)}` : '/sign-up'}
             className="mono border-b-2 border-ink pb-0.5 text-[11px] hover:border-hazard hover:text-hazard"
           >
             CREATE AN ACCOUNT &gt;&gt;&gt;

@@ -15,6 +15,9 @@ next-env.d.ts
 
 # mongodb local data (binaries/tools artifacts)
 *.db-journal
+.moveup-dev-mongo/
+.impeccable/
+.idea/
 
 # misc
 .DS_Store

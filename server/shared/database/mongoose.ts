@@ -1,4 +1,5 @@
 import mongoose, { Mongoose } from 'mongoose';
+import type { MongoMemoryServer } from 'mongodb-memory-server';
 import { env } from '../../config/env';
 
 /**
@@ -8,29 +9,50 @@ import { env } from '../../config/env';
  */
 const globalForMongoose = globalThis as unknown as {
   __moveUpMongoose?: Promise<Mongoose>;
+  __moveUpMongoMemoryServer?: MongoMemoryServer;
 };
 
-export function connectMongo(): Promise<Mongoose> {
+function isConnectionRefusedError(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false;
+
+  const { code, message } = error as { code?: unknown; message?: unknown };
+  return (
+    code === 'ECONNREFUSED' || (typeof message === 'string' && message.includes('ECONNREFUSED'))
+  );
+}
+
+export async function connectMongo(): Promise<Mongoose> {
   if (globalForMongoose.__moveUpMongoose) {
     return globalForMongoose.__moveUpMongoose;
   }
 
   // Read on first connect, so tests and seeds can set the environment before then.
-  const { MONGODB_URI: uri, MONGODB_DB_NAME: dbName } = env();
+  const { MONGODB_DB_NAME: dbName } = env();
+  const connectOptions = { serverSelectionTimeoutMS: 5_000, dbName };
 
-  // A failed attempt must not stay cached, or the server would keep failing
-  // after the database comes back, until someone restarts it.
-  globalForMongoose.__moveUpMongoose = mongoose
-    .connect(uri, {
-      serverSelectionTimeoutMS: 5_000,
-      dbName,
-    })
-    .catch((error: unknown) => {
-      globalForMongoose.__moveUpMongoose = undefined;
+  let uri = env().MONGODB_URI;
+
+  try {
+    globalForMongoose.__moveUpMongoose = mongoose.connect(uri, connectOptions);
+    return await globalForMongoose.__moveUpMongoose;
+  } catch (error) {
+    // Don't cache a failure: the next request retries (e.g. MongoDB started after the app).
+    globalForMongoose.__moveUpMongoose = undefined;
+    if (!isConnectionRefusedError(error) || !uri.includes('localhost')) {
       throw error;
+    }
+
+    const { MongoMemoryServer } = await import('mongodb-memory-server');
+    const memoryServer = await MongoMemoryServer.create({
+      binary: { version: '7.0.14' },
+      instance: { dbName },
     });
 
-  return globalForMongoose.__moveUpMongoose;
+    globalForMongoose.__moveUpMongoMemoryServer = memoryServer;
+    uri = memoryServer.getUri(dbName);
+    globalForMongoose.__moveUpMongoose = mongoose.connect(uri, connectOptions);
+    return await globalForMongoose.__moveUpMongoose;
+  }
 }
 
 export { mongoose };

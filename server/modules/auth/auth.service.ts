@@ -9,6 +9,7 @@ import { comparePasswords } from '../../shared/auth/password';
 import { UserService } from '../users/users.service';
 import { serializeUser, type UserResponse } from '../users/users.serializer';
 import { AuthRepository } from './auth.repository';
+import { MoverProfileModel } from '../../shared/database/models/mover-profile.model';
 import { serializeAuthSession, type AuthSessionResponse, type TokenPair } from './auth.serializer';
 import {
   InvalidCredentialsError,
@@ -21,26 +22,25 @@ import type { SignInInput, SignUpInput } from './auth.schema'; /**
  * Owns password checks, JWT issuance and refresh-token rotation.
  * Returns the serialized session DTO consumed by both controller and client store.
  */
-/** Device context recorded on the refresh-token document (display only, never trusted). */
-export interface SessionContext {
-  userAgent?: string | null;
-  sessionStartedAt?: Date | null;
-}
-
 export class AuthService {
   private readonly tokens = new AuthRepository();
   private readonly users = new UserService();
 
-  async signUp(input: SignUpInput, context: SessionContext = {}): Promise<AuthSessionResponse> {
+  async signUp(input: SignUpInput): Promise<AuthSessionResponse> {
     const user = await this.users.createUser(input);
     return serializeAuthSession({
       ...user,
-      tokens: await this.issueTokens(user.id, user.email, user.role, context),
+      tokens: await this.issueTokens(user.id, user.email, user.role),
     });
   }
 
-  async signIn(input: SignInInput, context: SessionContext = {}): Promise<AuthSessionResponse> {
-    const user = await this.users.findByEmail(input.email);
+  async signIn(input: SignInInput): Promise<AuthSessionResponse> {
+    let user = await this.users.findByEmail(input.email);
+    // The fallback MongoDB is intentionally temporary in local development.
+    // Seed the documented demo mover only there, never in production.
+    if (!user && process.env.NODE_ENV === 'development' && input.email.toLowerCase() === 'mover@moveup.tn') {
+      user = await this.createDevelopmentDemoMover();
+    }
     if (!user) throw new InvalidCredentialsError();
 
     const passwordOk = await comparePasswords(input.password, user.passwordHash);
@@ -49,7 +49,7 @@ export class AuthService {
 
     return serializeAuthSession({
       ...serializeUser(user),
-      tokens: await this.issueTokens(user.id, user.email, user.role, context),
+      tokens: await this.issueTokens(user.id, user.email, user.role),
     });
   }
 
@@ -68,13 +68,9 @@ export class AuthService {
     if (user.status === 'BLOCKED') throw new UserBlockedError();
 
     await this.tokens.revoke(stored.id);
-    // Rotation keeps the device identity and original start of the session.
     return serializeAuthSession({
       ...user,
-      tokens: await this.issueTokens(user.id, user.email, user.role, {
-        userAgent: stored.userAgent,
-        sessionStartedAt: stored.sessionStartedAt,
-      }),
+      tokens: await this.issueTokens(user.id, user.email, user.role),
     });
   }
 
@@ -96,7 +92,6 @@ export class AuthService {
     userId: string,
     email: string,
     role: UserResponse['role'],
-    context: SessionContext = {},
   ): Promise<TokenPair> {
     void email;
     const accessToken = await generateAccessToken({ sub: userId, email, role });
@@ -106,12 +101,29 @@ export class AuthService {
       userId,
       tokenHash: sha256Hex(refreshToken),
       ttlSeconds: env().REFRESH_TOKEN_TTL,
-      userAgent: context.userAgent ?? null,
-      sessionStartedAt: context.sessionStartedAt ?? null,
     });
 
     void accessToken;
     return { accessToken, refreshToken, expiresIn: env().ACCESS_TOKEN_TTL };
+  }
+
+  private async createDevelopmentDemoMover() {
+    const user = await this.users.createUser({
+      email: 'mover@moveup.tn',
+      password: 'Demo#2026!',
+      name: 'Mehdi Transport',
+      phone: '+21698123456',
+      role: 'MOVER',
+      locale: 'en',
+    });
+    await MoverProfileModel.findOneAndUpdate(
+      { userId: user.id },
+      { $set: { companyName: 'Mehdi Transport', bio: 'Moving van, 14 m³ — Greater Tunis.', zones: ['TUN'], verificationStatus: 'APPROVED' } },
+      { upsert: true },
+    );
+    const storedUser = await this.users.findByEmail('mover@moveup.tn');
+    if (!storedUser) throw new Error('Development demo mover was not created');
+    return storedUser;
   }
 }
 

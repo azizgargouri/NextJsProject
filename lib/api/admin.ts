@@ -18,6 +18,7 @@ import type {
   StorageObjectsQuery,
   StorageStatusDto,
   UserStatus,
+  AdminClaimUpdatePayload, AdminClaimsQuery, AdminReviewsQuery, ClaimDto, QualityStatsDto, ReviewDto, ReviewStatus,
 } from '@/types';
 
 export const adminApi = {
@@ -177,4 +178,15 @@ export const adminApi = {
     );
     return data;
   },
+
+  quality: async (): Promise<QualityStatsDto> => (await axiosClient.get<QualityStatsDto>('/api/admin/quality')).data,
+  claims: async (query: AdminClaimsQuery): Promise<PageDto<ClaimDto>> =>
+    (await axiosClient.get<PageDto<ClaimDto>>('/api/admin/claims', { params: query })).data,
+  claim: async (id: string): Promise<ClaimDto> => (await axiosClient.get<{ claim: ClaimDto }>(`/api/admin/claims/${id}`)).data.claim,
+  updateClaim: async (id: string, payload: AdminClaimUpdatePayload): Promise<ClaimDto> =>
+    (await axiosClient.patch<{ claim: ClaimDto }>(`/api/admin/claims/${id}`, payload)).data.claim,
+  reviews: async (query: AdminReviewsQuery): Promise<PageDto<ReviewDto>> =>
+    (await axiosClient.get<PageDto<ReviewDto>>('/api/admin/reviews', { params: query })).data,
+  moderateReview: async (id: string, status: ReviewStatus, note?: string): Promise<ReviewDto> =>
+    (await axiosClient.patch<{ review: ReviewDto }>(`/api/admin/reviews/${id}`, { status, note })).data.review,
 };

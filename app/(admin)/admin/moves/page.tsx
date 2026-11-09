@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
-import { AdminModuleNotConnected } from '@/components/features/admin/admin-module-not-connected';
+import { MovesPortal } from '@/components/features/admin/moves/moves-portal';
 
 export const metadata: Metadata = { title: 'Move requests' };
 
 export default function AdminMovesPage() {
-  return <AdminModuleNotConnected module="moves" />;
+  return <MovesPortal />;
 }

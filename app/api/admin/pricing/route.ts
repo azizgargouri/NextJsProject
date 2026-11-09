@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { NextResponse } from 'next/server';
 import { PricingService, PricingRuleCreateSchema } from '@/server/modules/pricing';
 import { errorResponse, requireAdmin } from '@/server/shared/auth/guards';

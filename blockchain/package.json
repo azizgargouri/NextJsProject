@@ -1,0 +1,33 @@
+{
+  "name": "moveup-contracts",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Employment contract registry for MoveUp (Solidity + Hardhat)",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "node": "hardhat node",
+    "deploy:local": "hardhat run scripts/deploy.ts --network localhost",
+    "deploy:amoy": "hardhat run scripts/deploy.ts --network amoy",
+    "deploy:sepolia": "hardhat run scripts/deploy.ts --network sepolia",
+    "grant:local": "hardhat run scripts/grant-hr-admin.ts --network localhost",
+    "grant:amoy": "hardhat run scripts/grant-hr-admin.ts --network amoy",
+    "grant:sepolia": "hardhat run scripts/grant-hr-admin.ts --network sepolia",
+    "dump:local": "hardhat run scripts/dump-contracts.ts --network localhost",
+    "dump:amoy": "hardhat run scripts/dump-contracts.ts --network amoy",
+    "dump:sepolia": "hardhat run scripts/dump-contracts.ts --network sepolia",
+    "export-abi": "hardhat run scripts/export-abi.ts"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^22.10.0",
+    "dotenv": "^16.4.7",
+    "hardhat": "^2.22.17",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.2"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.1.0"
+  }
+}

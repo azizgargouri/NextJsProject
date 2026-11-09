@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="MoveUp icon">
+  <rect width="512" height="512" fill="#f2f1ec"/>
+  <rect x="48" y="48" width="416" height="416" fill="#101010"/>
+  <path d="M130 338V174h58l75 102V174h48v164h-58l-75-102v102h-48Zm220 0V174h58v164h-58Z" fill="#f2f1ec"/>
+  <rect x="340" y="70" width="48" height="372" fill="#e61919"/>
+</svg>

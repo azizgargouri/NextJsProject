@@ -14,9 +14,11 @@ export interface UserDoc {
   role: Role;
   locale: string;
   status: UserStatus;
-  /** Object-storage key of the current avatar (null when none). */
+  /** Auto-created custodial wallet address (public). */
+  walletAddress: string | null;
+  /** AES-256-GCM encrypted private key — never exposed by the API. */
+  walletPrivateKeyEncrypted: string | null;
   avatarKey: string | null;
-  /** Notifications created after this instant count as unread. */
   notificationsSeenAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -42,6 +44,8 @@ const UserSchema = new Schema<UserDoc>(
     role: { type: String, enum: [...ROLES], default: 'CLIENT' },
     locale: { type: String, enum: ['en', 'fr', 'ar'], default: 'en' },
     status: { type: String, enum: [...USER_STATUSES], default: 'ACTIVE' },
+    walletAddress: { type: String, default: null, lowercase: true, trim: true },
+    walletPrivateKeyEncrypted: { type: String, default: null },
     avatarKey: { type: String, default: null },
     notificationsSeenAt: { type: Date, default: null },
     deletedAt: { type: Date, default: null },

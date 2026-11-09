@@ -2,7 +2,7 @@ import type { AuditEventType } from '@/types';
 
 const plural = (count: number, one: string, other: string) => (count === 1 ? one : other);
 
-const auditEvents: Record<AuditEventType, string> = {
+const auditEvents: Partial<Record<AuditEventType, string>> = {
   SIGNIN: 'Sign in',
   SIGNOUT: 'Sign out',
   SIGNUP: 'Sign up',

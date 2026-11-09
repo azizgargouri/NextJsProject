@@ -9,7 +9,9 @@ export interface AuthUser {
   phone: string;
   role: UserRole;
   locale: string;
-  avatarUrl?: string | null;
+  /** Public address of the auto-created app wallet. */
+  walletAddress: string | null;
+  avatarUrl: string | null;
   createdAt: string;
 }
 

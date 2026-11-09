@@ -15,23 +15,22 @@ import { AdminButton } from '@/components/ui/admin-button';
 import { AdminCard } from '@/components/ui/admin-card';
 import { AdminSkeleton } from '@/components/ui/admin-skeleton';
 import { useAdminOverview } from '@/hooks/content/admin';
-import { useAdminI18n } from '@/lib/i18n/admin';
 import { useAdminShell } from '../shell/admin-shell-context';
+import { QualityOverview } from './quality-overview';
 
 export function AdminOverviewPortal() {
   const { setPage, clearPage, clearFooter } = useAdminShell();
   const overview = useAdminOverview();
-  const { m } = useAdminI18n();
 
   useEffect(() => {
     setPage({
-      breadcrumbs: [{ label: m.common.admin }, { label: m.nav.items.overview }],
-      title: m.overview.title,
-      description: m.overview.description,
+      breadcrumbs: [{ label: 'Admin' }, { label: 'Overview' }],
+      title: 'Operations overview',
+      description: 'Account health and platform readiness from the live MoveUp database.',
       actions: (
         <AdminButton asChild size="sm">
           <Link href="/admin/users">
-            {m.overview.manageUsers} <ArrowRight />
+            Manage users <ArrowRight />
           </Link>
         </AdminButton>
       ),
@@ -41,7 +40,7 @@ export function AdminOverviewPortal() {
       clearPage();
       clearFooter();
     };
-  }, [clearFooter, clearPage, m, setPage]);
+  }, [clearFooter, clearPage, setPage]);
 
   if (overview.isPending) return <OverviewSkeleton />;
 
@@ -50,10 +49,12 @@ export function AdminOverviewPortal() {
       <div className="p-4 min-[426px]:p-10">
         <AdminCard className="max-w-2xl p-6">
           <CircleAlert className="size-5 text-destructive" />
-          <h2 className="mt-4 text-base font-semibold">{m.overview.loadFailed}</h2>
-          <p className="mt-1 text-sm text-muted-foreground">{m.overview.loadFailedBody}</p>
+          <h2 className="mt-4 text-base font-semibold">Overview could not be loaded</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Check the MongoDB connection, then retry this request.
+          </p>
           <AdminButton className="mt-5" size="sm" onClick={() => overview.refetch()}>
-            {m.common.retry}
+            Retry
           </AdminButton>
         </AdminCard>
       </div>
@@ -71,35 +72,37 @@ export function AdminOverviewPortal() {
             <div>
               <div className="flex items-center gap-2 text-sm font-semibold">
                 <Users className="size-4 text-primary" />
-                {m.overview.registry}
+                Account registry
               </div>
-              <p className="mt-1 text-sm text-muted-foreground">{m.overview.registryBody}</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Live users by role and current access status.
+              </p>
             </div>
             <div className="sm:text-right">
               <p className="text-3xl font-bold tracking-[-0.03em]">{users.total}</p>
-              <p className="text-xs text-muted-foreground">{m.overview.totalAccounts}</p>
+              <p className="text-xs text-muted-foreground">total accounts</p>
             </div>
           </div>
 
           <div className="border-y border-border bg-muted/60 px-6 py-4">
             <div className="mb-2 flex items-center justify-between text-xs">
-              <span className="font-semibold">{m.overview.activeAccess}</span>
+              <span className="font-semibold">Active access</span>
               <span className="text-muted-foreground">{activePercent}%</span>
             </div>
             <div className="h-2 overflow-hidden rounded-sm bg-border" aria-hidden>
               <div className="h-full bg-primary" style={{ width: `${activePercent}%` }} />
             </div>
             <p className="mt-2 text-xs text-muted-foreground">
-              {m.overview.activeBlocked(users.active, users.blocked)}
+              {users.active} active · {users.blocked} blocked
             </p>
           </div>
 
           <div className="grid divide-y divide-border sm:grid-cols-4 sm:divide-x sm:divide-y-0">
             {[
-              [m.overview.clients, users.clients],
-              [m.overview.movers, users.movers],
-              [m.overview.admins, users.admins],
-              [m.overview.new30, users.registeredLast30Days],
+              ['Clients', users.clients],
+              ['Movers', users.movers],
+              ['Admins', users.admins],
+              ['New · 30 days', users.registeredLast30Days],
             ].map(([label, value]) => (
               <div key={label} className="px-6 py-4">
                 <p className="text-xl font-bold tracking-[-0.02em]">{value}</p>
@@ -112,56 +115,63 @@ export function AdminOverviewPortal() {
         <AdminCard className="p-6">
           <div className="flex items-center gap-2 text-sm font-semibold">
             <ShieldCheck className="size-4 text-primary" />
-            {m.overview.verification}
+            Mover verification
           </div>
-          <p className="mt-1 text-sm text-muted-foreground">{m.overview.verificationBody}</p>
+          <p className="mt-1 text-sm text-muted-foreground">Application review state.</p>
           <div className="mt-6 space-y-3">
             <StatusRow
               icon={CircleAlert}
-              label={m.overview.pendingReview}
+              label="Pending review"
               value={movers.pendingReview}
               urgent={movers.pendingReview > 0}
             />
-            <StatusRow
-              icon={CircleCheck}
-              label={m.overview.approvedMovers}
-              value={movers.approved}
-            />
+            <StatusRow icon={CircleCheck} label="Approved movers" value={movers.approved} />
           </div>
           <div className="mt-6 border-t border-border pt-4">
-            <p className="text-xs leading-5 text-muted-foreground">{m.overview.verificationNote}</p>
+            <p className="text-xs leading-5 text-muted-foreground">
+              The mover-review workflow is scheduled for the next admin vertical slice.
+            </p>
           </div>
         </AdminCard>
       </div>
+
+      <QualityOverview />
 
       <AdminCard className="overflow-hidden">
         <div className="border-b border-border px-6 py-5">
           <div className="flex items-center gap-2 text-sm font-semibold">
             <Database className="size-4 text-primary" />
-            {m.overview.readiness}
+            Operations data readiness
           </div>
-          <p className="mt-1 text-sm text-muted-foreground">{m.overview.readinessBody}</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            A-01 metrics remain unavailable until the move-request domain is connected.
+          </p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[680px] text-left text-xs">
             <thead className="bg-muted text-muted-foreground">
               <tr>
-                <th className="h-10 px-4 font-semibold">{m.overview.columns.metric}</th>
-                <th className="h-10 px-4 font-semibold">{m.overview.columns.value}</th>
-                <th className="h-10 px-4 font-semibold">{m.overview.columns.source}</th>
-                <th className="h-10 px-4 font-semibold">{m.overview.columns.state}</th>
+                <th className="h-10 px-4 font-semibold">Metric</th>
+                <th className="h-10 px-4 font-semibold">Current value</th>
+                <th className="h-10 px-4 font-semibold">Source</th>
+                <th className="h-10 px-4 font-semibold">State</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {m.overview.metrics.map(([label, source]) => (
+              {[
+                ['New requests', 'MoveRequest collection'],
+                ['Moves in progress', 'MoveRequest status timeline'],
+                ['Completed moves', 'MoveRequest completion state'],
+                ['Revenue', 'Payment and commission records'],
+              ].map(([label, source]) => (
                 <tr key={label} className="hover:bg-muted/50">
                   <td className="px-4 py-3 font-medium">{label}</td>
                   <td className="px-4 py-3 text-base font-semibold">—</td>
                   <td className="px-4 py-3 text-muted-foreground">{source}</td>
                   <td className="px-4 py-3">
                     <span className="inline-flex items-center gap-1.5 text-muted-foreground">
-                      <span className="size-1.5 rounded-full bg-muted-foreground/50" />{' '}
-                      {m.overview.notConnected}
+                      <span className="size-1.5 rounded-full bg-muted-foreground/50" /> Not
+                      connected
                     </span>
                   </td>
                 </tr>
@@ -197,9 +207,8 @@ function StatusRow({
 }
 
 function OverviewSkeleton() {
-  const { m } = useAdminI18n();
   return (
-    <div className="space-y-6 p-4 min-[426px]:p-10" aria-label={m.overview.loadingLabel}>
+    <div className="space-y-6 p-4 min-[426px]:p-10" aria-label="Loading overview">
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(320px,0.8fr)]">
         <AdminSkeleton className="h-72" />
         <AdminSkeleton className="h-72" />

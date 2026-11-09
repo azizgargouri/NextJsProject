@@ -1,21 +1,18 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 import { AuthLayout } from '@/components/features/auth/auth-layout';
 import { SignUpForm } from '@/components/features/auth/sign-up-form';
 
 export const metadata: Metadata = {
-  title: 'Create account',
+  title: 'Sign up',
 };
 
-/** `?role=MOVER` preselects the crew account type (linked from the landing). */
-export default async function SignUpPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ role?: string }>;
-}) {
-  const { role } = await searchParams;
+export default function SignUpPage() {
   return (
     <AuthLayout>
-      <SignUpForm initialRole={role?.toUpperCase() === 'MOVER' ? 'MOVER' : 'CLIENT'} />
+      <Suspense fallback={<div className="mono p-8 text-xs text-ink-40">LOADING FORM…</div>}>
+        <SignUpForm />
+      </Suspense>
     </AuthLayout>
   );
 }

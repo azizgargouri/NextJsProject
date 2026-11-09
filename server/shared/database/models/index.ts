@@ -1,15 +1,22 @@
 export { mongoose, connectMongo } from '../mongoose';
 export { UserModel, type UserDoc } from './user.model';
 export { RefreshTokenModel, type RefreshTokenDoc } from './refresh-token.model';
-export {
-  MoverProfileModel,
-  type MoverProfileDoc,
-  type MoverCosts,
-} from './mover-profile.model';
+export { MoverProfileModel, type MoverProfileDoc, type MoverCosts } from './mover-profile.model';
+export { EmployeeModel, type EmployeeDoc } from './employee.model';
+export { AttendanceModel, type AttendanceDoc, type AttendanceLocation } from './attendance.model';
+export { LeaveRequestModel, type LeaveRequestDoc } from './leave-request.model';
+export { WorkScheduleModel, type WorkScheduleDoc } from './work-schedule.model';
+export { MoveModel, type MoveDoc, type MoveStage, type MoveStageKey } from './move.model';
 export { AuditEventModel, type AuditEventDoc } from './audit-event.model';
 export { PricingRuleModel, type PricingRuleDoc } from './pricing-rule.model';
 export { ContentEntryModel, type ContentEntryDoc } from './content-entry.model';
-
+export { HomeModel, type HomeDoc, type RoomDoc, type OpeningDoc } from './home.model';
+export { ClaimModel, type ClaimDoc, type ClaimEvent } from './claim.model';
+export { ReviewModel, type ReviewDoc } from './review.model';
+export { AiMessageModel, type AiMessageDoc } from './ai-message.model';
+export { CrewModel, type CrewDoc } from './crew.model';
+export { TrackingSessionModel, type TrackingSessionDoc } from './tracking-session.model';
+export { LocationPingModel, type LocationPingDoc } from './location-ping.model';
 export {
   MoveRequestModel,
   type MoveRequestDoc,
