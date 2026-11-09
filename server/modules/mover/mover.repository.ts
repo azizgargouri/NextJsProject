@@ -492,6 +492,11 @@ export const moverRepository = {
     return QuoteModel.find({ offerId: { $in: offerIds } }).lean<QuoteDoc[]>();
   },
 
+  async listQuotesForMove(moveId: string): Promise<QuoteDoc[]> {
+    await db();
+    return QuoteModel.find({ moveId }).sort({ amount: 1, createdAt: 1 }).lean<QuoteDoc[]>();
+  },
+
   async countOpenQuotes(moveId: string, now: Date): Promise<number> {
     await db();
     return QuoteModel.countDocuments({ moveId, status: 'SENT', validUntil: { $gt: now } });

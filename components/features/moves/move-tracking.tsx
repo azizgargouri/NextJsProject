@@ -41,17 +41,17 @@ const FALLBACK_STAGES: MoveStageDto[] = [
     completedAt: new Date(Date.now() - 3600000).toISOString(),
   },
   {
-    key: 'ASSIGNED',
-    title: 'Vehicle assigned',
-    detail: 'Moving van · 14 m³ · Mehdi Transport assigned.',
-    durationMinutes: 12,
-    estimatedAt: new Date(Date.now() - 2400000).toISOString(),
-    completedAt: new Date(Date.now() - 2400000).toISOString(),
+    key: 'QUOTING',
+    title: 'Mover offers in progress',
+    detail: 'Eligible movers can accept or send a quote. No mover is assigned yet.',
+    durationMinutes: null,
+    estimatedAt: new Date().toISOString(),
+    completedAt: null,
   },
   {
     key: 'EN_ROUTE',
     title: 'Driver en route',
-    detail: 'Driver is travelling to your pickup location.',
+    detail: 'Live progress appears when the assigned mover starts the job.',
     durationMinutes: 18,
     estimatedAt: new Date().toISOString(),
     completedAt: null,
@@ -59,7 +59,7 @@ const FALLBACK_STAGES: MoveStageDto[] = [
   {
     key: 'ARRIVED',
     title: 'Vehicle arrives',
-    detail: 'Driver arrives at 12 Rue du Lac.',
+    detail: 'Arrival is recorded by the assigned mover.',
     durationMinutes: 5,
     estimatedAt: new Date(Date.now() + 1080000).toISOString(),
     completedAt: null,
@@ -249,7 +249,21 @@ export function MoveTracking({
     });
   };
 
-  const currentStages = move?.stages ?? FALLBACK_STAGES;
+  const acceptQuote = (quoteId: string) => {
+    if (!move) return;
+    startTransition(async () => {
+      try {
+        await api.moves.acceptQuote(move.id, quoteId);
+        const refreshed = await api.moves.getOne(move.id);
+        setMove(refreshed.move);
+      } catch (err: unknown) {
+        const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+        setLoadError(message || 'This quote is no longer available.');
+      }
+    });
+  };
+
+  const currentStages = move?.stages?.length ? move.stages : FALLBACK_STAGES;
   const matchedStageIndex = move ? currentStages.findIndex((s) => s.key === move.currentStage) : 2;
   const currentIndex = matchedStageIndex >= 0 ? matchedStageIndex : 2;
 
@@ -339,6 +353,48 @@ export function MoveTracking({
       </header>
       <ClientWorkspaceBar />
 
+      {user?.role === 'CLIENT' && move && (move.offersSent !== undefined || move.quotes?.length) && (
+        <section className="border-b border-ink bg-paper-soft px-4 py-4">
+          <div className="mx-auto max-w-7xl">
+            <p className="mono text-[10px] font-bold text-hazard">MOVER QUOTES / LIVE REQUEST STATUS</p>
+            {move.quotes?.length ? (
+              <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {move.quotes.map((quote) => (
+                  <div key={quote.id} className="border-2 border-ink bg-paper p-3">
+                    <p className="font-bold text-sm">{quote.moverName}</p>
+                    <p className="mono mt-1 text-lg font-bold">{quote.amount} {quote.currency}</p>
+                    {quote.message && <p className="mt-1 text-xs text-ink-60">{quote.message}</p>}
+                    <p className="mt-2 mono text-[9px] text-ink-40">VALID UNTIL {new Date(quote.validUntil).toLocaleString()}</p>
+                    {quote.status === 'SENT' && move.currentStage === 'QUOTING' && (
+                      <Button className="mt-3 w-full" disabled={isPending} onClick={() => acceptQuote(quote.id)}>ACCEPT QUOTE</Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-2 text-sm text-ink-60">{move.offersSent ? `${move.offersSent} eligible mover${move.offersSent === 1 ? '' : 's'} notified. Quotes will appear here as they respond.` : 'No eligible mover is currently available. Your request remains open for dispatch; no mover has been assigned.'}</p>
+            )}
+          </div>
+        </section>
+      )}
+
+      {move?.history && move.history.length > 0 && (
+        <section className="border-b border-ink px-4 py-4">
+          <div className="mx-auto max-w-7xl">
+            <p className="mono text-[10px] font-bold text-ink-60">REQUEST HISTORY</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {move.history.map((event, index) => (
+                <div key={`${event.createdAt}-${index}`} className="border border-ink bg-paper px-2 py-1.5 text-xs">
+                  <span className="font-bold">{event.toStatus.replaceAll('_', ' ')}</span>
+                  {event.note && <span className="text-ink-60"> — {event.note}</span>}
+                  <span className="ml-2 mono text-[9px] text-ink-40">{new Date(event.createdAt).toLocaleString()}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* User's Active Moves bar (if signed in) */}
       {userMoves.length > 0 && (
         <div className="border-b border-ink bg-paper-soft px-4 py-2.5">
@@ -377,8 +433,8 @@ export function MoveTracking({
         {/* Left Column: GPS Map & Addresses */}
         <section className="border-b border-ink md:border-b-0 md:border-r">
           <MoveRouteMap
-            pickupLabel={move?.pickupAddress ?? '12 Rue du Lac, Les Berges du Lac'}
-            destinationLabel={move?.destinationAddress ?? '8 Avenue Habib Bourguiba, La Marsa'}
+            pickupLabel={move?.pickupAddress ?? 'Pickup address pending'}
+            destinationLabel={move?.destinationAddress ?? 'Delivery address pending'}
             currentStageIndex={currentIndex}
             totalStages={displayStages.length}
           />
@@ -390,7 +446,7 @@ export function MoveTracking({
                 <span className="mono text-[9px] text-ink-40">ORIGIN</span>
               </div>
               <p className="mt-2 font-bold text-sm md:text-base">
-                {move?.pickupAddress ?? '12 Rue du Lac, Les Berges du Lac, Tunis'}
+                {move?.pickupAddress ?? 'Pickup address pending'}
               </p>
               <p className="mt-1 text-xs text-ink-80">
                 Driver arrives with assigned {move?.vehicle?.name ?? 'Moving van'}.
@@ -403,7 +459,7 @@ export function MoveTracking({
                 <span className="mono text-[9px] text-ink-40">DELIVERY</span>
               </div>
               <p className="mt-2 font-bold text-sm md:text-base">
-                {move?.destinationAddress ?? '8 Avenue Habib Bourguiba, La Marsa'}
+                {move?.destinationAddress ?? 'Delivery address pending'}
               </p>
               <p className="mt-1 text-xs text-ink-80">
                 Driver will call on arrival for gated entry.
@@ -494,7 +550,7 @@ export function MoveTracking({
                 <div>
                   <p className="mono text-[9px] text-ink-40">ASSIGNED OPERATOR &amp; VEHICLE</p>
                   <p className="mt-0.5 text-sm font-bold">
-                    {move?.mover?.name ?? 'Mehdi Transport'} &middot;{' '}
+                    {move?.mover?.name ?? 'Mover not yet assigned'} &middot;{' '}
                     {move?.vehicle?.name ?? 'Moving van (14 m³)'}
                   </p>
                   <p className="mono mt-0.5 text-[10px] text-ink-60">
@@ -666,7 +722,7 @@ export function MoveTracking({
           executeAdvanceStage('COMPLETED');
         }}
         moveReference={move?.reference ?? 'MU-2026-DEMO'}
-        moverName={move?.mover?.name ?? 'Mehdi Transport'}
+        moverName={move?.mover?.name ?? 'Mover not yet assigned'}
       />
     </main>
   );
