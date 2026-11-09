@@ -4,6 +4,25 @@ import { connectMongo } from '@/server/shared/database/mongoose';
 import { VoiceCheckinModel } from '@/server/shared/database/models/voice-checkin.model';
 
 /**
+ * Normalizes the stored clip to a real Buffer. Mongoose `.lean()` hands back a
+ * BSON `Binary` (whose `.length` is a method), not a Node Buffer, so a naive
+ * `String(data.length)` produces an invalid Content-Length header.
+ */
+function toBuffer(value: unknown): Buffer {
+  if (Buffer.isBuffer(value)) return value;
+  if (value instanceof Uint8Array) return Buffer.from(value);
+
+  const binary = value as {
+    buffer?: Uint8Array;
+    value?: (asRaw?: boolean) => Buffer;
+  } | null;
+
+  if (binary?.buffer) return Buffer.from(binary.buffer);
+  if (typeof binary?.value === 'function') return Buffer.from(binary.value(true));
+  return Buffer.alloc(0);
+}
+
+/**
  * GET /api/voice/checkins/[id]/audio — admin-only playback of a stored clip,
  * so RH can hear the exact recording behind a faulty check-in.
  */
@@ -16,14 +35,14 @@ export async function GET(
     const { id } = await context.params;
     await connectMongo();
     const row = await VoiceCheckinModel.findById(id).select('audio mimeType').lean();
-    if (!row || !row.audio || (row.audio as Buffer).length === 0) {
+    const data = toBuffer(row?.audio);
+    if (!row || data.length === 0) {
       return NextResponse.json(
         { message: 'Recording not found.', code: 'NOT_FOUND' },
         { status: 404 },
       );
     }
 
-    const data = row.audio as Buffer;
     return new NextResponse(new Uint8Array(data), {
       headers: {
         'Content-Type': row.mimeType || 'audio/webm',
