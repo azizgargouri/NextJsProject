@@ -14,6 +14,18 @@ function voiceBaseUrl(): string {
   return url.replace(/\/+$/, '');
 }
 
+/** Sniffs the uploaded container so RH playback uses the right MIME type. */
+function detectAudioMime(buffer: Buffer): string {
+  if (
+    buffer.length >= 12 &&
+    buffer.toString('ascii', 0, 4) === 'RIFF' &&
+    buffer.toString('ascii', 8, 12) === 'WAVE'
+  ) {
+    return 'audio/wav';
+  }
+  return 'audio/webm';
+}
+
 /** GET /api/voice/checkin — ping the Kaggle voice service health endpoint. */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
@@ -69,7 +81,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         distanceM: Number(body?.distance_m ?? 0),
         reasons: Array.isArray(body?.reasons) ? body.reasons : [],
         audio,
-        mimeType: 'audio/webm',
+        mimeType: detectAudioMime(audio),
       });
     } catch {
       // best effort only

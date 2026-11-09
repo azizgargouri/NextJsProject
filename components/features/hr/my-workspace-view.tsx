@@ -22,6 +22,7 @@ import {
   useVoiceCheckin,
 } from '@/hooks/content/hr';
 import { extractErrorMessage } from '@/lib/api/errors';
+import { convertToWav16k } from '@/lib/audio/wav';
 import type { AttendanceDto, LeaveRequestDto } from '@/types';
 
 const LEAVE_TYPES = [
@@ -65,12 +66,12 @@ function formatDate(value: string) {
   });
 }
 
-function fileToBase64(file: File): Promise<string> {
+function blobToBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '');
     reader.onerror = () => reject(new Error('Could not read the recording.'));
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(blob);
   });
 }
 
@@ -114,7 +115,10 @@ function VoiceCheckinSection() {
     void (async () => {
       setVerifying(true);
       try {
-        const audio_b64 = await fileToBase64(pendingFile);
+        // Kaggle's verifier reads audio with soundfile, which cannot decode
+        // the WebM/Opus MediaRecorder produces. Send 16 kHz mono WAV instead.
+        const wav = await convertToWav16k(pendingFile);
+        const audio_b64 = await blobToBase64(wav);
         const response = await voice.mutateAsync({
           audio_b64,
           transcript,

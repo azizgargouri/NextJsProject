@@ -47,7 +47,9 @@ export async function GET(
       headers: {
         'Content-Type': row.mimeType || 'audio/webm',
         'Content-Length': String(data.length),
-        'Content-Disposition': 'inline; filename="voice-checkin.webm"',
+        'Content-Disposition': `inline; filename="voice-checkin.${
+          (row.mimeType || '').includes('wav') ? 'wav' : 'webm'
+        }"`,
         'X-Content-Type-Options': 'nosniff',
       },
     });
