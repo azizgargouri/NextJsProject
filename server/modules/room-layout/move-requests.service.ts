@@ -1,5 +1,9 @@
 import { connectMongo } from '../../shared/database/mongoose';
 import { MoveModel, type MoveDoc } from '../../shared/database/models/move.model';
+import {
+  MoveRequestModel,
+  type MoveRequestDoc,
+} from '../../shared/database/models/move-request.model';
 import { footprintFor, summarizeItems, type Footprint } from './furniture-sizes';
 
 /** The signed-in client, as the guards resolve it from database truth. */
@@ -27,6 +31,23 @@ function toRequest(move: MoveDoc): ClientMoveRequest {
   };
 }
 
+/** A booked request (mover side); items keep the booking catalogue id when there is one. */
+function fromRequest(move: MoveRequestDoc): ClientMoveRequest {
+  return {
+    reference: move.reference,
+    pickupAddress: move.pickup.street,
+    destinationAddress: move.dropoff.street,
+    moveDate: move.moveDate,
+    items: move.items.map((item, index) => ({
+      id: item.key || `item-${index + 1}`,
+      name: item.name,
+      volume: item.volume ?? 0,
+      weight: item.weight ?? 0,
+      quantity: item.quantity,
+    })),
+  };
+}
+
 export interface MoveItemResponse {
   id: string;
   name: string;
@@ -45,18 +66,32 @@ export interface LinkedMoveRequestResponse {
   totals: ReturnType<typeof summarizeItems>;
 }
 
-/** Client move requests for Smart Room Layout: the client's own Moves, newest first. */
+/** Client move requests for Smart Room Layout: booked requests and legacy Moves, newest first. */
 export class MoveRequestsService {
   async listForClient(client: ClientRef): Promise<ClientMoveRequest[]> {
     await connectMongo();
-    const moves = await MoveModel.find({ clientId: client.id })
-      .sort({ createdAt: -1 })
-      .lean<MoveDoc[]>();
-    return moves.map(toRequest);
+    const [moves, requests] = await Promise.all([
+      MoveModel.find({ clientId: client.id }).sort({ createdAt: -1 }).lean<MoveDoc[]>(),
+      MoveRequestModel.find({ clientId: client.id, status: { $ne: 'CANCELLED' } })
+        .sort({ createdAt: -1 })
+        .lean<MoveRequestDoc[]>(),
+    ]);
+    // Booked requests (the live flow) and legacy Moves, newest first.
+    return [
+      ...requests.map((request) => ({ at: request.createdAt, value: fromRequest(request) })),
+      ...moves.map((move) => ({ at: move.createdAt, value: toRequest(move) })),
+    ]
+      .sort((a, b) => b.at.getTime() - a.at.getTime())
+      .map((entry) => entry.value);
   }
 
   async findForClient(client: ClientRef, reference: string): Promise<ClientMoveRequest | null> {
     await connectMongo();
+    const request = await MoveRequestModel.findOne({
+      reference,
+      clientId: client.id,
+    }).lean<MoveRequestDoc>();
+    if (request) return fromRequest(request);
     const move = await MoveModel.findOne({ reference, clientId: client.id }).lean<MoveDoc>();
     return move ? toRequest(move) : null;
   }
