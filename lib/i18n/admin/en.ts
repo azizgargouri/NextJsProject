@@ -114,6 +114,7 @@ export const en = {
       pricing: 'Pricing rules',
       content: 'Content',
       storage: 'Storage',
+      playground: 'Playground',
       audit: 'Audit log',
     },
   },
@@ -575,6 +576,65 @@ export const en = {
       SESSION_REVOKE_ONE: () => 'One of your devices was signed out',
       fallback: (who: string, event: string) => `${who}: ${event}`,
     },
+  },
+
+  playground: {
+    title: 'Playground',
+    description:
+      'Fake but coherent data for every module, to test the whole app. Reset only ever removes playground data.',
+    refresh: 'Refresh',
+    seedAll: 'Seed every module',
+    seed: 'Seed',
+    reset: 'Reset playground',
+    resetTitle: 'Remove all playground data?',
+    resetBody:
+      'Deletes the playground accounts, bookings, mover jobs, houses, claims, reviews and staff. The core demo accounts and real data are kept.',
+    cancel: 'Cancel',
+    confirmReset: 'Remove playground data',
+    seeded: 'Playground data is ready',
+    resetDone: 'Playground data removed',
+    failed: 'The playground could not run.',
+    disabled:
+      'The playground is off in production. Set PLAYGROUND_ENABLED=true to use it on a demo deployment.',
+    logins: (domain: string, password: string) =>
+      `Playground accounts use @${domain} emails (e.g. yasmine@${domain}, carthage@${domain}) and the password ${password}. They also add data to client@moveup.tn and mover@moveup.tn.`,
+    modules: {
+      accounts: { title: 'Accounts', body: 'Three clients and two movers, approved and insured.' },
+      bookings: {
+        title: 'Bookings & tracking',
+        body: 'Four bookings per client: assigned, en route, in transit and completed.',
+      },
+      mover: {
+        title: 'Mover workspace',
+        body: 'Requests dispatched to mover@moveup.tn: open offers, an assigned job, one loading, one completed with its earning.',
+      },
+      smartRooms: {
+        title: 'Smart rooms',
+        body: 'A three-room house per playground client, linked to a booking.',
+      },
+      quality: {
+        title: 'Claims & reviews',
+        body: 'A claim and a review on every completed booking; mover ratings updated.',
+      },
+      hr: {
+        title: 'HR',
+        body: 'Three staff in the HR directory with two weeks of attendance and leave requests.',
+      },
+    },
+    counts: {
+      clients: 'clients',
+      movers: 'movers',
+      bookings: 'bookings',
+      requests: 'requests',
+      openOffers: 'open offers',
+      jobs: 'jobs',
+      earnings: 'earnings',
+      houses: 'houses',
+      claims: 'claims',
+      reviews: 'reviews',
+      employees: 'staff',
+      leaveRequests: 'leave requests',
+    } as Record<string, string>,
   },
 
   storage: {

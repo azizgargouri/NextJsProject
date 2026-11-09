@@ -954,3 +954,16 @@ export type {
   VehicleType,
   VerificationStatus,
 } from './mover';
+
+// ── Seeder playground (admin) ───────────────────────────────────────────
+
+export type PlaygroundModuleKey =
+  'accounts' | 'bookings' | 'mover' | 'smartRooms' | 'quality' | 'hr';
+
+export interface PlaygroundDto {
+  enabled: boolean;
+  modules: PlaygroundModuleKey[];
+  domain: string;
+  password: string;
+  status: Record<PlaygroundModuleKey, Record<string, number>>;
+}

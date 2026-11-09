@@ -14,6 +14,7 @@
     "test:mover": "tsx --test --test-concurrency=1 tests/mover/*.test.ts",
     "db:seed:quality": "tsx server/quality.seed.ts",
     "db:seed:demo-moves": "tsx server/seeds/demo-moves.seed.ts",
+    "db:playground": "tsx server/seeds/playground.seed.ts",
     "test": "tsx --test tests/*.test.ts",
     "test:e2e": "node tests/e2e/smart-room.e2e.mjs"
   },

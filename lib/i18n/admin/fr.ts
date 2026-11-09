@@ -121,6 +121,7 @@ export const fr: AdminMessages = {
       pricing: 'Règles tarifaires',
       content: 'Contenu',
       storage: 'Stockage',
+      playground: 'Bac à sable',
       audit: "Journal d'audit",
     },
   },
@@ -599,6 +600,68 @@ export const fr: AdminMessages = {
       SESSION_REVOKE_ONE: () => 'Un de vos appareils a été déconnecté',
       fallback: (who, event) => `${who} : ${event}`,
     },
+  },
+
+  playground: {
+    title: 'Bac à sable',
+    description:
+      'Des données fictives mais cohérentes pour chaque module, pour tester toute l’application. La réinitialisation ne supprime que les données du bac à sable.',
+    refresh: 'Actualiser',
+    seedAll: 'Remplir tous les modules',
+    seed: 'Remplir',
+    reset: 'Réinitialiser',
+    resetTitle: 'Supprimer les données du bac à sable ?',
+    resetBody:
+      'Supprime les comptes, réservations, missions, logements, réclamations, avis et employés du bac à sable. Les comptes de démonstration et les données réelles sont conservés.',
+    cancel: 'Annuler',
+    confirmReset: 'Supprimer les données',
+    seeded: 'Données du bac à sable prêtes',
+    resetDone: 'Données du bac à sable supprimées',
+    failed: 'Le bac à sable n’a pas pu s’exécuter.',
+    disabled:
+      'Le bac à sable est désactivé en production. Définissez PLAYGROUND_ENABLED=true pour l’utiliser sur un déploiement de démonstration.',
+    logins: (domain: string, password: string) =>
+      `Les comptes du bac à sable utilisent des e-mails @${domain} (ex. yasmine@${domain}, carthage@${domain}) et le mot de passe ${password}. Ils ajoutent aussi des données à client@moveup.tn et mover@moveup.tn.`,
+    modules: {
+      accounts: {
+        title: 'Comptes',
+        body: 'Trois clients et deux déménageurs, approuvés et assurés.',
+      },
+      bookings: {
+        title: 'Réservations et suivi',
+        body: 'Quatre réservations par client : affectée, en route, en transit et terminée.',
+      },
+      mover: {
+        title: 'Espace déménageur',
+        body: 'Demandes envoyées à mover@moveup.tn : offres ouvertes, une mission affectée, une en chargement, une terminée avec son gain.',
+      },
+      smartRooms: {
+        title: 'Smart rooms',
+        body: 'Un logement de trois pièces par client du bac à sable, lié à une réservation.',
+      },
+      quality: {
+        title: 'Réclamations et avis',
+        body: 'Une réclamation et un avis sur chaque réservation terminée ; notes des déménageurs mises à jour.',
+      },
+      hr: {
+        title: 'RH',
+        body: 'Trois employés dans l’annuaire RH, avec deux semaines de présence et des demandes de congé.',
+      },
+    },
+    counts: {
+      clients: 'clients',
+      movers: 'déménageurs',
+      bookings: 'réservations',
+      requests: 'demandes',
+      openOffers: 'offres ouvertes',
+      jobs: 'missions',
+      earnings: 'gains',
+      houses: 'logements',
+      claims: 'réclamations',
+      reviews: 'avis',
+      employees: 'employés',
+      leaveRequests: 'demandes de congé',
+    } as Record<string, string>,
   },
 
   storage: {

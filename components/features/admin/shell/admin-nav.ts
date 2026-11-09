@@ -3,6 +3,7 @@ import {
   BriefcaseBusiness,
   ClipboardList,
   FileText,
+  FlaskConical,
   Gauge,
   Gavel,
   HardDrive,
@@ -69,6 +70,7 @@ export const adminNavGroups: AdminNavGroup[] = [
       { key: 'content', href: '/admin/content', icon: FileText },
       { key: 'storage', href: '/admin/storage', icon: HardDrive },
       { key: 'audit', href: '/admin/audit', icon: History },
+      { key: 'playground', href: '/admin/playground', icon: FlaskConical },
     ],
   },
 ];
