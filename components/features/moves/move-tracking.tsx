@@ -41,17 +41,17 @@ const FALLBACK_STAGES: MoveStageDto[] = [
     completedAt: new Date(Date.now() - 3600000).toISOString(),
   },
   {
-    key: 'ASSIGNED',
-    title: 'Vehicle assigned',
-    detail: 'Moving van · 14 m³ · Mehdi Transport assigned.',
-    durationMinutes: 12,
-    estimatedAt: new Date(Date.now() - 2400000).toISOString(),
-    completedAt: new Date(Date.now() - 2400000).toISOString(),
+    key: 'QUOTING',
+    title: 'Mover offers in progress',
+    detail: 'Eligible movers can accept or send a quote. No mover is assigned yet.',
+    durationMinutes: null,
+    estimatedAt: new Date().toISOString(),
+    completedAt: null,
   },
   {
     key: 'EN_ROUTE',
     title: 'Driver en route',
-    detail: 'Driver is travelling to your pickup location.',
+    detail: 'Live progress appears when the assigned mover starts the job.',
     durationMinutes: 18,
     estimatedAt: new Date().toISOString(),
     completedAt: null,
@@ -59,7 +59,7 @@ const FALLBACK_STAGES: MoveStageDto[] = [
   {
     key: 'ARRIVED',
     title: 'Vehicle arrives',
-    detail: 'Driver arrives at 12 Rue du Lac.',
+    detail: 'Arrival is recorded by the assigned mover.',
     durationMinutes: 5,
     estimatedAt: new Date(Date.now() + 1080000).toISOString(),
     completedAt: null,
@@ -249,7 +249,7 @@ export function MoveTracking({
     });
   };
 
-  const currentStages = move?.stages ?? FALLBACK_STAGES;
+  const currentStages = move?.stages?.length ? move.stages : FALLBACK_STAGES;
   const matchedStageIndex = move ? currentStages.findIndex((s) => s.key === move.currentStage) : 2;
   const currentIndex = matchedStageIndex >= 0 ? matchedStageIndex : 2;
 
