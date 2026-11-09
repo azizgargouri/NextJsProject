@@ -121,6 +121,15 @@ Description: `docs/member-6-v2-quality-ai.md`, `seed-data/README.md`. Brings the
 - Vision AI uses the configured `OLLAMA_URL` (was hard-coded to `127.0.0.1`) and `OLLAMA_VISION_MODEL` (`qwen2.5vl:7b` locally); with no cloud key it falls back to its rule engine.
 - Checks: tsc clean, eslint 0 errors, `yarn test` 21/21, `next build` succeeds; claim picker, pre-fill, client claims list and admin disputes verified in the browser. Demo data: `yarn db:seed:quality`.
 
+### Member 6 mover and admin wiring — 2026-11-09
+
+Followed `CLAUDE_MOVER_INTEGRATION_GUIDE.md` (from the member6 branch). The quality backend already supported the `MOVER` role, but nothing in the mover workspace reached it, and the admin sidebar still labelled working modules "Soon".
+
+- Mover app: Claims, Reviews and Assistant in the header and bottom bar; `/mover/claims` (+ detail with AI reply suggestions), `/mover/reviews`, `/mover/assistant` render the shared pages inside the mover shell instead of sending movers to the client workspace. The profile has a Reputation panel with the AI trust scorecard and a link to the public page `/movers/[id]`.
+- Links inside the shared pages follow the role (`lib/quality/paths.ts`); the server actions revalidate both `/dashboard` and `/mover` paths.
+- Admin: Move requests, Assignments, Disputes and Customer reviews no longer show "Soon" (their portals are built); Mover reviews still does.
+- Verified as `mover@moveup.tn`: claims list and detail stay in `/mover`, reviews, assistant, scorecard generation; the client's claim links still go to `/dashboard`.
+
 ## Waiting to be integrated
 
 Measured against `dev` on 2026-11-09, after the `main` sync:
