@@ -132,7 +132,16 @@ export function HomesPortal() {
                       </div>
                     ))}
                   </dl>
-                  <p className="mono mt-6 text-[11px] text-ink group-hover:text-hazard">
+                  <p className="mono mt-4 text-[10px] text-ink-40">
+                    {home.moveReference ? (
+                      <>
+                        Move request <span className="text-hazard">{home.moveReference}</span>
+                      </>
+                    ) : (
+                      'No move request linked'
+                    )}
+                  </p>
+                  <p className="mono mt-4 text-[11px] text-ink group-hover:text-hazard">
                     Open &gt;&gt;&gt;
                   </p>
                 </Link>

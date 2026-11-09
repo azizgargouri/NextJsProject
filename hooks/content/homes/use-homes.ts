@@ -13,6 +13,8 @@ export const homesKeys = {
   lists: (userId: string) => ['homes', userId, 'list'] as const,
   list: (userId: string, query: HomesQuery) => ['homes', userId, 'list', query] as const,
   detail: (userId: string, id: string) => ['homes', userId, 'detail', id] as const,
+  moveRequests: (userId: string) => ['homes', userId, 'move-requests'] as const,
+  layout: (userId: string, homeId: string) => ['homes', userId, 'layout', homeId] as const,
 };
 
 export function useHomesUserId(): string {
@@ -25,5 +27,14 @@ export function useHomes(query: HomesQuery) {
     queryKey: homesKeys.list(userId, query),
     queryFn: () => homesApi.list(query),
     placeholderData: (previous) => previous,
+  });
+}
+
+/** The client's move requests (link picker), with the house each one is linked to. */
+export function useClientMoveRequests() {
+  const userId = useHomesUserId();
+  return useQuery({
+    queryKey: homesKeys.moveRequests(userId),
+    queryFn: () => homesApi.moveRequests(),
   });
 }

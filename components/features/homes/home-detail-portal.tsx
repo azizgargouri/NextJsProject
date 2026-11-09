@@ -15,11 +15,13 @@ import {
   useUpdateHome,
   useUpdateRoom,
 } from '@/hooks/content/homes';
-import { HOME_LIMITS, type HomeDto, type RoomDto } from '@/types/homes';
+import { HOME_LIMITS, type HomeDetailDto, type RoomDto } from '@/types/homes';
 import { ConfirmDialog } from './confirm-dialog';
 import { HomeForm } from './home-form';
 import { apiErrorMessage, HOME_TYPE_LABELS, ROOM_TYPE_LABELS } from './home-schemas';
 import { HomesPageHeader } from './homes-page-header';
+import { LayoutPanel } from './layout-panel';
+import { MoveRequestPanel } from './move-request-panel';
 import { RoomForm } from './room-form';
 import { RoomOutline } from './room-outline';
 
@@ -78,7 +80,7 @@ export function HomeDetailPortal({ homeId }: { homeId: string }) {
   return <HomeDetail home={home} />;
 }
 
-function HomeDetail({ home }: { home: HomeDto }) {
+function HomeDetail({ home }: { home: HomeDetailDto }) {
   const router = useRouter();
   const [editingHome, setEditingHome] = useState(false);
   const [roomEditor, setRoomEditor] = useState<RoomEditor>(null);
@@ -196,6 +198,8 @@ function HomeDetail({ home }: { home: HomeDto }) {
       </dl>
       {home.notes && <p className="mt-6 max-w-3xl text-sm text-ink-80">{home.notes}</p>}
 
+      <MoveRequestPanel home={home} />
+
       <section aria-labelledby="rooms-title" className="mt-14">
         <div className="flex flex-wrap items-end justify-between gap-4 border-b border-ink pb-4">
           <h2 id="rooms-title" className="display text-3xl md:text-4xl">
@@ -279,6 +283,8 @@ function HomeDetail({ home }: { home: HomeDto }) {
           </ul>
         )}
       </section>
+
+      <LayoutPanel home={home} />
 
       <ConfirmDialog
         open={pendingDelete !== null}
