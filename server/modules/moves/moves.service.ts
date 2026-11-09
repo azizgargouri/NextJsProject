@@ -124,6 +124,7 @@ export class MovesService {
       trackingToken,
       pickupAddress: input.pickupAddress,
       destinationAddress: input.destinationAddress,
+      moveDate: input.moveDate ? new Date(input.moveDate) : null,
       items: input.items,
       volume,
       distance: input.distance,

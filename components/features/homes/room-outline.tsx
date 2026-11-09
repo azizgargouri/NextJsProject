@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react';
 import type { OpeningDto, Wall } from '@/types/homes';
 import { cn } from '@/lib/utils';
 
@@ -15,6 +15,10 @@ interface RoomOutlineProps {
   children?: ReactNode;
   /** Marks the drawing as a drag-and-drop target (`data-layout-room`). */
   roomId?: string;
+  /** Makes doors/windows draggable: called when one is grabbed. */
+  onOpeningPointerDown?: (index: number, event: ReactPointerEvent<SVGLineElement>) => void;
+  /** Opening being dragged (highlighted). */
+  activeOpening?: number | null;
 }
 
 /** Where a wall starts, which way it runs, and which way points into the room. */
@@ -61,6 +65,8 @@ export function RoomOutline({
   className,
   children,
   roomId,
+  onOpeningPointerDown,
+  activeOpening = null,
 }: RoomOutlineProps) {
   const width = safe(widthCm, 100);
   const length = safe(lengthCm, 100);
@@ -98,6 +104,25 @@ export function RoomOutline({
         if (span <= 0) return null;
         const { start, along, inward } = wallGeometry(opening.wall, width, length, offset);
         const end: Vec = [start[0] + along[0] * span, start[1] + along[1] * span];
+        // Wide invisible strip along the opening: what the pointer grabs.
+        const handle = onOpeningPointerDown && (
+          <line
+            x1={start[0]}
+            y1={start[1]}
+            x2={end[0]}
+            y2={end[1]}
+            stroke={activeOpening === index ? 'var(--color-hazard)' : 'transparent'}
+            strokeOpacity={0.25}
+            strokeWidth={wall * 4}
+            pointerEvents="stroke"
+            className="cursor-grab active:cursor-grabbing"
+            style={{ touchAction: 'none' }}
+            data-opening={index}
+            onPointerDown={(event) => onOpeningPointerDown(index, event)}
+          >
+            <title>{`Drag to move this ${opening.kind === 'DOOR' ? 'door' : 'window'}`}</title>
+          </line>
+        );
         const cut = (
           <line
             x1={start[0]}
@@ -129,6 +154,7 @@ export function RoomOutline({
                 stroke="var(--color-paper)"
                 strokeWidth={wall * 0.45}
               />
+              {handle}
             </g>
           );
         }
@@ -144,6 +170,7 @@ export function RoomOutline({
               strokeWidth={wall * 0.2}
               strokeDasharray={`${wall * 0.8} ${wall * 0.6}`}
             />
+            {handle}
           </g>
         );
       })}

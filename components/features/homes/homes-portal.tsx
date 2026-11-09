@@ -29,7 +29,7 @@ export function HomesPortal() {
   const atLimit = !debouncedSearch && (meta?.itemCount ?? 0) >= HOME_LIMITS.homesPerClient;
 
   return (
-    <main className="mx-auto max-w-7xl px-4 py-12 md:px-6">
+    <div>
       <HomesPageHeader
         trail={[{ label: 'Workspace', href: '/dashboard' }, { label: 'New houses' }]}
         title="My new house."
@@ -174,6 +174,6 @@ export function HomesPortal() {
           </Button>
         </nav>
       )}
-    </main>
+    </div>
   );
 }

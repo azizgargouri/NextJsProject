@@ -204,6 +204,7 @@ export function MoveBooking() {
         distance,
         items,
         vehicleName: vehicle.name,
+        moveDate,
       });
 
       // Clear draft on successful creation

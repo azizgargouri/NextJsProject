@@ -185,7 +185,8 @@ function RequestPicker({
               value={request.reference}
               disabled={!usable(request) || request.reference === current}
             >
-              {request.reference} · {formatDate(request.moveDate)} · {request.itemCount} items
+              {request.reference} · {formatDate(request.moveDate)} · {request.itemCount} item
+              {request.itemCount === 1 ? '' : 's'}
               {request.reference === current
                 ? ' (linked here)'
                 : request.linkedHome && !usable(request)

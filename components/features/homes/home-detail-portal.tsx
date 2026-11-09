@@ -39,18 +39,18 @@ export function HomeDetailPortal({ homeId }: { homeId: string }) {
 
   if (isLoading) {
     return (
-      <main className="mx-auto max-w-7xl px-4 py-12 md:px-6" aria-busy>
+      <div aria-busy>
         <div className="h-3 w-40 animate-pulse bg-paper-soft motion-reduce:animate-none" />
         <div className="mt-8 h-14 w-2/3 animate-pulse bg-paper-soft motion-reduce:animate-none" />
         <div className="mt-12 h-64 animate-pulse bg-paper-soft motion-reduce:animate-none" />
-      </main>
+      </div>
     );
   }
 
   if (isError || !home) {
     const notFound = isAxiosError(error) && [400, 404].includes(error.response?.status ?? 0);
     return (
-      <main className="mx-auto max-w-7xl px-4 py-12 md:px-6">
+      <div>
         <HomesPageHeader
           trail={[...TRAIL_ROOT, { label: 'Error' }]}
           title={notFound ? 'Not found.' : 'Error.'}
@@ -73,7 +73,7 @@ export function HomeDetailPortal({ homeId }: { homeId: string }) {
             </Link>
           </div>
         </div>
-      </main>
+      </div>
     );
   }
 
@@ -118,7 +118,7 @@ function HomeDetail({ home }: { home: HomeDetailDto }) {
   };
 
   return (
-    <main className="mx-auto max-w-7xl px-4 py-12 md:px-6">
+    <div>
       <HomesPageHeader
         trail={[...TRAIL_ROOT, { label: home.label }]}
         title={home.label}
@@ -303,7 +303,7 @@ function HomeDetail({ home }: { home: HomeDetailDto }) {
         onCancel={() => setPendingDelete(null)}
         onConfirm={confirmDelete}
       />
-    </main>
+    </div>
   );
 }
 

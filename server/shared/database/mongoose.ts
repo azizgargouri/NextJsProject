@@ -36,6 +36,8 @@ export async function connectMongo(): Promise<Mongoose> {
     globalForMongoose.__moveUpMongoose = mongoose.connect(uri, connectOptions);
     return await globalForMongoose.__moveUpMongoose;
   } catch (error) {
+    // Don't cache a failure: the next request retries (e.g. MongoDB started after the app).
+    globalForMongoose.__moveUpMongoose = undefined;
     if (!isConnectionRefusedError(error) || !uri.includes('localhost')) {
       throw error;
     }

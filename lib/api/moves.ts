@@ -12,6 +12,8 @@ export interface MoveCreatePayload {
     quantity: number;
   }[];
   vehicleName?: string;
+  /** YYYY-MM-DD */
+  moveDate?: string;
 }
 
 export interface MoveStageDto {

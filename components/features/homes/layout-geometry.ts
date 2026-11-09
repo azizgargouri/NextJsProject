@@ -1,4 +1,4 @@
-import type { RoomDto } from '@/types/homes';
+import type { RoomDto, Wall } from '@/types/homes';
 
 /**
  * Client mirror of server/modules/room-layout/layout-packer.ts#spotProblem so a
@@ -58,6 +58,36 @@ export function spotProblem(
   }
   const hit = others.find((other) => overlaps(rect, other.rect, GAP_CM));
   return hit ? `Too close to ${hit.name}.` : null;
+}
+
+/**
+ * Door/window drag: the wall nearest the pointer, and the offset that centres
+ * an opening of `span` cm on it — snapped to the grid and kept on the wall.
+ */
+export function openingSpot(
+  room: { widthCm: number; lengthCm: number },
+  point: { x: number; y: number },
+  span: number,
+): { wall: Wall; offsetCm: number } | null {
+  const { widthCm: W, lengthCm: L } = room;
+  if (!(W > 0 && L > 0) || !Number.isFinite(point.x) || !Number.isFinite(point.y)) return null;
+  // Distance to each wall segment (not its infinite line), so past a corner the wall you
+  // dragged beyond wins; exactly diagonal from a corner, the first listed wins.
+  const beyond = (value: number, max: number) => Math.max(-value, value - max, 0);
+  const { x, y } = point;
+  const distances: [Wall, number][] = [
+    ['N', Math.hypot(beyond(x, W), y)],
+    ['S', Math.hypot(beyond(x, W), L - y)],
+    ['W', Math.hypot(x, beyond(y, L))],
+    ['E', Math.hypot(W - x, beyond(y, L))],
+  ];
+  const [wall] = distances.reduce((best, next) => (next[1] < best[1] ? next : best));
+  const wallLength = wall === 'N' || wall === 'S' ? W : L;
+  const along = wall === 'N' || wall === 'S' ? point.x : point.y;
+  const width = Number.isFinite(span) && span > 0 ? span : 0;
+  const max = Math.max(wallLength - width, 0);
+  const offset = Math.round((along - width / 2) / SNAP_CM) * SNAP_CM;
+  return { wall, offsetCm: Math.min(Math.max(offset, 0), max) };
 }
 
 /** Keep the item inside the room, on the 5 cm grid, and flush to a wall when near it. */

@@ -12,7 +12,7 @@ export function HomeCreatePortal() {
   const createHome = useCreateHome();
 
   return (
-    <main className="mx-auto max-w-4xl px-4 py-12 md:px-6">
+    <div className="mx-auto max-w-4xl">
       <HomesPageHeader
         trail={[
           { label: 'Workspace', href: '/dashboard' },
@@ -38,6 +38,6 @@ export function HomeCreatePortal() {
           }
         />
       </div>
-    </main>
+    </div>
   );
 }

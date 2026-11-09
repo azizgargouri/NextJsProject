@@ -20,6 +20,8 @@ export interface MoveDoc {
   trackingToken: string;
   pickupAddress: string;
   destinationAddress: string;
+  /** Day the client picked when booking; null on moves booked before it was stored. */
+  moveDate: Date | null;
   items: { id: string; name: string; volume: number; weight: number; quantity: number }[];
   volume: number;
   distance: number;
@@ -52,6 +54,7 @@ const MoveSchema = new Schema<MoveDoc>(
     trackingToken: { type: String, required: true, unique: true, index: true, select: false },
     pickupAddress: { type: String, required: true },
     destinationAddress: { type: String, required: true },
+    moveDate: { type: Date, default: null },
     items: { type: [{ id: String, name: String, volume: Number, weight: Number, quantity: Number }], default: [] },
     volume: { type: Number, required: true },
     distance: { type: Number, required: true },
