@@ -378,6 +378,23 @@ export function MoveTracking({
         </section>
       )}
 
+      {move?.history && move.history.length > 0 && (
+        <section className="border-b border-ink px-4 py-4">
+          <div className="mx-auto max-w-7xl">
+            <p className="mono text-[10px] font-bold text-ink-60">REQUEST HISTORY</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {move.history.map((event, index) => (
+                <div key={`${event.createdAt}-${index}`} className="border border-ink bg-paper px-2 py-1.5 text-xs">
+                  <span className="font-bold">{event.toStatus.replaceAll('_', ' ')}</span>
+                  {event.note && <span className="text-ink-60"> — {event.note}</span>}
+                  <span className="ml-2 mono text-[9px] text-ink-40">{new Date(event.createdAt).toLocaleString()}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* User's Active Moves bar (if signed in) */}
       {userMoves.length > 0 && (
         <div className="border-b border-ink bg-paper-soft px-4 py-2.5">
@@ -416,8 +433,8 @@ export function MoveTracking({
         {/* Left Column: GPS Map & Addresses */}
         <section className="border-b border-ink md:border-b-0 md:border-r">
           <MoveRouteMap
-            pickupLabel={move?.pickupAddress ?? '12 Rue du Lac, Les Berges du Lac'}
-            destinationLabel={move?.destinationAddress ?? '8 Avenue Habib Bourguiba, La Marsa'}
+            pickupLabel={move?.pickupAddress ?? 'Pickup address pending'}
+            destinationLabel={move?.destinationAddress ?? 'Delivery address pending'}
             currentStageIndex={currentIndex}
             totalStages={displayStages.length}
           />
@@ -429,7 +446,7 @@ export function MoveTracking({
                 <span className="mono text-[9px] text-ink-40">ORIGIN</span>
               </div>
               <p className="mt-2 font-bold text-sm md:text-base">
-                {move?.pickupAddress ?? '12 Rue du Lac, Les Berges du Lac, Tunis'}
+                {move?.pickupAddress ?? 'Pickup address pending'}
               </p>
               <p className="mt-1 text-xs text-ink-80">
                 Driver arrives with assigned {move?.vehicle?.name ?? 'Moving van'}.
@@ -442,7 +459,7 @@ export function MoveTracking({
                 <span className="mono text-[9px] text-ink-40">DELIVERY</span>
               </div>
               <p className="mt-2 font-bold text-sm md:text-base">
-                {move?.destinationAddress ?? '8 Avenue Habib Bourguiba, La Marsa'}
+                {move?.destinationAddress ?? 'Delivery address pending'}
               </p>
               <p className="mt-1 text-xs text-ink-80">
                 Driver will call on arrival for gated entry.
@@ -533,7 +550,7 @@ export function MoveTracking({
                 <div>
                   <p className="mono text-[9px] text-ink-40">ASSIGNED OPERATOR &amp; VEHICLE</p>
                   <p className="mt-0.5 text-sm font-bold">
-                    {move?.mover?.name ?? 'Mehdi Transport'} &middot;{' '}
+                    {move?.mover?.name ?? 'Mover not yet assigned'} &middot;{' '}
                     {move?.vehicle?.name ?? 'Moving van (14 m³)'}
                   </p>
                   <p className="mono mt-0.5 text-[10px] text-ink-60">
@@ -705,7 +722,7 @@ export function MoveTracking({
           executeAdvanceStage('COMPLETED');
         }}
         moveReference={move?.reference ?? 'MU-2026-DEMO'}
-        moverName={move?.mover?.name ?? 'Mehdi Transport'}
+        moverName={move?.mover?.name ?? 'Mover not yet assigned'}
       />
     </main>
   );

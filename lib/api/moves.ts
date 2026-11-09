@@ -65,6 +65,7 @@ export interface MoveDataDto {
   updatedAt: string;
   offersSent?: number;
   quotes?: { id: string; moverId: string; moverName: string; amount: number; currency: string; message: string; status: string; validUntil: string }[];
+  history?: { fromStatus: string | null; toStatus: string; note: string; createdAt: string }[];
 }
 
 export interface MoveResponse {

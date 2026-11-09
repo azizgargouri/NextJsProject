@@ -70,6 +70,7 @@ export class MovesService {
 
   private async serializeRequest(move: MoveRequestDoc, includeQuotes = false) {
     const quotes = includeQuotes ? await moverRepository.listQuotesForMove(String(move._id)) : [];
+    const history = await moverRepository.listStatusEvents(String(move._id));
     const quoteData = await Promise.all(quotes.map(async (quote) => {
       const mover = await moverRepository.findUser(quote.moverId);
       return { id: String(quote._id), moverId: quote.moverId, moverName: mover?.name ?? 'Verified mover', amount: quote.amount, currency: quote.currency, message: quote.message, status: quote.status, validUntil: quote.validUntil.toISOString() };
@@ -82,6 +83,7 @@ export class MovesService {
       vehicle: { name: 'To be confirmed by mover', capacity: 0, payload: 0 },
       mover: { userId: move.assignedMoverId ?? undefined, name: move.assignedMoverId ? 'Assigned mover' : 'Awaiting mover offers', phone: '', companyName: '' },
       pickup: move.pickup, dropoff: move.dropoff, offersSent: 0, quotes: quoteData,
+      history: history.map((event) => ({ fromStatus: event.fromStatus, toStatus: event.toStatus, note: event.note, createdAt: event.createdAt.toISOString() })),
       stages: [], createdAt: move.createdAt.toISOString(), updatedAt: move.updatedAt.toISOString(),
     };
   }
@@ -108,6 +110,10 @@ export class MovesService {
       status: 'SUBMITTED', progressStage: null,
       estimatedPrice: price,
       finalPrice: null, assignedMoverId: null, assignedAt: null, deliveredAt: null, completedAt: null,
+    });
+    await moverRepository.addStatusEvent({
+      moveId: String(move._id), fromStatus: null, toStatus: 'SUBMITTED',
+      note: 'Move request submitted by client', actorId: clientId,
     });
     const { offersSent } = await dispatchMove(String(move._id), { actorId: clientId });
     const refreshed = (await MoveRequestModel.findById(move._id).lean()) as MoveRequestDoc | null;

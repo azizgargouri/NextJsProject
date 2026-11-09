@@ -91,10 +91,8 @@ export function MoveBooking() {
   const [distance, setDistance] = useState(12);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [pickupAddress, setPickupAddress] = useState('12 Rue du Lac, Les Berges du Lac');
-  const [destinationAddress, setDestinationAddress] = useState(
-    '8 Avenue Habib Bourguiba, La Marsa',
-  );
+  const [pickupAddress, setPickupAddress] = useState('');
+  const [destinationAddress, setDestinationAddress] = useState('');
   const [isOffline, setIsOffline] = useState(false);
   const [chosenVehicle, setChosenVehicle] = useState<string>('AUTO');
   const [moveDate, setMoveDate] = useState<string>(() => new Date().toISOString().split('T')[0]!);
@@ -252,6 +250,11 @@ export function MoveBooking() {
 
     if (items.length === 0) {
       setError('Please add at least one item to your load inventory before booking.');
+      return;
+    }
+
+    if (pickupAddress.trim().length < 3 || destinationAddress.trim().length < 3) {
+      setError('Enter both pickup and delivery addresses before submitting your request.');
       return;
     }
 
