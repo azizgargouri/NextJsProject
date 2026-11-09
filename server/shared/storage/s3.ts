@@ -10,7 +10,8 @@ import { z } from 'zod';
 import { ServiceUnavailableError } from '../database/errors';
 
 /**
- * S3-compatible object storage (RustFS locally via `docker compose up -d`).
+ * S3-compatible object storage: RustFS locally (`docker compose up -d`),
+ * Cloudflare R2 in production (S3_REGION=auto).
  * Config is validated lazily so the rest of the app boots without storage;
  * storage calls surface a 503 instead of crashing the process.
  */
@@ -53,6 +54,10 @@ function client(): S3Client {
     region: config.S3_REGION,
     forcePathStyle: true,
     credentials: { accessKeyId: config.S3_ACCESS_KEY, secretAccessKey: config.S3_SECRET_KEY },
+    // Recent SDKs add CRC checksum headers to every upload; S3-compatible stores
+    // (Cloudflare R2, RustFS) may reject them. Send them only when an API needs them.
+    requestChecksumCalculation: 'WHEN_REQUIRED',
+    responseChecksumValidation: 'WHEN_REQUIRED',
   });
   return cachedClient;
 }
