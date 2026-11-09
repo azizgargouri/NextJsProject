@@ -11,9 +11,26 @@ export interface MoveCreatePayload {
     weight: number;
     quantity: number;
   }[];
-  pickup?: { city?: string; zone?: string; postalCode?: string; floor?: number; hasElevator?: boolean; accessNotes?: string };
-  dropoff?: { city?: string; zone?: string; postalCode?: string; floor?: number; hasElevator?: boolean; accessNotes?: string };
-  housingType?: string; sizeRooms?: number; extraServices?: string[]; notes?: string;
+  pickup?: {
+    city?: string;
+    zone?: string;
+    postalCode?: string;
+    floor?: number;
+    hasElevator?: boolean;
+    accessNotes?: string;
+  };
+  dropoff?: {
+    city?: string;
+    zone?: string;
+    postalCode?: string;
+    floor?: number;
+    hasElevator?: boolean;
+    accessNotes?: string;
+  };
+  housingType?: string;
+  sizeRooms?: number;
+  extraServices?: string[];
+  notes?: string;
   vehicleName?: string;
   /** YYYY-MM-DD */
   moveDate?: string;
@@ -40,6 +57,13 @@ export interface MoveItemDto {
 export interface MoveDataDto {
   id: string;
   reference: string;
+  /** 'request' = a booking handled by movers (progress comes from the mover app). */
+  source?: 'request' | 'legacy';
+  /** The request's own status (SUBMITTED, QUOTING, ASSIGNED, … DELIVERED, COMPLETED). */
+  status?: string;
+  progressStage?: string | null;
+  moveDate?: string;
+  timeSlot?: string;
   clientId: string;
   pickupAddress: string;
   destinationAddress: string;
@@ -64,7 +88,16 @@ export interface MoveDataDto {
   createdAt: string;
   updatedAt: string;
   offersSent?: number;
-  quotes?: { id: string; moverId: string; moverName: string; amount: number; currency: string; message: string; status: string; validUntil: string }[];
+  quotes?: {
+    id: string;
+    moverId: string;
+    moverName: string;
+    amount: number;
+    currency: string;
+    message: string;
+    status: string;
+    validUntil: string;
+  }[];
   history?: { fromStatus: string | null; toStatus: string; note: string; createdAt: string }[];
 }
 
@@ -100,7 +133,9 @@ export const movesApi = {
   },
 
   acceptQuote: async (moveId: string, quoteId: string): Promise<{ jobId: string }> => {
-    const { data } = await axiosClient.post<{ jobId: string }>(`/api/moves/${moveId}/quotes/${quoteId}/accept`);
+    const { data } = await axiosClient.post<{ jobId: string }>(
+      `/api/moves/${moveId}/quotes/${quoteId}/accept`,
+    );
     return data;
   },
 };

@@ -130,6 +130,17 @@ export function MoveTracking({
   const [token, setToken] = useState(trackingToken || '');
   const [move, setMove] = useState<MoveDataDto | null>(null);
   const [userMoves, setUserMoves] = useState<MoveDataDto[]>([]);
+  // Keep the "your active moves" chips in step after accepting a quote or confirming delivery.
+  useEffect(() => {
+    if (!move) return;
+    setUserMoves((previous) =>
+      previous.map((entry) =>
+        entry.id === move.id
+          ? { ...entry, currentStage: move.currentStage, status: move.status }
+          : entry,
+      ),
+    );
+  }, [move]);
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [minutes, setMinutes] = useState(14);
@@ -257,7 +268,8 @@ export function MoveTracking({
         const refreshed = await api.moves.getOne(move.id);
         setMove(refreshed.move);
       } catch (err: unknown) {
-        const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+        const message = (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message;
         setLoadError(message || 'This quote is no longer available.');
       }
     });
@@ -290,8 +302,9 @@ export function MoveTracking({
   const nextStage =
     currentIndex < displayStages.length - 1 ? displayStages[currentIndex + 1] : null;
 
+  // Booked requests are moved forward by their mover (and confirmed by the client), not by admins.
   const canAdvance =
-    user?.role === 'ADMIN' ||
+    (user?.role === 'ADMIN' && move?.source !== 'request') ||
     user?.role === 'MOVER' ||
     (user?.role === 'CLIENT' && nextStage?.key === 'COMPLETED');
 
@@ -353,30 +366,49 @@ export function MoveTracking({
       </header>
       <ClientWorkspaceBar />
 
-      {user?.role === 'CLIENT' && move && (move.offersSent !== undefined || move.quotes?.length) && (
-        <section className="border-b border-ink bg-paper-soft px-4 py-4">
-          <div className="mx-auto max-w-7xl">
-            <p className="mono text-[10px] font-bold text-hazard">MOVER QUOTES / LIVE REQUEST STATUS</p>
-            {move.quotes?.length ? (
-              <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {move.quotes.map((quote) => (
-                  <div key={quote.id} className="border-2 border-ink bg-paper p-3">
-                    <p className="font-bold text-sm">{quote.moverName}</p>
-                    <p className="mono mt-1 text-lg font-bold">{quote.amount} {quote.currency}</p>
-                    {quote.message && <p className="mt-1 text-xs text-ink-60">{quote.message}</p>}
-                    <p className="mt-2 mono text-[9px] text-ink-40">VALID UNTIL {new Date(quote.validUntil).toLocaleString()}</p>
-                    {quote.status === 'SENT' && move.currentStage === 'QUOTING' && (
-                      <Button className="mt-3 w-full" disabled={isPending} onClick={() => acceptQuote(quote.id)}>ACCEPT QUOTE</Button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="mt-2 text-sm text-ink-60">{move.offersSent ? `${move.offersSent} eligible mover${move.offersSent === 1 ? '' : 's'} notified. Quotes will appear here as they respond.` : 'No eligible mover is currently available. Your request remains open for dispatch; no mover has been assigned.'}</p>
-            )}
-          </div>
-        </section>
-      )}
+      {user?.role === 'CLIENT' &&
+        move &&
+        (move.offersSent !== undefined || move.quotes?.length) && (
+          <section className="border-b border-ink bg-paper-soft px-4 py-4">
+            <div className="mx-auto max-w-7xl">
+              <p className="mono text-[10px] font-bold text-hazard">
+                MOVER QUOTES / LIVE REQUEST STATUS
+              </p>
+              {move.quotes?.length ? (
+                <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {move.quotes.map((quote) => (
+                    <div key={quote.id} className="border-2 border-ink bg-paper p-3">
+                      <p className="font-bold text-sm">{quote.moverName}</p>
+                      <p className="mono mt-1 text-lg font-bold">
+                        {quote.amount} {quote.currency}
+                      </p>
+                      {quote.message && <p className="mt-1 text-xs text-ink-60">{quote.message}</p>}
+                      <p className="mt-2 mono text-[9px] text-ink-40">
+                        VALID UNTIL {new Date(quote.validUntil).toLocaleString()}
+                      </p>
+                      {quote.status === 'SENT' &&
+                        (move.status ?? move.currentStage) === 'QUOTING' && (
+                          <Button
+                            className="mt-3 w-full"
+                            disabled={isPending}
+                            onClick={() => acceptQuote(quote.id)}
+                          >
+                            ACCEPT QUOTE
+                          </Button>
+                        )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-2 text-sm text-ink-60">
+                  {move.offersSent
+                    ? `${move.offersSent} eligible mover${move.offersSent === 1 ? '' : 's'} notified. Quotes will appear here as they respond.`
+                    : 'No eligible mover is currently available. Your request remains open for dispatch; no mover has been assigned.'}
+                </p>
+              )}
+            </div>
+          </section>
+        )}
 
       {move?.history && move.history.length > 0 && (
         <section className="border-b border-ink px-4 py-4">
@@ -384,10 +416,15 @@ export function MoveTracking({
             <p className="mono text-[10px] font-bold text-ink-60">REQUEST HISTORY</p>
             <div className="mt-2 flex flex-wrap gap-2">
               {move.history.map((event, index) => (
-                <div key={`${event.createdAt}-${index}`} className="border border-ink bg-paper px-2 py-1.5 text-xs">
+                <div
+                  key={`${event.createdAt}-${index}`}
+                  className="border border-ink bg-paper px-2 py-1.5 text-xs"
+                >
                   <span className="font-bold">{event.toStatus.replaceAll('_', ' ')}</span>
                   {event.note && <span className="text-ink-60"> — {event.note}</span>}
-                  <span className="ml-2 mono text-[9px] text-ink-40">{new Date(event.createdAt).toLocaleString()}</span>
+                  <span className="ml-2 mono text-[9px] text-ink-40">
+                    {new Date(event.createdAt).toLocaleString()}
+                  </span>
                 </div>
               ))}
             </div>

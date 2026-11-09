@@ -20,6 +20,8 @@ export interface MoveAddress {
 }
 
 export interface MoveItem {
+  /** Booking catalogue id (e.g. sofa, bed, box): gives Smart Room Layout real sizes. */
+  key?: string;
   name: string;
   quantity: number;
   category: string;
@@ -69,6 +71,9 @@ export interface MoveRequestDoc {
   assignedAt: Date | null;
   deliveredAt: Date | null;
   completedAt: Date | null;
+  /** Road distance the client booked, and the vehicle the booking sized the load for. */
+  distanceKm?: number | null;
+  vehicleName?: string | null;
   createdAt: Date;
   updatedAt: Date;
   _id: Types.ObjectId;
@@ -97,6 +102,7 @@ const ItemSchema = new Schema<MoveItem>(
     volume: { type: Number, default: 0, min: 0 },
     weight: { type: Number, default: 0, min: 0 },
     room: { type: String, default: '', trim: true },
+    key: { type: String, default: '', trim: true },
   },
   { _id: false },
 );
@@ -135,6 +141,8 @@ const MoveRequestSchema = new Schema<MoveRequestDoc>(
     assignedAt: { type: Date, default: null },
     deliveredAt: { type: Date, default: null },
     completedAt: { type: Date, default: null },
+    distanceKm: { type: Number, default: null, min: 0 },
+    vehicleName: { type: String, default: null },
   },
   { timestamps: true },
 );

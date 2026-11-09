@@ -2,15 +2,7 @@
 
 import { useEffect, useState, useTransition } from 'react';
 import Link from 'next/link';
-import {
-  Search,
-  Truck,
-  RotateCcw,
-  ExternalLink,
-  Package,
-  AlertCircle,
-  Play,
-} from 'lucide-react';
+import { Search, Truck, RotateCcw, ExternalLink, Package, AlertCircle, Play } from 'lucide-react';
 import { AdminBadge } from '@/components/ui/admin-badge';
 import { AdminButton } from '@/components/ui/admin-button';
 import { AdminCard } from '@/components/ui/admin-card';
@@ -86,12 +78,7 @@ export function MovesPortal() {
       title: 'Move requests',
       description: 'Supervise, track, and advance live customer moves across Greater Tunis.',
       actions: (
-        <AdminButton
-          variant="outline"
-          size="sm"
-          onClick={fetchMoves}
-          className="mono text-xs"
-        >
+        <AdminButton variant="outline" size="sm" onClick={fetchMoves} className="mono text-xs">
           <RotateCcw size={12} className={`mr-1.5 ${isLoading ? 'animate-spin' : ''}`} />
           Refresh
         </AdminButton>
@@ -111,14 +98,13 @@ export function MovesPortal() {
     startTransition(async () => {
       try {
         const res = await api.moves.advance(moveId, nextStage);
-        setMoves((prev) =>
-          prev.map((m) => (m.id === moveId ? { ...m, ...res.move } : m)),
-        );
+        setMoves((prev) => prev.map((m) => (m.id === moveId ? { ...m, ...res.move } : m)));
         if (selectedMove?.id === moveId) {
           setSelectedMove(res.move);
         }
       } catch (err: unknown) {
-        const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+        const msg = (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message;
         setError(msg || 'Failed to update stage');
       }
     });
@@ -148,19 +134,27 @@ export function MovesPortal() {
       {/* KPI Overview Strip */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <AdminCard className="p-4">
-          <p className="mono text-[10px] text-muted-foreground uppercase font-semibold">Active Moves</p>
+          <p className="mono text-[10px] text-muted-foreground uppercase font-semibold">
+            Active Moves
+          </p>
           <p className="display mt-1 text-3xl font-bold">{activeCount}</p>
           <p className="mono text-[10px] text-hazard mt-1">{inTransitCount} currently in transit</p>
         </AdminCard>
 
         <AdminCard className="p-4">
-          <p className="mono text-[10px] text-muted-foreground uppercase font-semibold">Live Telemetry</p>
+          <p className="mono text-[10px] text-muted-foreground uppercase font-semibold">
+            Live Telemetry
+          </p>
           <p className="display mt-1 text-3xl font-bold text-hazard">{inTransitCount}</p>
-          <p className="mono text-[10px] text-muted-foreground mt-1">Real-time GPS on RN9 Corridor</p>
+          <p className="mono text-[10px] text-muted-foreground mt-1">
+            Real-time GPS on RN9 Corridor
+          </p>
         </AdminCard>
 
         <AdminCard className="p-4">
-          <p className="mono text-[10px] text-muted-foreground uppercase font-semibold">Completed</p>
+          <p className="mono text-[10px] text-muted-foreground uppercase font-semibold">
+            Completed
+          </p>
           <p className="display mt-1 text-3xl font-bold">
             {moves.filter((m) => m.currentStage === 'COMPLETED').length}
           </p>
@@ -168,9 +162,15 @@ export function MovesPortal() {
         </AdminCard>
 
         <AdminCard className="p-4">
-          <p className="mono text-[10px] text-muted-foreground uppercase font-semibold">Gross Estimated</p>
-          <p className="display mt-1 text-3xl font-bold">{totalRevenue} <span className="text-sm font-normal">TND</span></p>
-          <p className="mono text-[10px] text-muted-foreground mt-1">Across {totalMoves} booked orders</p>
+          <p className="mono text-[10px] text-muted-foreground uppercase font-semibold">
+            Gross Estimated
+          </p>
+          <p className="display mt-1 text-3xl font-bold">
+            {totalRevenue} <span className="text-sm font-normal">TND</span>
+          </p>
+          <p className="mono text-[10px] text-muted-foreground mt-1">
+            Across {totalMoves} booked orders
+          </p>
         </AdminCard>
       </div>
 
@@ -232,14 +232,17 @@ export function MovesPortal() {
                   {filtered.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground mono">
-                        {isLoading ? 'Loading move operations…' : 'No move records matching this criteria.'}
+                        {isLoading
+                          ? 'Loading move operations…'
+                          : 'No move records matching this criteria.'}
                       </td>
                     </tr>
                   ) : (
                     filtered.map((move) => {
                       const isSelected = selectedMove?.id === move.id;
                       const nextStageIdx = STAGES_ORDER.indexOf(move.currentStage) + 1;
-                      const nextStage = nextStageIdx < STAGES_ORDER.length ? STAGES_ORDER[nextStageIdx] : null;
+                      const nextStage =
+                        nextStageIdx < STAGES_ORDER.length ? STAGES_ORDER[nextStageIdx] : null;
 
                       return (
                         <tr
@@ -254,7 +257,9 @@ export function MovesPortal() {
                           </td>
 
                           <td className="px-4 py-3">
-                            <AdminBadge variant={STAGE_BADGE_VARIANT[move.currentStage] ?? 'default'}>
+                            <AdminBadge
+                              variant={STAGE_BADGE_VARIANT[move.currentStage] ?? 'default'}
+                            >
                               {move.currentStage === 'IN_TRANSIT' && (
                                 <span className="size-1.5 rounded-full bg-white animate-pulse mr-1" />
                               )}
@@ -264,12 +269,16 @@ export function MovesPortal() {
 
                           <td className="px-4 py-3 max-w-[200px]">
                             <p className="truncate font-medium">{move.pickupAddress}</p>
-                            <p className="truncate text-muted-foreground text-[11px]">&rarr; {move.destinationAddress}</p>
+                            <p className="truncate text-muted-foreground text-[11px]">
+                              &rarr; {move.destinationAddress}
+                            </p>
                           </td>
 
                           <td className="px-4 py-3">
                             <p className="font-medium">{move.mover?.name ?? 'Assigned Mover'}</p>
-                            <p className="mono text-[10px] text-muted-foreground">{move.vehicle?.name}</p>
+                            <p className="mono text-[10px] text-muted-foreground">
+                              {move.vehicle?.name}
+                            </p>
                           </td>
 
                           <td className="px-4 py-3 mono">
@@ -296,7 +305,14 @@ export function MovesPortal() {
                                 <ExternalLink size={11} /> TRACK
                               </Link>
 
-                              {nextStage && (
+                              {nextStage && move.source === 'request' ? (
+                                <span
+                                  className="mono text-[10px] text-muted-foreground"
+                                  title="Booked requests move forward when their mover reports each step"
+                                >
+                                  {move.status === 'QUOTING' ? 'AWAITING MOVER' : 'MOVER REPORTS'}
+                                </span>
+                              ) : nextStage ? (
                                 <AdminButton
                                   variant="outline"
                                   size="sm"
@@ -308,7 +324,7 @@ export function MovesPortal() {
                                   <Play size={10} className="mr-1 text-hazard" />
                                   ADVANCE
                                 </AdminButton>
-                              )}
+                              ) : null}
                             </div>
                           </td>
                         </tr>
@@ -327,7 +343,9 @@ export function MovesPortal() {
             <AdminCard className="p-5 border-2 border-border space-y-4">
               <div className="flex items-start justify-between border-b border-border pb-3">
                 <div>
-                  <p className="mono text-[10px] text-muted-foreground font-semibold">MOVE DETAILS</p>
+                  <p className="mono text-[10px] text-muted-foreground font-semibold">
+                    MOVE DETAILS
+                  </p>
                   <h3 className="display text-xl font-bold mt-0.5">{selectedMove.reference}</h3>
                 </div>
                 <button
@@ -371,9 +389,17 @@ export function MovesPortal() {
                   </p>
                   <div className="max-h-40 overflow-y-auto space-y-1.5 border border-border p-2 bg-muted/20 mono text-[11px]">
                     {selectedMove.items.map((item, idx) => (
-                      <div key={idx} className="flex justify-between border-b border-border/30 pb-1 last:border-0">
-                        <span>{item.name} &times; {item.quantity}</span>
-                        <span className="text-muted-foreground">{item.volume * item.quantity}m&sup3; &middot; {item.weight * item.quantity}kg</span>
+                      <div
+                        key={idx}
+                        className="flex justify-between border-b border-border/30 pb-1 last:border-0"
+                      >
+                        <span>
+                          {item.name} &times; {item.quantity}
+                        </span>
+                        <span className="text-muted-foreground">
+                          {item.volume * item.quantity}m&sup3; &middot;{' '}
+                          {item.weight * item.quantity}kg
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -382,7 +408,9 @@ export function MovesPortal() {
 
               {/* Operator Advance Stage controller */}
               <div className="pt-2">
-                <p className="mono text-[10px] font-bold text-muted-foreground uppercase mb-2">STAGE PIPELINE ADVANCE</p>
+                <p className="mono text-[10px] font-bold text-muted-foreground uppercase mb-2">
+                  STAGE PIPELINE ADVANCE
+                </p>
                 <div className="grid grid-cols-2 gap-1.5 mono text-[10px]">
                   {STAGES_ORDER.map((stageKey) => {
                     const isCurrent = selectedMove.currentStage === stageKey;
