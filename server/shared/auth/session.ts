@@ -32,7 +32,7 @@ async function loadActiveUser(userId: string): Promise<SessionUser> {
  * streaming AI routes whose access token may have expired mid-conversation.
  * sameSite=lax keeps the cookie off cross-site POSTs (CSRF protection).
  */
-async function userFromRefreshCookie(): Promise<SessionUser | null> {
+export async function userFromRefreshCookie(): Promise<SessionUser | null> {
   const raw = (await cookies()).get(REFRESH_COOKIE)?.value;
   if (!raw) return null;
   const stored = await new AuthRepository().findValidByTokenHash(sha256Hex(raw));

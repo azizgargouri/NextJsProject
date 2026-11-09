@@ -18,14 +18,34 @@ export async function getCurrentUser(request: Request): Promise<AccessTokenPaylo
 /** Guard for protected handlers (replaces AuthGuard / @Public). */
 export async function requireAuth(request: Request): Promise<AccessTokenPayload> {
   const tokenUser = await getCurrentUser(request);
-  if (!tokenUser) throw new UnauthorizedError();
+  if (tokenUser) {
+    const storedUser = await new UserRepository().findOneById(tokenUser.sub);
+    if (!storedUser || storedUser.deletedAt) throw new UnauthorizedError();
+    if (storedUser.status === 'BLOCKED') throw new ForbiddenError('Account is blocked');
 
-  const storedUser = await new UserRepository().findOneById(tokenUser.sub);
-  if (!storedUser || storedUser.deletedAt) throw new UnauthorizedError();
-  if (storedUser.status === 'BLOCKED') throw new ForbiddenError('Account is blocked');
+    // Roles and email come from current database truth, not a possibly stale token.
+    return { ...tokenUser, email: storedUser.email, role: storedUser.role };
+  }
 
-  // Roles and email come from current database truth, not a possibly stale token.
-  return { ...tokenUser, email: storedUser.email, role: storedUser.role };
+  // Fallback to httpOnly session cookie if Bearer header is missing (e.g. page refresh / fetch calls)
+  try {
+    const { userFromRefreshCookie } = await import('./session');
+    const session = await userFromRefreshCookie();
+    if (session) {
+      const nowSec = Math.floor(Date.now() / 1000);
+      return {
+        sub: session.sub,
+        email: session.email,
+        role: session.role,
+        iat: nowSec,
+        exp: nowSec + 3600,
+      };
+    }
+  } catch {
+    // Fall through to UnauthorizedError
+  }
+
+  throw new UnauthorizedError();
 }
 
 /** Enforces a verified role at the HTTP boundary; services never trust client state. */
