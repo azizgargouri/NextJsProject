@@ -96,6 +96,12 @@ Compared `dev` with the `smart-room` branch page by page, running the branch sid
 
   `/request` and `/track` stay open to guests, and show the same client links to signed-in clients.
 
+### Static demo moves for testing — 2026-11-09
+
+`yarn db:seed:demo-moves` (after `yarn db:seed`) adds three static move requests for `client@moveup.tn`: `MU-2026-DEMO01` (37 items, Tunis → Sfax), `MU-2026-DEMO02` (14 items) and `MU-2026-DEMO03` (12 items), taken from the `smart-room` branch's sample data. They are created through the booking service, so they are ordinary Moves and appear in Smart Rooms, Live tracking and the dashboard. It also creates the house "Demo flat, Sfax" (5 rooms) linked to `MU-2026-DEMO01`. Idempotent; delete the `MU-2026-DEMO0x` moves when real bookings exist.
+
+Tested: the AI layout for "Demo flat, Sfax" placed all 37 pieces (24 placements, boxes stacked) with the local `qwen2.5-coder:7b` in 87 s. The small model put the washing machine in the office and the desk in the main bedroom; drag them in the editor, or use Groq or a larger Ollama model for better placements.
+
 ## Waiting to be integrated
 
 Measured against `dev` on 2026-11-09, after the `main` sync:
