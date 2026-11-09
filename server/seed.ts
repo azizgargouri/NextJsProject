@@ -7,14 +7,17 @@ import { EmployeeModel } from './shared/database/models/employee.model';
 import { AttendanceModel } from './shared/database/models/attendance.model';
 import { LeaveRequestModel } from './shared/database/models/leave-request.model';
 import { WorkScheduleModel } from './shared/database/models/work-schedule.model';
-import { MoveModel } from './shared/database/models/move.model';
-import { PricingRuleModel } from './shared/database/models/pricing-rule.model';
-import { ContentEntryModel } from './shared/database/models/content-entry.model';
-import {
-  CONTENT_DEFAULTS,
-  CONTENT_KEYS,
-  CONTENT_LOCALES,
-} from './modules/content/content.constants';
+import { ensureWalletForEmail } from './shared/wallet/provisioning';
+
+/**
+ * Employee role → platform auth role. Only `users` rows can sign in, so every
+ * RH staff member needs a real account whose role matches their HR role.
+ */
+const AUTH_ROLE_BY_EMPLOYEE_ROLE: Record<'hr' | 'manager' | 'employee', 'ADMIN' | 'MOVER' | 'CLIENT'> = {
+  hr: 'ADMIN',
+  manager: 'MOVER',
+  employee: 'CLIENT',
+};
 
 // Load .env for standalone execution (Next.js pipelines export it in server runtime).
 try {
@@ -60,10 +63,10 @@ async function seed() {
     { upsert: true, returnDocument: 'after' },
   );
   if (!adminDoc) throw new Error('Admin upsert failed');
-  await seedHr(String(adminDoc._id), adminEmail.toLowerCase());
+  await seedHr();
 
   // Demo client
-  const clientDoc = await UserModel.findOneAndUpdate(
+  await UserModel.findOneAndUpdate(
     { email: 'client@moveup.tn' },
     {
       $set: {
@@ -75,24 +78,6 @@ async function seed() {
         status: 'ACTIVE',
       },
       $setOnInsert: { email: 'client@moveup.tn' },
-    },
-    { upsert: true, returnDocument: 'after' },
-  );
-
-  // Omar (Smart layout client)
-  await UserModel.findOneAndUpdate(
-    { email: 'omar.client@moveup.tn' },
-    {
-      $set: {
-        passwordHash: demoHash,
-        name: 'Omar Test Client',
-        phone: '+21622000111',
-        role: 'CLIENT',
-        locale: 'en',
-        status: 'ACTIVE',
-        deletedAt: null,
-      },
-      $setOnInsert: { email: 'omar.client@moveup.tn' },
     },
     { upsert: true },
   );
@@ -130,95 +115,12 @@ async function seed() {
     { upsert: true },
   );
 
-  // Seed active live move for client@moveup.tn
-  if (clientDoc && moverDoc) {
-    const moveClientId = String(clientDoc._id);
-    const now = new Date();
-    await MoveModel.findOneAndUpdate(
-      { reference: 'MU-2026-004281' },
-      {
-        $set: {
-          clientId: moveClientId,
-          trackingToken: 'demo-tracking-token-2026',
-          pickupAddress: '12 Rue du Lac, Les Berges du Lac, Tunis',
-          destinationAddress: '8 Avenue Habib Bourguiba, La Marsa',
-          distance: 14,
-          volume: 3.33,
-          estimatedPrice: 185,
-          vehicle: { name: 'Moving van', capacity: 14, payload: 1800 },
-          mover: {
-            userId: moverId,
-            name: 'Mehdi Transport',
-            phone: '+21698123456',
-            companyName: 'Mehdi Transport',
-          },
-          currentStage: 'IN_TRANSIT',
-          items: [
-            { id: 'sofa', name: '3-Seater Upholstered Sofa', volume: 1.6, weight: 68, quantity: 1 },
-            { id: 'box', name: 'Standard Moving Box', volume: 0.08, weight: 14, quantity: 6 },
-            { id: 'table', name: 'Dining Table (Wood)', volume: 1.25, weight: 42, quantity: 1 },
-          ],
-          stages: [
-            { key: 'CONFIRMED', title: 'Booking confirmed', detail: 'Your move request has been confirmed and scheduled.', durationMinutes: 0, estimatedAt: new Date(now.getTime() - 7200000), completedAt: new Date(now.getTime() - 7200000) },
-            { key: 'ASSIGNED', title: 'Vehicle assigned', detail: 'A vetted vehicle and mover team have been assigned.', durationMinutes: 12, estimatedAt: new Date(now.getTime() - 6000000), completedAt: new Date(now.getTime() - 6000000) },
-            { key: 'EN_ROUTE', title: 'Driver en route', detail: 'Driver is travelling to your pickup location.', durationMinutes: 18, estimatedAt: new Date(now.getTime() - 4200000), completedAt: new Date(now.getTime() - 4200000) },
-            { key: 'ARRIVED', title: 'Vehicle arrives', detail: 'Driver arrives at pickup location and prepares loading.', durationMinutes: 5, estimatedAt: new Date(now.getTime() - 3600000), completedAt: new Date(now.getTime() - 3600000) },
-            { key: 'LOADING', title: 'Loading starts', detail: 'Furniture and boxes are inventoried and loaded into the vehicle.', durationMinutes: 45, estimatedAt: new Date(now.getTime() - 900000), completedAt: new Date(now.getTime() - 900000) },
-            { key: 'IN_TRANSIT', title: 'In transit', detail: 'Your cargo is securely on the road to destination.', durationMinutes: 26, estimatedAt: now, completedAt: null },
-            { key: 'DELIVERY', title: 'Delivery', detail: 'Unloading items at the delivery address.', durationMinutes: 35, estimatedAt: new Date(now.getTime() + 1500000), completedAt: null },
-            { key: 'COMPLETED', title: 'Move completed', detail: 'Move delivered. Please confirm and review your service.', durationMinutes: null, estimatedAt: new Date(now.getTime() + 3600000), completedAt: null },
-          ],
-        },
-        $setOnInsert: { reference: 'MU-2026-004281' },
-      },
-      { upsert: true },
-    );
-    console.log('Seeded live move: MU-2026-004281 (IN_TRANSIT) for client@moveup.tn');
+  // Sign-up accounts also receive app wallets; keep the demo users consistent.
+  for (const email of [adminEmail.toLowerCase(), 'client@moveup.tn', 'mover@moveup.tn']) {
+    await ensureWalletForEmail(email);
   }
 
-  // Pricing rule — one active table (registry exclusivity is a service rule).
-  await PricingRuleModel.findOneAndUpdate(
-    { name: 'MoveUp Standard 2026' },
-    {
-      $set: {
-        status: 'ACTIVE',
-        currency: 'TND',
-        baseFare: 45,
-        perKm: 1.2,
-        perM3: 18,
-        expressSurcharge: 20,
-        minQuote: 60,
-        effectiveFrom: new Date('2026-01-01T00:00:00.000Z'),
-        effectiveTo: null,
-        deletedAt: null,
-      },
-      $setOnInsert: { name: 'MoveUp Standard 2026' },
-    },
-    { upsert: true, returnDocument: 'after' },
-  );
-  // Never keep two ACTIVE rules after a seed.
-  await PricingRuleModel.updateMany(
-    { name: { $ne: 'MoveUp Standard 2026' }, status: 'ACTIVE' },
-    { $set: { status: 'RETIRED' } },
-  );
-
-  // Content entries — per-locale registry seeded with the in-code defaults.
-  for (const locale of CONTENT_LOCALES) {
-    for (const key of Object.keys(CONTENT_KEYS)) {
-      await ContentEntryModel.findOneAndUpdate(
-        { key, locale },
-        {
-          $set: { value: CONTENT_DEFAULTS[key] ?? '' },
-          $setOnInsert: { key, locale },
-        },
-        { upsert: true },
-      );
-    }
-  }
-
-  console.log(
-    'Seed complete: admin, client, mover + moverProfile, pricing rule, content entries (en/fr/ar).',
-  );
+  console.log('Seed complete: admin, client, mover + moverProfile (demo accounts).');
 }
 
 /**
@@ -226,24 +128,88 @@ async function seed() {
  * the admin's own HR record + 5 staff, a week of shifts, today's attendance
  * and two leave requests. Everything is an idempotent upsert.
  */
-async function seedHr(organization: string, adminEmail: string) {
+async function seedHr() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
   const staff = [
-    { employeeRef: 'HR001', fullName: 'HR Administrator', email: adminEmail, role: 'hr' },
+    {
+      employeeRef: 'HR001',
+      fullName: 'HR Administrator',
+      email: 'hr@moveup.tn',
+      phone: '+216710000001',
+      role: 'hr' as const,
+      password: 'Hr#2026!',
+    },
     {
       employeeRef: 'EMP001',
       fullName: 'Alice Johnson',
       email: 'alice@moveup.tn',
-      role: 'employee',
+      phone: '+216710000002',
+      role: 'employee' as const,
+      password: 'Demo#2026!',
     },
-    { employeeRef: 'EMP002', fullName: 'Bob Smith', email: 'bob@moveup.tn', role: 'employee' },
-    { employeeRef: 'EMP003', fullName: 'Carol Davis', email: 'carol@moveup.tn', role: 'employee' },
-    { employeeRef: 'EMP004', fullName: 'Dave Wilson', email: 'dave@moveup.tn', role: 'employee' },
-    { employeeRef: 'EMP005', fullName: 'Eve Brown', email: 'eve@moveup.tn', role: 'employee' },
+    {
+      employeeRef: 'EMP002',
+      fullName: 'Bob Smith',
+      email: 'bob@moveup.tn',
+      phone: '+216710000003',
+      role: 'employee' as const,
+      password: 'Demo#2026!',
+    },
+    {
+      employeeRef: 'EMP003',
+      fullName: 'Carol Davis',
+      email: 'carol@moveup.tn',
+      phone: '+216710000004',
+      role: 'employee' as const,
+      password: 'Demo#2026!',
+    },
+    {
+      employeeRef: 'EMP004',
+      fullName: 'Dave Wilson',
+      email: 'dave@moveup.tn',
+      phone: '+216710000005',
+      role: 'employee' as const,
+      password: 'Demo#2026!',
+    },
+    {
+      employeeRef: 'EMP005',
+      fullName: 'Eve Brown',
+      email: 'eve@moveup.tn',
+      phone: '+216710000006',
+      role: 'employee' as const,
+      password: 'Demo#2026!',
+    },
   ];
 
+  // 1. Auth accounts first — sign-in reads `users`, so the RH directory alone is not enough.
+  for (const member of staff) {
+    await UserModel.findOneAndUpdate(
+      { email: member.email },
+      {
+        $set: {
+          passwordHash: await bcrypt.hash(member.password, 10),
+          name: member.fullName,
+          phone: member.phone,
+          role: AUTH_ROLE_BY_EMPLOYEE_ROLE[member.role],
+          locale: 'en',
+          status: 'ACTIVE',
+          deletedAt: null,
+        },
+        $setOnInsert: { email: member.email },
+      },
+      { upsert: true },
+    );
+  }
+
+  // Every RH query is scoped to `organization === user.sub` (see resolveReadScope),
+  // so the HR account has to own the organisation the records point at.
+  const hrAccount = await UserModel.findOne({ email: 'hr@moveup.tn' }).lean();
+  if (!hrAccount) throw new Error('HR auth account missing');
+  const organization = String(hrAccount._id);
+
+  // 2. RH directory rows for the same organisation.
   const ids: Record<string, string> = {};
   for (const member of staff) {
     const doc = await EmployeeModel.findOneAndUpdate(
@@ -264,6 +230,18 @@ async function seedHr(organization: string, adminEmail: string) {
     ids[member.employeeRef] = String(doc._id);
   }
   console.log('Employees seeded:', staff.map((member) => member.employeeRef).join(', '));
+  for (const member of staff) {
+    console.log(
+      `  ${member.employeeRef}  ${member.email}  ${member.password}  → ${AUTH_ROLE_BY_EMPLOYEE_ROLE[member.role]}`,
+    );
+  }
+
+  // Auto-create a custodial app wallet for every demo HR/employee account.
+  // The same wallet is written to both the User and Employee records.
+  for (const member of staff) {
+    const wallet = await ensureWalletForEmail(member.email);
+    console.log(`  ${member.employeeRef}  app wallet  ${wallet.address}`);
+  }
 
   const employees = Object.values(ids);
 

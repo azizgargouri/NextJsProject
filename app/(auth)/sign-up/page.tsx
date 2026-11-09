@@ -4,7 +4,7 @@ import { AuthLayout } from '@/components/features/auth/auth-layout';
 import { SignUpForm } from '@/components/features/auth/sign-up-form';
 
 export const metadata: Metadata = {
-  title: 'Create account',
+  title: 'Sign up',
 };
 
 export default function SignUpPage() {

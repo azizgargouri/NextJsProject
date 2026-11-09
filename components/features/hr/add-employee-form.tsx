@@ -36,7 +36,12 @@ export function AddEmployeeForm() {
     formState: { errors },
   } = useForm<AddEmployeeValues>({
     resolver: zodResolver(AddEmployeeSchema),
-    defaultValues: { employeeRef: 'EMP', fullName: '', email: '', role: 'employee' },
+    defaultValues: {
+      employeeRef: 'EMP',
+      fullName: '',
+      email: '',
+      role: 'employee',
+    },
   });
 
   const onSubmit = (values: AddEmployeeValues) => {
@@ -63,6 +68,7 @@ export function AddEmployeeForm() {
         <h1 className="display text-4xl md:text-5xl">NEW STAFF.</h1>
         <p className="mt-3 text-sm text-ink-80">
           The record joins your organisation directory — attendance and leave open up immediately.
+          An app wallet is created automatically for contract signing.
         </p>
 
         <div className="mt-8 space-y-6">
@@ -109,6 +115,13 @@ export function AddEmployeeForm() {
             </Select>
             <FieldError message={errors.role?.message} />
           </FieldRow>
+
+          <div className="border border-ink/20 bg-paper-soft px-3 py-3">
+            <p className="mono text-[9px] normal-case tracking-normal text-ink-40">
+              The server generates a custodial app wallet for this employee. Its private key is
+              encrypted and never shown in the browser.
+            </p>
+          </div>
 
           {serverError && (
             <p className="mono border border-hazard bg-hazard/5 px-3 py-2 text-[11px] normal-case tracking-normal text-hazard">

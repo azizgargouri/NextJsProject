@@ -15,6 +15,8 @@ export interface UserRow {
   role: 'CLIENT' | 'MOVER' | 'ADMIN';
   locale: string;
   status: 'ACTIVE' | 'BLOCKED';
+  walletAddress: string | null;
+  walletPrivateKeyEncrypted: string | null;
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
@@ -31,6 +33,8 @@ export function toUserRow(doc: UserDoc): UserRow {
     role: doc.role as UserRow['role'],
     locale: doc.locale,
     status: doc.status as UserRow['status'],
+    walletAddress: doc.walletAddress,
+    walletPrivateKeyEncrypted: doc.walletPrivateKeyEncrypted,
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt,
     deletedAt: doc.deletedAt ?? null,

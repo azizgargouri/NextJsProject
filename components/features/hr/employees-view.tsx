@@ -12,6 +12,7 @@ import { StatusLabel } from '@/components/ui/status-chip';
 import { LoadingBlock } from '@/components/features/hr/loading-block';
 import { useEmployees, useUpdateEmployee } from '@/hooks/content/hr';
 import { extractErrorMessage } from '@/lib/api/errors';
+import { shortAddress } from '@/lib/blockchain/config';
 import type { EmployeeDto, EmployeeRole } from '@/types';
 
 const ROLES: EmployeeRole[] = ['employee', 'manager', 'hr'];
@@ -24,7 +25,11 @@ export function EmployeesView() {
   const updateEmployee = useUpdateEmployee();
 
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [draft, setDraft] = useState<Draft>({ fullName: '', email: '', role: 'employee' });
+  const [draft, setDraft] = useState<Draft>({
+    fullName: '',
+    email: '',
+    role: 'employee',
+  });
   const [rowError, setRowError] = useState<string | null>(null);
 
   const employees = employeesQuery.data ?? [];
@@ -33,7 +38,11 @@ export function EmployeesView() {
   function startEdit(employee: EmployeeDto) {
     setRowError(null);
     setEditingId(employee.id);
-    setDraft({ fullName: employee.fullName, email: employee.email, role: employee.role });
+    setDraft({
+      fullName: employee.fullName,
+      email: employee.email,
+      role: employee.role,
+    });
   }
 
   function cancelEdit() {
@@ -126,6 +135,7 @@ export function EmployeesView() {
                 <th className="px-4 py-3 font-normal">REF</th>
                 <th className="px-4 py-3 font-normal">NAME</th>
                 <th className="px-4 py-3 font-normal">EMAIL</th>
+                <th className="px-4 py-3 font-normal">APP WALLET</th>
                 <th className="px-4 py-3 font-normal">ROLE</th>
                 <th className="px-4 py-3 font-normal">STATUS</th>
                 <th className="px-4 py-3 text-right font-normal">ACTIONS</th>
@@ -142,6 +152,9 @@ export function EmployeesView() {
                       <td className="mono px-4 py-3 text-[11px]">{employee.employeeRef}</td>
                       <td className="px-4 py-3 text-sm">{employee.fullName}</td>
                       <td className="px-4 py-3 text-sm text-ink-80">{employee.email}</td>
+                      <td className="mono px-4 py-3 text-[10px] text-ink-80">
+                        {employee.walletAddress ? shortAddress(employee.walletAddress, 5) : '—'}
+                      </td>
                       <td className="mono px-4 py-3 text-[10px] uppercase">{employee.role}</td>
                       <td className="px-4 py-3">
                         <StatusLabel kind="employee" value={employee.status} />
@@ -176,7 +189,7 @@ export function EmployeesView() {
 
                     {isEditing && (
                       <tr className="border-b border-ink/15 bg-paper-soft">
-                        <td colSpan={6} className="px-4 py-4">
+                        <td colSpan={7} className="px-4 py-4">
                           <form
                             onSubmit={(event) => {
                               event.preventDefault();

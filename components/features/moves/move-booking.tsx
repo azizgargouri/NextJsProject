@@ -3,7 +3,7 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowRight, Minus, Plus, Truck, WifiOff, Weight, Box, UserCheck, LogIn, AlertTriangle, Calendar, Building, Check } from 'lucide-react';
+import { ArrowRight, Minus, Plus, Truck, WifiOff, Weight, Box, UserCheck, LogIn, AlertTriangle, Calendar, Building } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { LoadScan, type ScanSuggestion } from './load-scan';
 import { RouteMapPicker } from './route-map-picker';

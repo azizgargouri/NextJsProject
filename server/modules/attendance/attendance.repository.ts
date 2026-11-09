@@ -5,6 +5,7 @@ import {
   AttendanceModel,
   type AttendanceDoc,
   type AttendanceLocation,
+  type AttendancePunch,
 } from '../../shared/database/models/attendance.model';
 import type { AttendanceStatus } from '../../shared/database/enums';
 
@@ -26,6 +27,7 @@ export interface AttendanceRow {
   status: AttendanceStatus;
   breakDuration: number;
   location: AttendanceLocation | null;
+  punches: AttendancePunch[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -57,6 +59,10 @@ export function toAttendanceRow(doc: AttendanceDoc): AttendanceRow {
     status: doc.status,
     breakDuration: doc.breakDuration ?? 0,
     location: doc.location ?? null,
+    punches: (doc.punches ?? []).map((punch) => ({
+      at: punch.at,
+      location: punch.location ?? null,
+    })),
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt,
   };

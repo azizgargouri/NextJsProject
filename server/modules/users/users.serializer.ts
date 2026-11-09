@@ -9,6 +9,8 @@ export interface UserResponse {
   role: Role;
   locale: string;
   status: UserStatus;
+  /** Public address of the auto-created app wallet (never the private key). */
+  walletAddress: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -22,6 +24,7 @@ export function serializeUser(user: {
   role: Role;
   locale: string;
   status: UserStatus;
+  walletAddress: string | null;
   createdAt: Date;
   updatedAt: Date;
 }): UserResponse {
@@ -33,6 +36,7 @@ export function serializeUser(user: {
     role: user.role,
     locale: user.locale,
     status: user.status,
+    walletAddress: user.walletAddress,
     createdAt: user.createdAt.toISOString(),
     updatedAt: user.updatedAt.toISOString(),
   };

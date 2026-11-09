@@ -8,6 +8,12 @@ export interface AttendanceLocation {
   accuracy?: number;
 }
 
+/** One check-in registration: when the button was pressed and where from. */
+export interface AttendancePunch {
+  at: Date;
+  location: AttendanceLocation | null;
+}
+
 /** Attendance document — one row per employee per work day (unique index). */
 export interface AttendanceDoc {
   id: string;
@@ -18,6 +24,8 @@ export interface AttendanceDoc {
   status: AttendanceStatus;
   breakDuration: number;
   location: AttendanceLocation | null;
+  /** Every press of the check-in button, oldest first (the first one sets `clockIn`). */
+  punches: AttendancePunch[];
   createdAt: Date;
   updatedAt: Date;
 
@@ -36,6 +44,22 @@ const AttendanceSchema = new Schema<AttendanceDoc>(
       lat: { type: Number, min: -90, max: 90 },
       lng: { type: Number, min: -180, max: 180 },
       accuracy: { type: Number, min: 0 },
+    },
+    punches: {
+      type: [
+        new Schema<AttendancePunch>(
+          {
+            at: { type: Date, required: true },
+            location: {
+              lat: { type: Number, min: -90, max: 90 },
+              lng: { type: Number, min: -180, max: 180 },
+              accuracy: { type: Number, min: 0 },
+            },
+          },
+          { _id: false },
+        ),
+      ],
+      default: [],
     },
   },
   { timestamps: true },

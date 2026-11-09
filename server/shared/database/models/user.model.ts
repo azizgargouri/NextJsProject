@@ -14,6 +14,10 @@ export interface UserDoc {
   role: Role;
   locale: string;
   status: UserStatus;
+  /** Auto-created custodial wallet address (public). */
+  walletAddress: string | null;
+  /** AES-256-GCM encrypted private key — never exposed by the API. */
+  walletPrivateKeyEncrypted: string | null;
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
@@ -38,6 +42,8 @@ const UserSchema = new Schema<UserDoc>(
     role: { type: String, enum: [...ROLES], default: 'CLIENT' },
     locale: { type: String, enum: ['en', 'fr', 'ar'], default: 'en' },
     status: { type: String, enum: [...USER_STATUSES], default: 'ACTIVE' },
+    walletAddress: { type: String, default: null, lowercase: true, trim: true },
+    walletPrivateKeyEncrypted: { type: String, default: null },
     deletedAt: { type: Date, default: null },
   },
   { timestamps: true },

@@ -1,7 +1,9 @@
 import { z } from 'zod';
 
 export const SignInSchema = z.object({
-  email: z.string().email('Invalid email address'),
+  // Trimmed + lowercased: browsers autofill a trailing space that would
+  // otherwise miss the (lowercase, exact) database lookup and read as 401.
+  email: z.string().trim().toLowerCase().email('Invalid email address'),
   password: z.string().min(1, 'Password is required'),
 });
 

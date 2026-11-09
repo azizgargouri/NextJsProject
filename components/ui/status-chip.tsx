@@ -55,11 +55,33 @@ const ROSTER: Record<'in' | 'leave' | 'absent' | 'out', { label: string; variant
   out: { label: 'Not checked in', variant: 'quiet' },
 };
 
+const CONTRACT: Record<
+  'pending' | 'active' | 'terminated' | 'superseded',
+  { label: string; variant: ChipVariant }
+> = {
+  pending: { label: 'Pending signature', variant: 'outline' },
+  active: { label: 'Active', variant: 'ink' },
+  terminated: { label: 'Terminated', variant: 'hazard' },
+  superseded: { label: 'Superseded', variant: 'quiet' },
+};
+
+const PROPOSAL: Record<
+  'awaiting_employee' | 'completed' | 'expired' | 'cancelled',
+  { label: string; variant: ChipVariant }
+> = {
+  awaiting_employee: { label: 'Awaiting employee', variant: 'outline' },
+  completed: { label: 'Anchored', variant: 'ink' },
+  expired: { label: 'Expired', variant: 'hazard' },
+  cancelled: { label: 'Cancelled', variant: 'quiet' },
+};
+
 const CONFIG = {
   attendance: ATTENDANCE,
   leave: LEAVE,
   employee: EMPLOYEE,
   roster: ROSTER,
+  contract: CONTRACT,
+  proposal: PROPOSAL,
 } as const;
 
 export type StatusKind = keyof typeof CONFIG;

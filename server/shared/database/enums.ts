@@ -36,3 +36,30 @@ export const LEAVE_DECISIONS = ['approved', 'rejected'] as const;
 
 export const WORK_SCHEDULE_STATUSES = ['planned', 'confirmed', 'completed', 'cancelled'] as const;
 export type WorkScheduleStatus = (typeof WORK_SCHEDULE_STATUSES)[number];
+
+/* --- Crews & location tracking --- */
+
+export const CREW_STATUSES = ['active', 'inactive'] as const;
+export type CrewStatus = (typeof CREW_STATUSES)[number];
+
+export const TRACKING_SESSION_STATUSES = ['active', 'ended'] as const;
+export type TrackingSessionStatus = (typeof TRACKING_SESSION_STATUSES)[number];
+
+export const LOCATION_PING_SOURCES = ['checkin', 'interval', 'manual'] as const;
+export type LocationPingSource = (typeof LOCATION_PING_SOURCES)[number];
+
+/* --- On-chain employment contracts --- */
+
+export const CONTRACT_STATUSES = ['pending', 'active', 'terminated', 'superseded'] as const;
+export type ContractStatus = (typeof CONTRACT_STATUSES)[number];
+
+export const CONTRACT_PROPOSAL_STATUSES = [
+  'awaiting_employee',
+  'completed',
+  'expired',
+  'cancelled',
+] as const;
+export type ContractProposalStatus = (typeof CONTRACT_PROPOSAL_STATUSES)[number];
+
+export const SALARY_PERIODS = ['month', 'year', 'hour'] as const;
+export type SalaryPeriod = (typeof SALARY_PERIODS)[number];

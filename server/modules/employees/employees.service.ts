@@ -9,6 +9,7 @@ import type { AccessTokenPayload } from '../../shared/auth/jwt';
 import { EmployeeRepository, type EmployeeRow } from './employees.repository';
 import type { EmployeeCreateInput, EmployeeUpdateInput } from './employees.schema';
 import { serializeEmployee, type EmployeeResponse } from './employees.serializer';
+import { ensureWalletForEmail } from '../../shared/wallet/provisioning';
 
 /**
  * Employees business logic — directory CRUD scoped to one organisation
@@ -43,7 +44,16 @@ export class EmployeeService extends AbstractCrudService<EmployeeRow> {
       throw new AlreadyExistsError('Employee', 'email');
     }
 
-    const employee = await this.repository.create({ ...input, email, organization });
+    // HR no longer types a MetaMask address: the server creates the app wallet.
+    // A matching auth account (if it exists) is kept in sync by email.
+    const wallet = await ensureWalletForEmail(email);
+    const employee = await this.repository.create({
+      ...input,
+      email,
+      organization,
+      walletAddress: wallet.address,
+      walletPrivateKeyEncrypted: wallet.encryptedPrivateKey,
+    });
     return serializeEmployee(employee);
   }
 
@@ -52,15 +62,20 @@ export class EmployeeService extends AbstractCrudService<EmployeeRow> {
     input: EmployeeUpdateInput,
     organization: string,
   ): Promise<EmployeeResponse> {
-    if (Object.keys(input).length === 0) {
+    // Wallet addresses are managed by the server (custodial app wallets);
+    // accepting a manual address here would break server-side signing.
+    const { walletAddress: _managedWallet, ...updatesInput } = input;
+    void _managedWallet;
+
+    if (Object.keys(updatesInput).length === 0) {
       throw new BadRequestError('No fields to update');
     }
 
     const existing = await this.findOneInOrganization(id, organization);
 
-    const updates: Record<string, unknown> = { ...input };
-    if (input.email !== undefined) {
-      const email = input.email.toLowerCase();
+    const updates: Record<string, unknown> = { ...updatesInput };
+    if (updatesInput.email !== undefined) {
+      const email = updatesInput.email.toLowerCase();
       const clash = await this.repository.findByEmail(email);
       if (clash && clash.id !== existing.id) {
         throw new AlreadyExistsError('Employee', 'email');

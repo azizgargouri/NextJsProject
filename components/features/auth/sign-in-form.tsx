@@ -21,7 +21,8 @@ if (typeof window !== 'undefined') {
 }
 
 const SignInFormSchema = z.object({
-  email: z.string().email('Invalid email address'),
+  // Mirrors the server schema: autofilled emails often carry a trailing space.
+  email: z.string().trim().toLowerCase().email('Invalid email address'),
   password: z.string().min(1, 'Password is required'),
 });
 

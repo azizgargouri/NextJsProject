@@ -19,6 +19,10 @@ export interface EmployeeDoc {
   role: EmployeeRole;
   status: EmployeeStatus;
   hireDate: Date | null;
+  /** Auto-created custodial wallet address (public). */
+  walletAddress: string | null;
+  /** AES-256-GCM encrypted private key — never exposed by the API. */
+  walletPrivateKeyEncrypted: string | null;
   organization: Types.ObjectId | null;
   createdAt: Date;
   updatedAt: Date;
@@ -41,6 +45,8 @@ const EmployeeSchema = new Schema<EmployeeDoc>(
     role: { type: String, enum: [...EMPLOYEE_ROLES], default: 'employee' },
     status: { type: String, enum: [...EMPLOYEE_STATUSES], default: 'active' },
     hireDate: { type: Date, default: null },
+    walletAddress: { type: String, default: null, lowercase: true, trim: true },
+    walletPrivateKeyEncrypted: { type: String, default: null },
     organization: { type: Schema.Types.ObjectId, ref: 'User', index: true },
   },
   { timestamps: true },

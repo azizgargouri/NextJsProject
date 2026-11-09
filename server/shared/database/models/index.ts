@@ -14,3 +14,6 @@ export { HomeModel, type HomeDoc, type RoomDoc, type OpeningDoc } from './home.m
 export { ClaimModel, type ClaimDoc, type ClaimEvent } from './claim.model';
 export { ReviewModel, type ReviewDoc } from './review.model';
 export { AiMessageModel, type AiMessageDoc } from './ai-message.model';
+export { CrewModel, type CrewDoc } from './crew.model';
+export { TrackingSessionModel, type TrackingSessionDoc } from './tracking-session.model';
+export { LocationPingModel, type LocationPingDoc } from './location-ping.model';

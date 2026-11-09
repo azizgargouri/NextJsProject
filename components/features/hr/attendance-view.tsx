@@ -512,7 +512,22 @@ export function AttendanceView() {
                 <span className="mono ml-auto text-[10px] text-ink-40">
                   IN {formatTime(record.clockIn)}
                   {record.clockOut ? ` · OUT ${formatTime(record.clockOut)}` : ''}
+                  {record.punches.length > 1 ? ` · ${record.punches.length} REGISTRATIONS` : ''}
                 </span>
+                {record.punches.length > 0 && (
+                  <span className="mono w-full text-[9px] leading-relaxed text-ink-40">
+                    {record.punches
+                      .map(
+                        (punch) =>
+                          `${formatTime(punch.at)}${
+                            punch.location
+                              ? ` @ ${punch.location.lat.toFixed(4)}, ${punch.location.lng.toFixed(4)}`
+                              : ' (no location)'
+                          }`,
+                      )
+                      .join(' · ')}
+                  </span>
+                )}
                 <StatusLabel kind="attendance" value={record.status} />
               </li>
             ))}

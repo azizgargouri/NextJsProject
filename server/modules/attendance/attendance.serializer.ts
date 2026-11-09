@@ -1,5 +1,14 @@
 import type { AttendanceStatus } from '../../shared/database/enums';
-import type { AttendanceLocation } from '../../shared/database/models/attendance.model';
+import type {
+  AttendanceLocation,
+  AttendancePunch,
+} from '../../shared/database/models/attendance.model';
+
+/** A single registration, serialized for the client. */
+export interface AttendancePunchResponse {
+  at: string;
+  location: AttendanceLocation | null;
+}
 
 /** Whitelisted attendance response (employee embedded as a compact reference). */
 export interface AttendanceResponse {
@@ -11,6 +20,7 @@ export interface AttendanceResponse {
   status: AttendanceStatus;
   breakDuration: number;
   location: AttendanceLocation | null;
+  punches: AttendancePunchResponse[];
   createdAt: string;
   updatedAt: string;
 }
@@ -25,6 +35,7 @@ export function serializeAttendance(row: {
   status: AttendanceStatus;
   breakDuration: number;
   location: AttendanceLocation | null;
+  punches?: AttendancePunch[];
   createdAt: Date;
   updatedAt: Date;
 }): AttendanceResponse {
@@ -37,6 +48,10 @@ export function serializeAttendance(row: {
     status: row.status,
     breakDuration: row.breakDuration,
     location: row.location,
+    punches: (row.punches ?? []).map((punch) => ({
+      at: punch.at.toISOString(),
+      location: punch.location ?? null,
+    })),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
