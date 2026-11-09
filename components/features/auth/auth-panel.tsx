@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef } from 'react';
+import Link from 'next/link';
 import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
 
@@ -47,24 +48,28 @@ export function AuthPanel() {
   const ticks = [
     'CONSOLE / TUNIS-NORD',
     'REGISTRY SYNC OK',
-    'MOVER QUEUE: 237',
+    'QUOTES IN WRITING',
     'TOKEN: HS256 + 15M',
     'PAPER TRAIL: ON',
-    'ZONE GRID: 11 SECTORS',
+    'TUNIS · SFAX · SOUSSE',
   ];
 
   return (
     <aside
       ref={rootRef}
       className="dotgrid relative hidden flex-col justify-between border-r border-ink bg-paper-soft p-10 lg:flex"
-      aria-hidden
     >
       <div className="flex items-center justify-between border-b border-ink/30 pb-6">
-        <p data-auth-panel-cell className="mono text-sm font-bold">
-          <span className="mr-2 inline-block size-2.5 bg-hazard align-middle" />
-          MOVE<span className="text-hazard">UP</span>
-        </p>
-        <p data-auth-panel-cell className="mono text-[10px] text-ink-40">
+        <Link
+          href="/"
+          aria-label="MoveUp home"
+          data-auth-panel-cell
+          className="mono text-sm font-bold hover:text-hazard-ink"
+        >
+          <span className="mr-2 inline-block size-2.5 bg-hazard align-middle" aria-hidden />
+          MOVE<span className="text-hazard-ink">UP</span>
+        </Link>
+        <p data-auth-panel-cell aria-hidden className="mono text-[11px] text-ink-60">
           SECURE AREA
         </p>
       </div>
@@ -81,16 +86,16 @@ export function AuthPanel() {
         </p>
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-2" aria-hidden>
         {ticks.map((tick, index) => (
           <p
             key={tick}
             data-auth-tick
-            className="mono flex items-center gap-3 text-[10px] text-ink-80"
+            className="mono flex items-center gap-3 text-[11px] text-ink-80"
           >
             <span className="inline-block size-1 bg-ink-40" />
             {tick}
-            <span className="ml-auto text-ink-40">
+            <span className="ml-auto text-ink-60">
               {'///'}
               {`0${index + 1}`}
             </span>
@@ -98,8 +103,8 @@ export function AuthPanel() {
         ))}
       </div>
 
-      <p data-auth-panel-cell className="mono text-[10px] text-ink-40">
-        © 2026 — REG TN-2026-0119 — REV 2.6
+      <p data-auth-panel-cell className="mono text-[11px] text-ink-60">
+        © {new Date().getFullYear()} MOVEUP · TUNIS / SFAX / SOUSSE
       </p>
     </aside>
   );

@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Link from 'next/link';
+import { AuthHeader } from './back-home';
 import { useRouter } from 'next/navigation';
 import type { AxiosError } from 'axios';
 import gsap from 'gsap';
@@ -63,14 +64,7 @@ export function SignInForm() {
 
   return (
     <div ref={rootRef} className="flex min-h-dvh flex-col justify-between px-6 py-10 md:px-12">
-      {/* Header */}
-      <div data-form-reveal className="flex items-center justify-between">
-        <Link href="/" className="mono flex items-center gap-2 text-sm font-bold lg:hidden">
-          <span className="inline-block size-2.5 bg-hazard" aria-hidden />
-          MOVE<span className="text-hazard">UP</span>
-        </Link>
-        <p className="mono text-[10px] text-ink-40">ENDPOINT / SIGN-IN</p>
-      </div>
+      <AuthHeader />
 
       {/* Form */}
       <form

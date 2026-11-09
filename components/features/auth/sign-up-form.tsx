@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Link from 'next/link';
+import { AuthHeader } from './back-home';
 import { useRouter } from 'next/navigation';
 import type { AxiosError } from 'axios';
 import gsap from 'gsap';
@@ -82,14 +83,7 @@ export function SignUpForm({ initialRole = 'CLIENT' }: { initialRole?: 'CLIENT' 
       ref={rootRef}
       className="flex min-h-dvh flex-col justify-between bg-paper px-6 py-10 md:px-12"
     >
-      {/* Header */}
-      <div data-form-reveal className="flex items-center justify-between">
-        <Link href="/" className="mono flex items-center gap-2 text-sm font-bold lg:hidden">
-          <span className="inline-block size-2.5 bg-hazard" aria-hidden />
-          MOVE<span className="text-hazard">UP</span>
-        </Link>
-        <p className="mono text-[10px] text-ink-40">ENDPOINT / SIGN-UP</p>
-      </div>
+      <AuthHeader />
 
       {/* Form */}
       <form
@@ -103,7 +97,7 @@ export function SignUpForm({ initialRole = 'CLIENT' }: { initialRole?: 'CLIENT' 
           SESSION.
         </h1>
         <p data-form-reveal className="mt-4 text-sm text-ink-80">
-          Movers apply here and are verified by the society within 48 hours.
+          Movers apply here and are verified by MoveUp within two working days.
         </p>
 
         {/* Role selector — segmented control */}
