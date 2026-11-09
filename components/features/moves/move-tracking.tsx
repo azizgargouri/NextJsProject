@@ -25,6 +25,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { MoveRouteMap } from './move-route-map';
 import { ProofOfDeliveryModal } from './proof-of-delivery-modal';
+import { MoveChat } from './move-chat';
 import { useAuthStore } from '@/hooks/stores/auth-store';
 import { api } from '@/lib/api';
 import type { MoveDataDto, MoveStageDto } from '@/lib/api/moves';
@@ -408,6 +409,19 @@ export function MoveTracking({
               )}
             </div>
           </section>
+        )}
+
+      {move?.source === 'request' &&
+        move.mover.userId &&
+        user?.role === 'CLIENT' &&
+        move.clientId === user.id && (
+          <MoveChat
+            moveId={move.id}
+            moverName={move.mover.companyName || move.mover.name}
+            open={['ASSIGNED', 'EN_ROUTE', 'IN_PROGRESS', 'DELIVERED', 'DISPUTED'].includes(
+              move.status ?? '',
+            )}
+          />
         )}
 
       {move?.history && move.history.length > 0 && (
