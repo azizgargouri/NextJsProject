@@ -22,6 +22,8 @@ import { StatusEventModel } from '../../shared/database/models/status-event.mode
 import { QuoteModel } from '../../shared/database/models/quote.model';
 import { NotificationModel } from '../../shared/database/models/notification.model';
 import { MessageModel } from '../../shared/database/models/message.model';
+import { VehicleModel } from '../../shared/database/models/vehicle.model';
+import { TeamMemberModel } from '../../shared/database/models/team-member.model';
 import { respondToOffer } from '../mover/mover.offers';
 import { updateJobStatus } from '../mover/mover.jobs';
 import { completeMove } from '../mover/mover.completion';
@@ -126,20 +128,38 @@ async function makeMoverReady(moverId: string, zones: readonly string[], rating:
     },
     { upsert: true },
   );
-  const insured = await MoverDocumentModel.exists({
-    moverId,
-    type: 'INSURANCE',
-    expiresAt: { $gt: new Date() },
-  });
-  if (!insured) {
+  // A verified file: ID, licence, vehicle registration and insurance, all reviewed.
+  for (const type of ['ID', 'LICENCE', 'REGISTRATION', 'INSURANCE'] as const) {
+    const valid = await MoverDocumentModel.exists({
+      moverId,
+      type,
+      $or: [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }],
+    });
+    if (valid) continue;
     await MoverDocumentModel.create({
       moverId,
-      type: 'INSURANCE',
-      storageKey: `${PG.storagePrefix}${moverId}/insurance.pdf`,
+      type,
+      storageKey: `${PG.storagePrefix}${moverId}/${type.toLowerCase()}.pdf`,
       contentType: 'application/pdf',
-      fileName: 'insurance-playground.pdf',
-      expiresAt: new Date(Date.now() + 200 * DAY_MS),
+      fileName: `${type.toLowerCase()}-playground.pdf`,
+      expiresAt: type === 'ID' ? null : new Date(Date.now() + 200 * DAY_MS),
+      reviewedBy: 'playground',
+      reviewedAt: new Date(),
     });
+  }
+  if (!(await VehicleModel.exists({ moverId }))) {
+    await VehicleModel.create({
+      moverId,
+      type: 'VAN',
+      capacityM3: 14,
+      plate: `PG-${moverId.slice(-6)}`,
+    });
+  }
+  if (!(await TeamMemberModel.exists({ moverId }))) {
+    await TeamMemberModel.create([
+      { moverId, name: 'Sami Ferchichi', phone: '+21622300401', role: 'Driver (playground)' },
+      { moverId, name: 'Walid Mansour', phone: '+21622300402', role: 'Helper (playground)' },
+    ]);
   }
   await AvailabilityModel.bulkWrite(
     Array.from({ length: 60 }, (_, index) => ({
@@ -305,6 +325,20 @@ async function driveTo(moveId: string, target: Target, adminId: string) {
 
 async function seedBookings() {
   const { core, clients } = await seedAccounts();
+  // Re-running the playground also refreshes its still-open offers.
+  const openRequests = await MoveRequestModel.find({
+    reference: { $regex: `^${PG.movePrefix}` },
+    status: { $in: ['SUBMITTED', 'QUOTING'] },
+  })
+    .select('_id')
+    .lean();
+  await JobOfferModel.updateMany(
+    {
+      moveId: { $in: openRequests.map((request) => String(request._id)) },
+      status: 'PENDING',
+    },
+    { $set: { expiresAt: new Date(Date.now() + 7 * DAY_MS) } },
+  );
   let sequence = 0;
   for (const [clientIndex, client] of clients.entries()) {
     for (let slot = 0; slot < BOOKINGS_PER_CLIENT; slot += 1) {
@@ -335,6 +369,12 @@ async function seedBookings() {
         client.id,
       );
       await MoveRequestModel.updateOne({ _id: booked.id }, { $set: { reference } });
+      // Real offers expire after OFFER_TTL_MINUTES (2 h) and pass to the next mover;
+      // playground offers stay open for a week so the demo data does not drain away.
+      await JobOfferModel.updateMany(
+        { moveId: booked.id, status: 'PENDING' },
+        { $set: { expiresAt: new Date(Date.now() + 7 * DAY_MS) } },
+      );
       await driveTo(booked.id, target, core.adminId);
       if (finished) {
         // Finished moves happened in the past.
@@ -668,6 +708,8 @@ export async function resetPlayground() {
     NotificationModel.deleteMany({ link: { $in: links } }),
     MoveRequestModel.deleteMany({ _id: { $in: requestIds } }),
     MoverDocumentModel.deleteMany({ storageKey: { $regex: `^${PG.storagePrefix}` } }),
+    VehicleModel.deleteMany({ plate: { $regex: '^PG-' } }),
+    TeamMemberModel.deleteMany({ role: { $regex: '\\(playground\\)$' } }),
     AvailabilityModel.deleteMany({ moverId: { $in: userIds } }),
     MoverProfileModel.deleteMany({ userId: { $in: userIds } }),
     AttendanceModel.deleteMany({ employee: { $in: employeeIds } }),
