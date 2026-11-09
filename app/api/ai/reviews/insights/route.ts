@@ -10,7 +10,8 @@ import {
   aiModel,
   insightsByRules,
   insightsPrompt,
-  isAiEnabled,
+  isAiAvailable,
+  markAiFailure,
 } from '@/server/modules/ai';
 
 export const maxDuration = 30;
@@ -32,8 +33,20 @@ export async function POST(request: Request) {
       api: '/api/ai/reviews/insights',
     });
 
-    if (!isAiEnabled() || corpus.length === 0) {
-      return new Response(JSON.stringify(insightsByRules(corpus)), {
+    if (!(await isAiAvailable()) || corpus.length === 0) {
+      const json = JSON.stringify(insightsByRules(corpus));
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        async start(controller) {
+          const chunkSize = 24;
+          for (let i = 0; i < json.length; i += chunkSize) {
+            controller.enqueue(encoder.encode(json.slice(i, i + chunkSize)));
+            await new Promise((resolve) => setTimeout(resolve, 16));
+          }
+          controller.close();
+        },
+      });
+      return new Response(stream, {
         headers: { 'Content-Type': 'text/plain; charset=utf-8' },
       });
     }
@@ -45,6 +58,9 @@ export async function POST(request: Request) {
       prompt: insightsPrompt(corpus),
       maxOutputTokens: AI_LIMITS.maxOutputTokens,
       abortSignal: AbortSignal.timeout(AI_LIMITS.timeoutMs),
+      onError: ({ error }) => {
+        markAiFailure(error);
+      },
     });
     return result.toTextStreamResponse();
   } catch (error) {

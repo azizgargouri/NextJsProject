@@ -4,6 +4,7 @@ import { requirePageUser } from '@/server/shared/auth/session';
 import { reviewsRepository, reviewsService } from '@/server/modules/reviews';
 import { connectMongo } from '@/server/shared/database/mongoose';
 import { UserModel } from '@/server/shared/database/models/user.model';
+import { MoverProfileModel } from '@/server/shared/database/models/mover-profile.model';
 import {
   EmptyBlock,
   PageTitle,
@@ -14,6 +15,7 @@ import { Stars } from '@/components/features/workspace/workspace-ui';
 import { ReviewForm } from '@/components/features/workspace/review-form';
 import { ReviewReplyForm } from '@/components/features/workspace/review-reply-form';
 import { RatingSummary } from '@/components/features/workspace/rating-summary';
+import type { CompletedMoveOption } from '@/components/features/workspace/claim-form';
 import type { RatingSummaryDto, ReviewDto } from '@/types';
 
 export const metadata: Metadata = { title: 'Reviews' };
@@ -54,15 +56,73 @@ export default async function ReviewsPage() {
   }
 
   await connectMongo();
-  const movers = await UserModel.find({ role: 'MOVER', status: 'ACTIVE', deletedAt: null })
-    .select('name')
-    .sort({ name: 1 })
-    .lean<{ _id: unknown; name: string }[]>();
+  const [movers, profiles] = await Promise.all([
+    UserModel.find({ role: 'MOVER', status: 'ACTIVE', deletedAt: null })
+      .select('name')
+      .sort({ name: 1 })
+      .lean<{ _id: unknown; name: string }[]>(),
+    MoverProfileModel.find()
+      .select('userId companyName')
+      .lean<{ userId: string; companyName?: string }[]>(),
+  ]);
+
+  const companyByUserId = new Map(
+    profiles.map((p) => [String(p.userId), p.companyName || undefined]),
+  );
+  const moverList = movers.map((mover) => {
+    const id = String(mover._id);
+    return {
+      id,
+      name: companyByUserId.get(id) ?? mover.name,
+    };
+  });
+
+  const primaryMover = moverList[0] ?? { id: '', name: 'MoveUp Certified Partner' };
+  const secondaryMover = moverList[1] ?? primaryMover;
+
+  const completedMoves: CompletedMoveOption[] = [
+    {
+      moveReference: 'MV-2026-0155',
+      route: 'Tunis (La Marsa) → Sousse (Kantaoui)',
+      completedDate: '07 Nov 2026',
+      truckTier: '20m³ Padded Van · 3 Crew + Lift',
+      moverId: primaryMover.id,
+      moverName: primaryMover.name,
+      totalPaidTnd: 680,
+    },
+    {
+      moveReference: 'MV-2026-0142',
+      route: 'Ariana (Ennasr 2) → Les Berges du Lac 2',
+      completedDate: '04 Nov 2026',
+      truckTier: '30m³ Heavy Box Truck · 4 Crew',
+      moverId: primaryMover.id,
+      moverName: primaryMover.name,
+      totalPaidTnd: 850,
+    },
+    {
+      moveReference: 'MV-2026-0118',
+      route: 'Tunis (El Menzah 6) → Hammamet Nord',
+      completedDate: '28 Oct 2026',
+      truckTier: '14m³ Urban Transit Van · 2 Crew',
+      moverId: primaryMover.id,
+      moverName: primaryMover.name,
+      totalPaidTnd: 490,
+    },
+    {
+      moveReference: 'MV-2026-0097',
+      route: 'Sousse (Sahloul) → Monastir Marina',
+      completedDate: '19 Oct 2026',
+      truckTier: '20m³ Padded Van · Fragile Pack',
+      moverId: secondaryMover.id,
+      moverName: secondaryMover.name,
+      totalPaidTnd: 540,
+    },
+  ];
 
   return (
     <div className="space-y-10">
       <PageTitle kicker="AFTER YOUR MOVE" title="RATE YOUR MOVER." />
-      <ReviewForm movers={movers.map((mover) => ({ id: String(mover._id), name: mover.name }))} />
+      <ReviewForm movers={moverList} completedMoves={completedMoves} />
       <section className="space-y-4">
         <h2 className="mono text-[11px]">My reviews ({page.meta.itemCount})</h2>
         {page.data.length === 0 ? (
@@ -96,7 +156,17 @@ function ReviewCard({
         <div className="flex items-center gap-3">
           <Stars value={review.rating} />
           <span className="mono text-[10px] text-ink-80">
-            {showStatus ? review.mover?.name : review.client?.name} · MOVE {review.moveReference}
+            {showStatus && review.mover ? (
+              <Link
+                href={`/movers/${review.mover.id}`}
+                className="underline underline-offset-4 hover:text-hazard"
+              >
+                {review.mover.name}
+              </Link>
+            ) : (
+              review.client?.name
+            )}{' '}
+            · MOVE {review.moveReference}
           </span>
         </div>
         <div className="flex items-center gap-3">

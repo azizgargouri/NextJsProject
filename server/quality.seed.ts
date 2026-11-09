@@ -5,7 +5,12 @@ import { UserModel } from './shared/database/models/user.model';
 import { MoverProfileModel } from './shared/database/models/mover-profile.model';
 import { ClaimModel } from './shared/database/models/claim.model';
 import { ReviewModel } from './shared/database/models/review.model';
-import { moderateReviewByRules, triageClaimByRules } from './modules/ai/ai.fallback';
+import {
+  mediateClaimByRules,
+  moderateReviewByRules,
+  triageClaimByRules,
+  VISION_DEMO_PRESETS,
+} from './modules/ai/ai.fallback';
 
 try {
   process.loadEnvFile();
@@ -103,6 +108,36 @@ async function seedQuality() {
   for (const claim of claims) {
     const triage = triageClaimByRules({ ...claim, category: claim.category });
     const createdAt = daysAgo(claim.created);
+    const isGlassClaim = claim.reference === 'CLM-DEMO-0001';
+    const glassPreset = VISION_DEMO_PRESETS[0]!;
+    const evidencePhotos = isGlassClaim ? [glassPreset.dataUrl] : [];
+    const visionAnalysis = isGlassClaim
+      ? {
+          ...glassPreset.analysis,
+          source: 'rules' as const,
+          model: null,
+          analyzedAt: createdAt,
+        }
+      : null;
+    const aiMediation = isGlassClaim
+      ? {
+          ...mediateClaimByRules({
+            reference: claim.reference,
+            category: claim.category,
+            priority: triage.priority,
+            subject: claim.subject,
+            description: claim.description,
+            amountClaimed: claim.amountClaimed,
+            moverRatingAvg: 3.5,
+            moverClaimsCount: 2,
+            visionSeverity: glassPreset.analysis.overallSeverity,
+            visionEstimatedCostTnd: glassPreset.analysis.recommendedClaimAmountTnd,
+          }),
+          source: 'rules' as const,
+          model: null,
+          generatedAt: createdAt,
+        }
+      : null;
     const timeline = [
       {
         kind: 'CREATED',
@@ -164,10 +199,14 @@ async function seedQuality() {
           subject: claim.subject,
           description: claim.description,
           amountClaimed: claim.amountClaimed,
+          evidencePhotos,
+          visionAnalysis,
           aiTriage: { ...triage, source: 'rules', model: null, createdAt },
+          aiMediation,
           resolution,
           timeline,
           createdAt,
+          updatedAt: timeline[timeline.length - 1]?.createdAt ?? createdAt,
         },
       },
       { upsert: true, timestamps: false },

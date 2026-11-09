@@ -6,12 +6,20 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { canTransitionClaim } from '../lib/quality/constants';
 import {
+  ClaimMediationSchema,
   ClaimTriageSchema,
+  DamageVisionSchema,
+  MoverScorecardSchema,
   ReviewInsightsSchema,
   ReviewModerationSchema,
 } from '../lib/quality/ai-schemas';
-import { moderateReviewByRules, triageClaimByRules } from '../server/modules/ai/ai.fallback';
-import { insightsByRules } from '../server/modules/ai/ai.insights';
+import {
+  analyzeDamageByRules,
+  mediateClaimByRules,
+  moderateReviewByRules,
+  triageClaimByRules,
+} from '../server/modules/ai/ai.fallback';
+import { insightsByRules, moverScorecardByRules } from '../server/modules/ai/ai.insights';
 import { ClaimAdminUpdateSchema, ClaimCreateSchema } from '../server/modules/claims/claims.schema';
 import { serializeClaim } from '../server/modules/claims/claims.serializer';
 import { ReviewCreateSchema } from '../server/modules/reviews/reviews.schema';
@@ -203,5 +211,75 @@ describe('rule-based review insights', () => {
     ]);
     assert.equal(ReviewInsightsSchema.safeParse(insights).success, true);
     assert.ok(insights.issues.some((issue) => /punctuality/i.test(issue)));
+  });
+});
+
+describe('multimodal vision damage assessment & AI dispute mediation', () => {
+  it('returns a schema-valid DamageVision assessment for presets and free hints', () => {
+    const presetVision = analyzeDamageByRules({ presetId: 'glass-table' });
+    assert.equal(DamageVisionSchema.safeParse(presetVision).success, true);
+    assert.equal(presetVision.overallSeverity, 'SEVERE');
+    assert.equal(presetVision.recommendedClaimAmountTnd, 450);
+
+    const hintVision = analyzeDamageByRules({
+      hint: '55 inch OLED TV screen shattered',
+      imageCount: 2,
+    });
+    assert.equal(DamageVisionSchema.safeParse(hintVision).success, true);
+    assert.equal(hintVision.overallSeverity, 'TOTAL_LOSS');
+
+    const plateVision = analyzeDamageByRules({
+      hint: 'broken plate',
+      imageCount: 1,
+    });
+    assert.equal(DamageVisionSchema.safeParse(plateVision).success, true);
+    assert.equal(plateVision.detectedItems[0]?.repairable, false);
+    assert.equal(plateVision.recommendedClaimAmountTnd, 12);
+
+    const multiVision = analyzeDamageByRules({
+      hint: 'SCRATCHED A SEAT, BROKE A TV SCREEN, BROKE A FRAMED PIC, BROKE TWO PLATES',
+      imageCount: 4,
+    });
+    assert.equal(DamageVisionSchema.safeParse(multiVision).success, true);
+    assert.equal(multiVision.detectedItems.length, 4);
+    assert.equal(multiVision.detectedItems[3]?.estimatedCostTnd, 24);
+    assert.equal(multiVision.detectedItems[3]?.repairable, false);
+  });
+
+  it('computes a schema-valid ClaimMediation compensation breakdown & liability split', () => {
+    const mediation = mediateClaimByRules({
+      reference: 'CLM-DEMO-0001',
+      category: 'DAMAGE',
+      priority: 'HIGH',
+      subject: 'Glass table broken during unloading',
+      description: 'The glass coffee table arrived with a large crack.',
+      amountClaimed: 450,
+      moverRatingAvg: 3.1,
+      moverClaimsCount: 2,
+      visionSeverity: 'SEVERE',
+      visionEstimatedCostTnd: 450,
+    });
+    assert.equal(ClaimMediationSchema.safeParse(mediation).success, true);
+    assert.equal(mediation.clientLiabilityPct + mediation.moverLiabilityPct, 100);
+    assert.ok(mediation.recommendedAmountTnd > 0);
+    assert.ok(mediation.compensationBreakdown.length >= 2);
+  });
+
+  it('produces a schema-valid MoverScorecard for the public mover profile', () => {
+    const scorecard = moverScorecardByRules({
+      moverName: 'Mehdi Transport',
+      summary: {
+        average: 4.2,
+        count: 5,
+        distribution: { 1: 0, 2: 1, 3: 0, 4: 1, 5: 3 },
+        punctuality: 4.0,
+        care: 4.5,
+        communication: 4.2,
+      },
+      claimsCount: 1,
+      comments: [{ rating: 5, comment: 'Careful team and on time.' }],
+    });
+    assert.equal(MoverScorecardSchema.safeParse(scorecard).success, true);
+    assert.ok(scorecard.trustScore >= 70);
   });
 });

@@ -82,16 +82,21 @@ export function StarInput({
   name,
   label,
   defaultValue,
+  onValueChange,
   required,
   error,
 }: {
   name: string;
   label: string;
   defaultValue?: number;
+  onValueChange?: (value: number) => void;
   required?: boolean;
   error?: string;
 }) {
   const [value, setValue] = React.useState(defaultValue ?? 0);
+  React.useEffect(() => {
+    if (defaultValue !== undefined) setValue(defaultValue);
+  }, [defaultValue]);
   return (
     <fieldset>
       <legend className="mono pb-2 text-[10px] text-ink-80">
@@ -107,7 +112,10 @@ export function StarInput({
               value={score}
               required={required && score === 1}
               checked={value === score}
-              onChange={() => setValue(score)}
+              onChange={() => {
+                setValue(score);
+                onValueChange?.(score);
+              }}
               className="peer sr-only"
             />
             <Star

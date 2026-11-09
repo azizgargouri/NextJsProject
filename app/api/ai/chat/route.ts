@@ -1,19 +1,27 @@
 import { NextResponse } from 'next/server';
-import { convertToModelMessages, stepCountIs, streamText, type UIMessage } from 'ai';
+import {
+  convertToModelMessages,
+  createUIMessageStream,
+  createUIMessageStreamResponse,
+  stepCountIs,
+  streamText,
+  type UIMessage,
+} from 'ai';
 import { errorResponse } from '@/server/shared/auth/guards';
 import { requireSessionUser } from '@/server/shared/auth/session';
 import { ValidationError } from '@/server/shared/database/errors';
 import { EventType, logEvent } from '@/server/shared/logger/audit';
 import {
   AI_LIMITS,
-  AiUnavailableError,
   aiModel,
   aiModelId,
+  answerChatByToolsFallback,
   assertChatQuota,
   buildTools,
   clearChatHistory,
-  isAiEnabled,
+  isAiAvailable,
   loadChatHistory,
+  markAiFailure,
   saveChatMessage,
   systemPrompt,
 } from '@/server/modules/ai';
@@ -31,11 +39,12 @@ function textOf(message: UIMessage): string {
 /**
  * POST /api/ai/chat — called by `useChat` (course ch.6 "Étape 1: Route Handler de streaming").
  * streamText + tools (multi-step) → UI message stream; onFinish persists the answer in MongoDB.
+ * When no cloud LLM key is configured, falls back to the Smart Agentic Tool Stream so live
+ * demos still show real tool calls and progressive token streaming over MongoDB data.
  */
 export async function POST(request: Request) {
   try {
     const user = await requireSessionUser(request);
-    if (!isAiEnabled()) throw new AiUnavailableError();
     await assertChatQuota(user.sub);
 
     const body = (await request.json().catch(() => null)) as { messages?: UIMessage[] } | null;
@@ -55,6 +64,48 @@ export async function POST(request: Request) {
       method: 'POST',
       api: '/api/ai/chat',
     });
+
+    if (!(await isAiAvailable())) {
+      const fallback = await answerChatByToolsFallback(user, question);
+      await saveChatMessage({
+        userId: user.sub,
+        role: 'assistant',
+        content: fallback.text,
+        tokens: Math.ceil(fallback.text.length / 4),
+        model: 'rules-agent',
+      });
+
+      const stream = createUIMessageStream({
+        execute: async ({ writer }) => {
+          const toolCallId = `call_${Date.now()}`;
+          writer.write({ type: 'start-step' });
+          writer.write({
+            type: 'tool-input-available',
+            toolCallId,
+            toolName: fallback.toolName,
+            input: fallback.toolInput,
+          });
+          writer.write({
+            type: 'tool-output-available',
+            toolCallId,
+            output: fallback.toolOutput,
+          });
+          writer.write({ type: 'finish-step' });
+          writer.write({ type: 'start-step' });
+          const textId = `txt_${Date.now()}`;
+          writer.write({ type: 'text-start', id: textId });
+          const words = fallback.text.split(/(\s+)/);
+          for (const word of words) {
+            if (!word) continue;
+            writer.write({ type: 'text-delta', id: textId, delta: word });
+            await new Promise((resolve) => setTimeout(resolve, 14));
+          }
+          writer.write({ type: 'text-end', id: textId });
+          writer.write({ type: 'finish-step' });
+        },
+      });
+      return createUIMessageStreamResponse({ stream });
+    }
 
     const result = streamText({
       model: aiModel(),
@@ -77,7 +128,10 @@ export async function POST(request: Request) {
     });
 
     return result.toUIMessageStreamResponse({
-      onError: () => 'The assistant could not answer right now. Please try again in a moment.',
+      onError: (error) => {
+        markAiFailure(error);
+        return 'Quota reached on cloud model — try your question again to use the instant local agent.';
+      },
     });
   } catch (error) {
     return errorResponse(error);
@@ -89,7 +143,7 @@ export async function GET(request: Request) {
   try {
     const user = await requireSessionUser(request);
     return NextResponse.json({
-      enabled: isAiEnabled(),
+      enabled: true,
       limitPerHour: AI_LIMITS.chatPerHour,
       messages: await loadChatHistory(user.sub),
     });

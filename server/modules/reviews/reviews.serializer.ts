@@ -65,9 +65,14 @@ export function serializeReview(
       : null,
     mover: mover ? { id: mover.id, name: mover.name } : null,
     moverReply: doc.moverReply
-      ? { text: doc.moverReply.text, createdAt: new Date(doc.moverReply.createdAt).toISOString() }
+      ? {
+          text: doc.moverReply.text,
+          createdAt: new Date(
+            doc.moverReply.createdAt ?? doc.createdAt ?? Date.now(),
+          ).toISOString(),
+        }
       : null,
-    createdAt: doc.createdAt.toISOString(),
+    createdAt: new Date(doc.createdAt ?? Date.now()).toISOString(),
   };
 
   if (audience === 'author') return { ...base, moderationNote: doc.moderationNote ?? null };

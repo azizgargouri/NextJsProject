@@ -15,20 +15,22 @@ import { Textarea } from './workspace-ui';
 
 const TOOL_LABELS: Record<string, string> = {
   'tool-listMyClaims': 'Reading your claims',
-  'tool-getClaimDetails': 'Opening the claim',
+  'tool-getClaimDetails': 'Opening the claim & Vision AI dossier',
   'tool-getMoverRating': 'Checking mover ratings',
+  'tool-estimateCompensation': 'Calculating compensation & liability split',
 };
 
 const SUGGESTIONS = {
   CLIENT: [
     'Where are my claims at?',
+    'Estimate compensation for a broken glass table (450 TND)',
+    'Check details of CLM-DEMO-0001',
     'Which mover has the best rating?',
-    'Comment ouvrir une réclamation ?',
   ],
   MOVER: [
     'Do I have open claims?',
+    'Estimate liability for a 300 TND damaged item',
     'What is my current rating?',
-    'How should I answer a bad review?',
   ],
 } as const;
 

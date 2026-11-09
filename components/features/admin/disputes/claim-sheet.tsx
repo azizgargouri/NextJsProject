@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useCompletion } from '@ai-sdk/react';
+import { experimental_useObject as useObject, useCompletion } from '@ai-sdk/react';
 import { toast } from 'sonner';
-import { Bot, CircleAlert, Sparkles, Square } from 'lucide-react';
+import { Bot, Camera, CheckCircle2, CircleAlert, Scale, Sparkles, Square } from 'lucide-react';
 import { AdminBadge } from '@/components/ui/admin-badge';
 import { AdminButton } from '@/components/ui/admin-button';
 import { AdminInput } from '@/components/ui/admin-input';
@@ -11,6 +11,7 @@ import { AdminSelect } from '@/components/ui/admin-select';
 import { AdminSheet } from '@/components/ui/admin-sheet';
 import { useAdminClaim, useClaimUpdate } from '@/hooks/content/admin';
 import { useAuthHeaders } from '@/hooks/use-auth-headers';
+import { ClaimMediationSchema } from '@/lib/quality/ai-schemas';
 import {
   CLAIM_CATEGORY_LABELS,
   CLAIM_OUTCOMES,
@@ -19,6 +20,7 @@ import {
   CLAIM_PRIORITY_LABELS,
   CLAIM_STATUS_LABELS,
   CLAIM_TRANSITIONS,
+  DAMAGE_SEVERITY_LABELS,
 } from '@/lib/quality/constants';
 import type { AdminClaimUpdatePayload, ClaimDto, ClaimOutcome, ClaimPriority } from '@/types';
 import {
@@ -30,6 +32,7 @@ import {
   apiErrorMessage,
 } from '../quality-ui';
 import { PRIORITY_VARIANT, STATUS_VARIANT } from './disputes-portal';
+import { EvidencePhotoGallery } from '@/components/features/workspace/evidence-photo-gallery';
 
 export function ClaimSheet({
   claimId,
@@ -77,10 +80,38 @@ function ClaimDetail({ claim }: { claim: ClaimDto }) {
     onError: () => toast.error('Draft could not be generated'),
   });
 
+  // AI SDK UI useObject (course ch.6 "streamObject + useObject"): streams structured arbitration & compensation.
+  const mediationStream = useObject({
+    api: `/api/ai/claims/${claim.id}/mediate`,
+    schema: ClaimMediationSchema,
+    headers,
+    onError: () => toast.error('AI mediation could not be generated'),
+  });
+
+  const activeMediation = mediationStream.object ?? claim.aiMediation ?? null;
+
   // Tokens stream into the decision textarea as they arrive.
   useEffect(() => {
     if (draft.completion) setDecision(draft.completion);
   }, [draft.completion]);
+
+  const applyMediationProposal = () => {
+    if (!activeMediation) return;
+    if (activeMediation.recommendedOutcome) {
+      setOutcome(activeMediation.recommendedOutcome);
+    }
+    if (activeMediation.recommendedAmountTnd !== undefined) {
+      setAmount(
+        activeMediation.recommendedOutcome === 'NO_ACTION'
+          ? ''
+          : String(activeMediation.recommendedAmountTnd),
+      );
+    }
+    if (activeMediation.draftResolutionNote) {
+      setDecision(activeMediation.draftResolutionNote);
+    }
+    toast.success('AI mediation proposal applied to the resolution form');
+  };
 
   const run = (payload: AdminClaimUpdatePayload, success: string) =>
     update.mutate(
@@ -133,6 +164,91 @@ function ClaimDetail({ claim }: { claim: ClaimDto }) {
           {claim.description}
         </p>
       </section>
+
+      {claim.evidencePhotos && claim.evidencePhotos.length > 0 ? (
+        <section className="space-y-2">
+          <h3 className="flex items-center gap-1.5 text-xs font-semibold">
+            <Camera className="size-3.5 text-primary" /> Photographic evidence (
+            {claim.evidencePhotos.length}) · Click to inspect
+          </h3>
+          <EvidencePhotoGallery
+            photos={claim.evidencePhotos}
+            detectedItems={claim.visionAnalysis?.detectedItems}
+            variant="admin"
+          />
+        </section>
+      ) : null}
+
+      {claim.visionAnalysis ? (
+        <section className="space-y-2.5 rounded-md border border-amber-500/40 bg-amber-500/5 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="flex items-center gap-2 text-xs font-semibold">
+              <Camera className="size-4 text-amber-500" /> Multimodal Vision AI Damage Scan
+            </h3>
+            <div className="flex flex-wrap gap-1.5">
+              <AdminBadge variant="destructive">
+                {DAMAGE_SEVERITY_LABELS[claim.visionAnalysis.overallSeverity]}
+              </AdminBadge>
+              <AdminBadge variant="outline">
+                Damage rate {claim.visionAnalysis.overallDamageRatePct ?? 65}%
+              </AdminBadge>
+              <SourceBadge
+                source={claim.visionAnalysis.source}
+                model={claim.visionAnalysis.model}
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-2 rounded-md border border-border bg-card p-2.5 text-xs">
+            <div>
+              <p className="text-muted-foreground">AI damage rate</p>
+              <p className="font-semibold text-destructive">
+                {claim.visionAnalysis.overallDamageRatePct ?? 65}%
+              </p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Estimated repair range</p>
+              <p className="font-semibold">
+                {claim.visionAnalysis.estimatedRepairMinTnd} –{' '}
+                {claim.visionAnalysis.estimatedRepairMaxTnd} TND
+              </p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Recommended indemnity</p>
+              <p className="font-semibold text-primary">
+                {claim.visionAnalysis.recommendedClaimAmountTnd} TND
+              </p>
+            </div>
+          </div>
+          <ul className="space-y-1.5 text-xs">
+            {claim.visionAnalysis.detectedItems.map((item, idx) => (
+              <li
+                key={idx}
+                className="flex items-center justify-between gap-2 rounded border border-border bg-card/60 px-2.5 py-1.5"
+              >
+                <div>
+                  <span className="font-medium">
+                    #{idx + 1} · {item.name}
+                  </span>{' '}
+                  <span className="text-muted-foreground">({item.material})</span>
+                  <p className="text-muted-foreground">{item.damageType}</p>
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="font-semibold">{item.estimatedCostTnd} TND</p>
+                  <p className="text-[11px] text-destructive">
+                    {item.damageRatePct ?? (item.repairable ? 45 : 95)}% damage
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ul>
+          {claim.visionAnalysis.authenticityNotes ? (
+            <p className="text-xs text-muted-foreground">
+              <span className="font-semibold text-foreground">Authenticity check: </span>
+              {claim.visionAnalysis.authenticityNotes}
+            </p>
+          ) : null}
+        </section>
+      ) : null}
 
       {claim.aiTriage ? (
         <section className="space-y-2 rounded-md border border-primary/40 bg-primary/5 p-4">
@@ -190,6 +306,137 @@ function ClaimDetail({ claim }: { claim: ClaimDto }) {
           </p>
         </section>
       ) : null}
+
+      {/* AI Dispute Mediator & Compensation Calculator (streamObject + useObject) */}
+      <section className="space-y-3 rounded-md border border-primary/40 bg-primary/5 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h3 className="flex items-center gap-2 text-xs font-semibold">
+              <Scale className="size-4 text-primary" /> AI Dispute Mediator & Compensation
+              Calculator
+            </h3>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Streams a structured settlement proposal cross-referencing vision evidence, mover
+              history & MoveUp policy rules.
+            </p>
+          </div>
+          {mediationStream.isLoading ? (
+            <AdminButton size="sm" variant="outline" onClick={mediationStream.stop}>
+              <Square /> Stop
+            </AdminButton>
+          ) : (
+            <AdminButton size="sm" variant="default" onClick={() => mediationStream.submit({})}>
+              <Sparkles /> {activeMediation ? 'Recalculate mediation' : 'Run AI Mediator'}
+            </AdminButton>
+          )}
+        </div>
+
+        {activeMediation ? (
+          <div className="space-y-3 border-t border-border/60 pt-3">
+            <div className="grid grid-cols-3 gap-2 rounded-md border border-border bg-card p-3 text-xs">
+              <div>
+                <p className="text-muted-foreground">Recommended outcome</p>
+                <p className="mt-0.5 font-semibold">
+                  {activeMediation.recommendedOutcome
+                    ? CLAIM_OUTCOME_LABELS[activeMediation.recommendedOutcome]
+                    : 'Calculating…'}
+                </p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Settlement amount</p>
+                <p className="mt-0.5 text-base font-bold text-primary">
+                  {activeMediation.recommendedAmountTnd !== undefined
+                    ? `${activeMediation.recommendedAmountTnd} TND`
+                    : '…'}
+                </p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Liability split</p>
+                <p className="mt-0.5 font-semibold">
+                  {activeMediation.moverLiabilityPct ?? 0}% Mover /{' '}
+                  {activeMediation.clientLiabilityPct ?? 0}% Client
+                </p>
+              </div>
+            </div>
+
+            {/* Visual Liability Split Bar */}
+            {activeMediation.moverLiabilityPct !== undefined ? (
+              <div className="space-y-1">
+                <div className="flex justify-between text-[11px] text-muted-foreground">
+                  <span>Mover responsibility ({activeMediation.moverLiabilityPct}%)</span>
+                  <span>
+                    Confidence{' '}
+                    {activeMediation.confidenceScore
+                      ? `${Math.round(activeMediation.confidenceScore * 100)}%`
+                      : '—'}
+                  </span>
+                </div>
+                <div className="flex h-2 w-full overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="bg-primary transition-all duration-300"
+                    style={{ width: `${activeMediation.moverLiabilityPct}%` }}
+                  />
+                </div>
+              </div>
+            ) : null}
+
+            {activeMediation.executiveSummary ? (
+              <p className="text-xs leading-5">{activeMediation.executiveSummary}</p>
+            ) : null}
+
+            {activeMediation.compensationBreakdown &&
+            activeMediation.compensationBreakdown.length > 0 ? (
+              <div className="rounded-md border border-border bg-card p-3">
+                <p className="text-xs font-semibold">Compensation breakdown (TND)</p>
+                <ul className="mt-2 divide-y divide-border text-xs">
+                  {activeMediation.compensationBreakdown
+                    .filter((row): row is NonNullable<typeof row> => Boolean(row && row.item))
+                    .map((row, idx) => (
+                      <li key={idx} className="flex items-start justify-between gap-2 py-1.5">
+                        <div>
+                          <p className="font-medium">{row.item}</p>
+                          {row.rationale ? (
+                            <p className="text-muted-foreground">{row.rationale}</p>
+                          ) : null}
+                        </div>
+                        <span className="shrink-0 font-mono font-semibold">
+                          {row.amountTnd !== undefined
+                            ? `${row.amountTnd >= 0 ? '' : '−'}${Math.abs(row.amountTnd)} TND`
+                            : '…'}
+                        </span>
+                      </li>
+                    ))}
+                </ul>
+              </div>
+            ) : null}
+
+            {activeMediation.policyCitations && activeMediation.policyCitations.length > 0 ? (
+              <div className="space-y-1">
+                <p className="text-xs font-semibold">Applicable policy & legal rules</p>
+                <ul className="space-y-1 text-xs text-muted-foreground">
+                  {activeMediation.policyCitations.filter(Boolean).map((citation, idx) => (
+                    <li key={idx} className="flex gap-2">
+                      <span className="mt-1.5 size-1 shrink-0 rounded-full bg-primary" />
+                      <span>{citation}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            {canResolve && !mediationStream.isLoading ? (
+              <AdminButton
+                size="sm"
+                variant="secondary"
+                onClick={applyMediationProposal}
+                className="w-full"
+              >
+                <CheckCircle2 /> Apply AI settlement proposal to decision form
+              </AdminButton>
+            ) : null}
+          </div>
+        ) : null}
+      </section>
 
       <section className="space-y-3 border-t border-border pt-5">
         <h3 className="text-xs font-semibold">Handle the claim</h3>
