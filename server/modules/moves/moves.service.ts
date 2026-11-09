@@ -1,10 +1,9 @@
-import { hashPassword } from '../../shared/auth/password';
-import { randomBytes } from 'node:crypto';
 import mongoose from 'mongoose';
 import { connectMongo } from '../../shared/database/mongoose';
-import { MoveModel, type MoveDoc, type MoveStage, type MoveStageKey } from '../../shared/database/models/move.model';
-import { MoverProfileModel } from '../../shared/database/models/mover-profile.model';
-import { UserModel } from '../../shared/database/models/user.model';
+import { MoveModel, type MoveDoc, type MoveStageKey } from '../../shared/database/models/move.model';
+import { MoveRequestModel, type MoveRequestDoc } from '../../shared/database/models/move-request.model';
+import { moverRepository } from '../mover/mover.repository';
+import { dispatchMove } from '../mover/mover.dispatch';
 import { NotFoundError, ValidationError, ForbiddenError } from '../../shared/database/errors';
 import type { MoveCreateInput } from './moves.schema';
 import type { AccessTokenPayload } from '../../shared/auth/jwt';
@@ -62,37 +61,27 @@ function serialize(move: MoveDoc) {
 }
 
 export class MovesService {
-  private async ensureDemoMover() {
-    await connectMongo();
-    let mover = await UserModel.findOne({ email: 'mover@moveup.tn' });
-    if (!mover) {
-      mover = await UserModel.create({
-        email: 'mover@moveup.tn',
-        passwordHash: await hashPassword('Demo#2026!'),
-        name: 'Mehdi Transport',
-        phone: '+21698123456',
-        role: 'MOVER',
-        locale: 'en',
-        status: 'ACTIVE',
-      });
-    }
-    await MoverProfileModel.findOneAndUpdate(
-      { userId: String(mover._id) },
-      {
-        $set: {
-          companyName: 'Mehdi Transport',
-          bio: 'Moving van, 14 m³ — Greater Tunis.',
-          zones: ['TUN'],
-          verificationStatus: 'APPROVED',
-        },
-      },
-      { upsert: true },
-    );
-    return mover;
+  private address(value: string) {
+    const normalized = value.toLowerCase();
+    const city = normalized.includes('sfax') ? 'Sfax' : normalized.includes('sousse') ? 'Sousse' : normalized.includes('bizerte') ? 'Bizerte' : normalized.includes('nabeul') ? 'Nabeul' : normalized.includes('kairouan') ? 'Kairouan' : 'Tunis';
+    const zone = city === 'Sfax' ? 'SFA' : city === 'Sousse' ? 'SOU' : city === 'Bizerte' ? 'BIZ' : city === 'Nabeul' ? 'NAB' : city === 'Kairouan' ? 'KAI' : 'TUN';
+    return { street: value, city, zone, postalCode: '', floor: 0, hasElevator: false, accessNotes: '' };
+  }
+
+  private serializeRequest(move: MoveRequestDoc) {
+    return {
+      id: String(move._id), reference: move.reference, clientId: move.clientId,
+      pickupAddress: move.pickup.street, destinationAddress: move.dropoff.street,
+      distance: 0, volume: move.volumeM3, estimatedPrice: move.estimatedPrice ?? 0,
+      currentStage: move.status, items: move.items.map((item, index) => ({ id: String(index), name: item.name, volume: 0, weight: 0, quantity: item.quantity })),
+      vehicle: { name: 'To be confirmed by mover', capacity: 0, payload: 0 },
+      mover: { userId: move.assignedMoverId ?? undefined, name: move.assignedMoverId ? 'Assigned mover' : 'Awaiting mover offers', phone: '', companyName: '' },
+      stages: [], createdAt: move.createdAt.toISOString(), updatedAt: move.updatedAt.toISOString(),
+    };
   }
 
   async create(input: MoveCreateInput, clientId: string) {
-    const mover = await this.ensureDemoMover();
+    await connectMongo();
     const volume = Number(input.items.reduce((total, item) => total + item.volume * item.quantity, 0).toFixed(2));
     const weight = Math.round(input.items.reduce((total, item) => total + item.weight * item.quantity, 0));
     const recommended = VEHICLES.find((candidate) => volume <= candidate.capacity && weight <= candidate.payload) ?? VEHICLES[VEHICLES.length - 1]!;
@@ -102,40 +91,21 @@ export class MovesService {
     }
     const vehicle = selected ?? recommended;
     const price = Math.round(vehicle.base + input.distance * 1.15 + volume * 4);
-    const now = new Date();
-    let cursor = now.getTime();
-    const stages: MoveStage[] = MOVE_STAGES_SPEC.map((stage, index) => {
-      if (index > 0) cursor += (MOVE_STAGES_SPEC[index - 1]?.minutes ?? 0) * 60_000;
-      return {
-        key: stage.key,
-        title: stage.title,
-        detail: stage.detail,
-        durationMinutes: stage.minutes,
-        estimatedAt: new Date(cursor),
-        completedAt: index <= 1 ? now : null,
-      };
-    });
     const reference = `MU-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
-    const trackingToken = randomBytes(24).toString('hex');
-
-    const move = await MoveModel.create({
+    const move = await moverRepository.createMove({
       reference,
       clientId,
-      trackingToken,
-      pickupAddress: input.pickupAddress,
-      destinationAddress: input.destinationAddress,
-      moveDate: input.moveDate ? new Date(input.moveDate) : null,
-      items: input.items,
-      volume,
-      distance: input.distance,
+      pickup: this.address(input.pickupAddress), dropoff: this.address(input.destinationAddress),
+      moveDate: input.moveDate ?? new Date(Date.now() + 86_400_000).toISOString().slice(0, 10), timeSlot: input.timeSlot ?? 'FULL_DAY',
+      housingType: '', sizeRooms: 0, volumeM3: volume, extraServices: [], notes: '',
+      items: input.items.map((item) => ({ name: item.name, quantity: item.quantity, category: '', isFragile: false, needsDisassembly: false })),
+      status: 'SUBMITTED', progressStage: null,
       estimatedPrice: price,
-      vehicle: { name: vehicle.name, capacity: vehicle.capacity, payload: vehicle.payload },
-      mover: { userId: String(mover._id), name: mover.name, phone: mover.phone, companyName: 'Mehdi Transport' },
-      currentStage: 'ASSIGNED',
-      stages,
+      finalPrice: null, assignedMoverId: null, assignedAt: null, deliveredAt: null, completedAt: null,
     });
-
-    return { ...serialize(move), trackingToken };
+    const { offersSent } = await dispatchMove(String(move._id), { actorId: clientId });
+    const refreshed = (await MoveRequestModel.findById(move._id).lean()) as MoveRequestDoc | null;
+    return { ...this.serializeRequest(refreshed ?? move), offersSent };
   }
 
   async findOne(identifier: string, trackingToken?: string | null, actor?: AccessTokenPayload | null) {
@@ -148,7 +118,17 @@ export class MovesService {
 
     const move = await MoveModel.findOne(query).select('+trackingToken');
     if (!move) {
-      throw new NotFoundError('Move not found with this reference or ID');
+      const request = await MoveRequestModel.findOne(
+        isMongoId ? { _id: identifier } : { reference: new RegExp(`^${identifier.trim()}$`, 'i') },
+      ).lean<MoveRequestDoc | null>();
+      if (!request) throw new NotFoundError('Move not found with this reference or ID');
+      const allowed = actor && (
+        actor.role === 'ADMIN' ||
+        (actor.role === 'CLIENT' && request.clientId === actor.sub) ||
+        (actor.role === 'MOVER' && request.assignedMoverId === actor.sub)
+      );
+      if (!allowed) throw new ForbiddenError('Please sign in to track this move');
+      return this.serializeRequest(request);
     }
 
     // Access authorization check
@@ -192,7 +172,14 @@ export class MovesService {
     }
 
     const moves = await MoveModel.find(query).sort({ createdAt: -1 }).limit(50);
-    return moves.map(serialize);
+    const requestQuery = actor.role === 'CLIENT'
+      ? { clientId: actor.sub }
+      : actor.role === 'MOVER'
+        ? { assignedMoverId: actor.sub }
+        : {};
+    const requests = await MoveRequestModel.find(requestQuery).sort({ createdAt: -1 }).limit(50).lean<MoveRequestDoc[]>();
+    return [...moves.map(serialize), ...requests.map((request) => this.serializeRequest(request))]
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
 
   async advance(identifier: string, stage: MoveStageKey, actor: AccessTokenPayload) {

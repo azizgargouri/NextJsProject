@@ -8,6 +8,7 @@ export const MoveCreateSchema = z.object({
   items: z.array(z.object({ id: z.string(), name: z.string(), volume: z.number().positive(), weight: z.number().positive(), quantity: z.number().int().positive() })).min(1),
   vehicleName: z.string().trim().min(2).optional(),
   moveDate: z.iso.date().optional(),
+  timeSlot: z.enum(['MORNING', 'AFTERNOON', 'FULL_DAY']).optional(),
 });
 
 export const MoveStageUpdateSchema = z.object({ stage: z.enum(MOVE_STAGE_KEYS) });

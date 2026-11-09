@@ -14,6 +14,7 @@ export interface MoveCreatePayload {
   vehicleName?: string;
   /** YYYY-MM-DD */
   moveDate?: string;
+  timeSlot?: 'MORNING' | 'AFTERNOON' | 'FULL_DAY';
 }
 
 export interface MoveStageDto {

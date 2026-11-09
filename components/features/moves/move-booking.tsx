@@ -277,6 +277,7 @@ export function MoveBooking() {
         items,
         vehicleName: vehicle.name,
         moveDate,
+        timeSlot: timeSlot as 'MORNING' | 'AFTERNOON' | 'FULL_DAY',
       });
 
       // Clear draft on successful creation
@@ -285,7 +286,7 @@ export function MoveBooking() {
       } catch {}
 
       setShowSignatureModal(false);
-      router.push(`/track/${response.move.id}?token=${response.move.trackingToken}`);
+      router.push(`/track/${response.move.id}`);
     } catch (submitError: unknown) {
       const axiosErr = submitError as {
         response?: { status?: number; data?: { code?: string; message?: string } };
