@@ -16,7 +16,8 @@
     "db:seed:demo-moves": "tsx server/seeds/demo-moves.seed.ts",
     "db:playground": "tsx server/seeds/playground.seed.ts",
     "test": "tsx --test tests/*.test.ts",
-    "test:e2e": "node tests/e2e/smart-room.e2e.mjs"
+    "test:e2e": "node tests/e2e/smart-room.e2e.mjs",
+    "test:api": "node scripts/api-smoke.mjs"
   },
   "dependencies": {
     "@ai-sdk/google": "^2.0.0",
@@ -40,9 +41,9 @@
     "ethers": "6.13.4",
     "gsap": "^3.13.0",
     "jose": "^6.1.0",
+    "jsqr": "^1.4.0",
     "leaflet": "^1.9.4",
     "lenis": "^1.3.27",
-    "jsqr": "^1.4.0",
     "lucide-react": "^0.545.0",
     "mongoose": "^9.11.4",
     "next": "^15.5.4",

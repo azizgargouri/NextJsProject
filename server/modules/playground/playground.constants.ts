@@ -1,12 +1,5 @@
 /** Modules the seeder playground can fill, in the order they are seeded. */
-export const PLAYGROUND_MODULES = [
-  'accounts',
-  'bookings',
-  'mover',
-  'smartRooms',
-  'quality',
-  'hr',
-] as const;
+export const PLAYGROUND_MODULES = ['accounts', 'bookings', 'smartRooms', 'quality', 'hr'] as const;
 
 export type PlaygroundModule = (typeof PLAYGROUND_MODULES)[number];
 

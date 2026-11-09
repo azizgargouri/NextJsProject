@@ -1,5 +1,11 @@
 import { connectMongo } from '../../shared/database/mongoose';
 import { MoveModel, type MoveDoc } from '../../shared/database/models/move.model';
+import {
+  MoveRequestModel,
+  type MoveRequestDoc,
+} from '../../shared/database/models/move-request.model';
+import { MoverProfileModel } from '../../shared/database/models/mover-profile.model';
+import { UserModel } from '../../shared/database/models/user.model';
 
 /** A client's move, shaped for the claim and review move pickers. */
 export interface ClientMoveOption {
@@ -11,6 +17,14 @@ export interface ClientMoveOption {
   moverName: string;
   totalPaidTnd: number;
 }
+
+const REQUEST_STATUS_LABELS: Record<string, string> = {
+  ASSIGNED: 'Mover assigned',
+  EN_ROUTE: 'En route',
+  IN_PROGRESS: 'In progress',
+  DELIVERED: 'Delivered',
+  COMPLETED: 'Completed',
+};
 
 const STAGE_LABELS: Record<MoveDoc['currentStage'], string> = {
   CONFIRMED: 'Confirmed',
@@ -35,12 +49,45 @@ const formatDay = (date: Date) =>
  */
 export async function clientMoveOptions(clientId: string): Promise<ClientMoveOption[]> {
   await connectMongo();
-  const moves = await MoveModel.find({ clientId })
-    .sort({ createdAt: -1 })
-    .limit(30)
-    .lean<MoveDoc[]>();
+  // Booked requests that reached a mover (a claim or review needs one), plus legacy Moves.
+  const [requests, moves] = await Promise.all([
+    MoveRequestModel.find({ clientId, assignedMoverId: { $ne: null } })
+      .sort({ createdAt: -1 })
+      .limit(30)
+      .lean<MoveRequestDoc[]>(),
+    MoveModel.find({ clientId }).sort({ createdAt: -1 }).limit(30).lean<MoveDoc[]>(),
+  ]);
+  const moverIds = [...new Set(requests.map((request) => request.assignedMoverId!))];
+  const [users, profiles] = await Promise.all([
+    UserModel.find({ _id: { $in: moverIds } })
+      .select('name')
+      .lean<{ _id: unknown; name: string }[]>(),
+    MoverProfileModel.find({ userId: { $in: moverIds } })
+      .select('userId companyName')
+      .lean<{ userId: string; companyName?: string }[]>(),
+  ]);
+  const nameOf = (id: string) =>
+    profiles.find((profile) => profile.userId === id)?.companyName ||
+    users.find((user) => String(user._id) === id)?.name ||
+    'Assigned mover';
 
-  return moves.map((move) => {
+  const fromRequests: ClientMoveOption[] = requests.map((request) => {
+    const day = request.completedAt ?? new Date(`${request.moveDate}T00:00:00`);
+    return {
+      moveReference: request.reference,
+      route: `${request.pickup.street} → ${request.dropoff.street}`,
+      completedDate:
+        request.status === 'COMPLETED'
+          ? formatDay(day)
+          : `${formatDay(day)} · ${REQUEST_STATUS_LABELS[request.status] ?? request.status}`,
+      truckTier: `${request.vehicleName ?? 'Vehicle to confirm'} · ${request.volumeM3} m³`,
+      moverId: request.assignedMoverId!,
+      moverName: nameOf(request.assignedMoverId!),
+      totalPaidTnd: request.finalPrice ?? request.estimatedPrice ?? 0,
+    };
+  });
+
+  const fromMoves = moves.map((move) => {
     const completedAt = move.stages.find((stage) => stage.key === 'COMPLETED')?.completedAt;
     const day = completedAt ?? move.moveDate ?? move.createdAt;
     return {
@@ -56,4 +103,5 @@ export async function clientMoveOptions(clientId: string): Promise<ClientMoveOpt
       totalPaidTnd: move.estimatedPrice,
     };
   });
+  return [...fromRequests, ...fromMoves];
 }

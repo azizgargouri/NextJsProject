@@ -957,8 +957,7 @@ export type {
 
 // ── Seeder playground (admin) ───────────────────────────────────────────
 
-export type PlaygroundModuleKey =
-  'accounts' | 'bookings' | 'mover' | 'smartRooms' | 'quality' | 'hr';
+export type PlaygroundModuleKey = 'accounts' | 'bookings' | 'smartRooms' | 'quality' | 'hr';
 
 export interface PlaygroundDto {
   enabled: boolean;

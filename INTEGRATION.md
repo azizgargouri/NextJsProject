@@ -130,12 +130,25 @@ Followed `CLAUDE_MOVER_INTEGRATION_GUIDE.md` (from the member6 branch). The qual
 - Admin: Move requests, Assignments, Disputes and Customer reviews no longer show "Soon" (their portals are built); Mover reviews still does.
 - Verified as `mover@moveup.tn`: claims list and detail stay in `/mover`, reviews, assistant, scorecard generation; the client's claim links still go to `/dashboard`.
 
+### `requests-and-inventory` (aziz) — merged 2026-11-09, merge `5fb46d8`
+
+Bookings now create a mover-side `MoveRequest` (instead of a legacy `Move` assigned to a hard-coded demo mover) and are dispatched to eligible movers straight away; the zone is inferred from the address. Tracking shows the request's history and its quotes, which the client can accept. No conflicts; `package-lock.json` removed again.
+
+Completing the module on top of it:
+
+- **Client tracking** (`server/modules/moves/moves.service.ts`): the 8-step timeline is rebuilt from the request's status history, with the real assigned mover, distance and vehicle (now stored on the request). `currentStage` is the timeline step, `status` the request status.
+- **Progress rules:** the assigned mover reports each step (mover app or tracking page, with the photo and load checks); the client's last step confirms delivery, which completes the job and creates the earning; admins cannot advance booked requests (the admin bookings page shows "Awaiting mover" / "Mover reports").
+- **Everything reads bookings:** Smart Room Layout and the claim/review move pickers include booked requests; request items keep their catalogue id for real furniture sizes.
+- **Mock data:** `yarn db:playground` books through the real flow — 8 clients, 5 movers in six cities, 45 bookings across every stage, houses, claims, reviews, HR.
+- **API smoke test:** `yarn test:api` (dev server running) calls all 102 routes as four users; it found and fixed two crashes.
+
+Verified end to end: booking → offer → accept or quote → en route → loading → in transit → delivered → client confirms → earning, through the API and the browser. Checks: tsc, eslint 0, 21/21 tests, 150/150 mover tests, next build.
+
 ## Waiting to be integrated
 
 Measured against `dev` on 2026-11-09, after the `main` sync:
 
-| Branch                   | Author      | Not yet in `dev`       |
-| ------------------------ | ----------- | ---------------------- |
-| `requests-and-inventory` | aziz        | nothing (fully merged) |
-| `unified-all-features`   | aziz        | nothing (fully merged) |
-| `mover-side`             | Salhi Firas | nothing (fully merged) |
+| Branch                 | Author      | Not yet in `dev`       |
+| ---------------------- | ----------- | ---------------------- |
+| `unified-all-features` | aziz        | nothing (fully merged) |
+| `mover-side`           | Salhi Firas | nothing (fully merged) |

@@ -599,14 +599,13 @@ export const en = {
     logins: (domain: string, password: string) =>
       `Playground accounts use @${domain} emails (e.g. yasmine@${domain}, carthage@${domain}) and the password ${password}. They also add data to client@moveup.tn and mover@moveup.tn.`,
     modules: {
-      accounts: { title: 'Accounts', body: 'Three clients and two movers, approved and insured.' },
-      bookings: {
-        title: 'Bookings & tracking',
-        body: 'Four bookings per client: assigned, en route, in transit and completed.',
+      accounts: {
+        title: 'Accounts',
+        body: 'Eight clients and five movers across six cities, approved and insured.',
       },
-      mover: {
-        title: 'Mover workspace',
-        body: 'Requests dispatched to mover@moveup.tn: open offers, an assigned job, one loading, one completed with its earning.',
+      bookings: {
+        title: 'Bookings & mover jobs',
+        body: 'Five bookings per client through the real flow: dispatched to movers, quoted, accepted, en route, loading, in transit, delivered and completed with earnings.',
       },
       smartRooms: {
         title: 'Smart rooms',
@@ -614,7 +613,7 @@ export const en = {
       },
       quality: {
         title: 'Claims & reviews',
-        body: 'A claim and a review on every completed booking; mover ratings updated.',
+        body: 'A review on every completed booking and claims on most of them; mover ratings updated.',
       },
       hr: {
         title: 'HR',
@@ -626,6 +625,10 @@ export const en = {
       movers: 'movers',
       bookings: 'bookings',
       requests: 'requests',
+      quotes: 'quotes',
+      active: 'in progress',
+      delivered: 'awaiting confirmation',
+      completed: 'completed',
       openOffers: 'open offers',
       jobs: 'jobs',
       earnings: 'earnings',

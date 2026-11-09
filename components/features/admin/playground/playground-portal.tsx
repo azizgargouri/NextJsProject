@@ -11,7 +11,6 @@ import {
   Sparkles,
   Trash2,
   Truck,
-  UserRound,
   Users,
   type LucideIcon,
 } from 'lucide-react';
@@ -28,7 +27,6 @@ import { useAdminShell } from '../shell/admin-shell-context';
 const ICONS: Record<PlaygroundModuleKey, LucideIcon> = {
   accounts: Users,
   bookings: Truck,
-  mover: UserRound,
   smartRooms: Home,
   quality: MessageSquareWarning,
   hr: BriefcaseBusiness,
