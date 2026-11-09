@@ -54,6 +54,7 @@ export async function POST(request: Request) {
     const result = streamObject({
       model: aiModel(),
       schema: ReviewInsightsSchema,
+      maxRetries: 0,
       system: 'You are a customer-experience analyst for a moving-service marketplace.',
       prompt: insightsPrompt(corpus),
       maxOutputTokens: AI_LIMITS.maxOutputTokens,

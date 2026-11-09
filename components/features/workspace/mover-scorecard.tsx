@@ -19,6 +19,7 @@ export function MoverScorecardCard({ moverId, moverName }: { moverId: string; mo
   const { object, submit, isLoading, error } = useObject({
     api: `/api/ai/movers/${moverId}/scorecard`,
     schema: MoverScorecardSchema,
+    credentials: 'include',
   });
 
   const bars = [
@@ -139,4 +140,3 @@ export function MoverScorecardCard({ moverId, moverName }: { moverId: string; mo
     </section>
   );
 }
-

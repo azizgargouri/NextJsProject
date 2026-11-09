@@ -85,19 +85,28 @@ const SEVERITY_BADGE_CLASSES: Record<DamageSeverity, string> = {
  * Downscales large smartphone/camera photos on a client canvas so up to 8 uploaded photos
  * stay fast over the wire and fit comfortably inside JSON & Server Action payloads.
  */
-async function compressImageDataUrl(dataUrl: string, maxDim = 960, quality = 0.8): Promise<string> {
+async function compressImageDataUrl(
+  dataUrl: string,
+  maxDim = 800,
+  quality = 0.72,
+): Promise<string> {
   if (!dataUrl.startsWith('data:image/') || dataUrl.startsWith('data:image/svg+xml')) {
     return dataUrl;
   }
-  if (dataUrl.length < 180_000) return dataUrl;
 
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
       try {
-        const scale = Math.min(1, maxDim / Math.max(img.width || 1, img.height || 1));
-        const width = Math.max(1, Math.round(img.width * scale));
-        const height = Math.max(1, Math.round(img.height * scale));
+        const origW = img.naturalWidth || img.width || 1;
+        const origH = img.naturalHeight || img.height || 1;
+        if (Math.max(origW, origH) <= maxDim && dataUrl.length < 80_000) {
+          resolve(dataUrl);
+          return;
+        }
+        const scale = Math.min(1, maxDim / Math.max(origW, origH));
+        const width = Math.max(1, Math.round(origW * scale));
+        const height = Math.max(1, Math.round(origH * scale));
         const canvas = document.createElement('canvas');
         canvas.width = width;
         canvas.height = height;
@@ -172,7 +181,7 @@ async function renderAnnotatedImage(rawSrc: string, boxes: RoiBox[]): Promise<st
           ctx.fillText(tagText, rx + 6, tagY + fontSize);
         });
 
-        resolve(canvas.toDataURL('image/jpeg', 0.84));
+        resolve(canvas.toDataURL('image/jpeg', 0.75));
       } catch {
         resolve(rawSrc);
       }
@@ -240,6 +249,7 @@ export function ClaimForm({
   useEffect(() => {
     fetch('/api/ai/claims/vision', {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
+      credentials: 'include',
     })
       .then((res) => (res.ok ? (res.json() as Promise<{ presets: DemoPreset[] }>) : null))
       .then((data) => {
@@ -400,6 +410,7 @@ export function ClaimForm({
           'Content-Type': 'application/json',
           ...(currentToken ? { Authorization: `Bearer ${currentToken}` } : {}),
         },
+        credentials: 'include',
         body: JSON.stringify({
           images: entries.map((e) => e.annotatedSrc),
           hint: hintText || undefined,

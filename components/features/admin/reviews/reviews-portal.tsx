@@ -256,6 +256,7 @@ function InsightsCard() {
     api: '/api/ai/reviews/insights',
     schema: ReviewInsightsSchema,
     headers,
+    credentials: 'include',
     onError: () => toast.error('Insights could not be generated'),
   });
   const data = insights.object;

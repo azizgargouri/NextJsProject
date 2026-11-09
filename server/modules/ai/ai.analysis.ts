@@ -48,6 +48,7 @@ export async function triageClaim(input: {
     const { object } = await generateObject({
       model: aiModel(),
       schema: ClaimTriageSchema,
+      maxRetries: 0,
       system:
         'You are the claims triage assistant of MoveUp, a Tunisian moving company. ' +
         'Classify the client claim. Be neutral: never promise compensation. ' +
@@ -79,6 +80,7 @@ export async function moderateReview(input: {
     const { object } = await generateObject({
       model: aiModel(),
       schema: ReviewModerationSchema,
+      maxRetries: 0,
       system:
         'You moderate customer reviews of moving companies. Negative but honest reviews are ' +
         'NOT toxic. Flag only insults, threats, hate speech, personal data or spam.',
@@ -116,6 +118,7 @@ export async function suggestMoverReply(input: {
   try {
     const { text } = await generateText({
       model: aiModel(),
+      maxRetries: 0,
       system:
         `You write short, professional public replies for the moving company "${input.moverName}". ` +
         'Max 3 sentences, same language as the review, no promises of money, no personal data.',
@@ -160,6 +163,7 @@ export async function suggestClaimThreadMessage(input: {
   try {
     const { text } = await generateText({
       model: aiModel(),
+      maxRetries: 0,
       system:
         `You are an AI dispute communication coach on MoveUp (Tunisian moving platform). ` +
         `Write a concise, polite, factual 2-3 sentence message from the perspective of the ${input.actorRole} ` +
@@ -184,7 +188,15 @@ export async function suggestClaimThreadMessage(input: {
  * uploads a photo without typing an item description hint.
  */
 async function captionPhotosWithLocalLlava(images: string[]): Promise<string | null> {
-  if (process.env.NODE_ENV === 'test') return null;
+  // Never attempt to contact localhost Ollama in test, serverless (Vercel / Lambda), or unless explicitly enabled
+  if (
+    process.env.NODE_ENV === 'test' ||
+    process.env.VERCEL ||
+    process.env.AWS_LAMBDA_FUNCTION_NAME ||
+    !process.env.ENABLE_LOCAL_LLAVA
+  ) {
+    return null;
+  }
   const base64Images = images
     .filter((img) => img.startsWith('data:image/') && !img.startsWith('data:image/svg+xml'))
     .slice(0, 4)
@@ -206,7 +218,7 @@ async function captionPhotosWithLocalLlava(images: string[]): Promise<string | n
           stream: false,
           options: { num_predict: 25, temperature: 0.1 },
         }),
-        signal: AbortSignal.timeout(9_000),
+        signal: AbortSignal.timeout(1_500),
       });
       if (!res.ok) return null;
       const data = (await res.json()) as { response?: string };
@@ -272,6 +284,7 @@ export async function analyzeClaimEvidencePhotos(input: {
     const { object } = await generateObject({
       model: aiModel(),
       schema: DamageVisionSchema,
+      maxRetries: 0,
       system:
         'You are the Multimodal Vision AI Damage Inspector for MoveUp, a Tunisian moving-service platform. ' +
         'Inspect the attached moving damage photo(s). Identify the damaged furniture or household item(s), ' +

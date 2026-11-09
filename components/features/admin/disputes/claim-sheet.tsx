@@ -77,6 +77,7 @@ function ClaimDetail({ claim }: { claim: ClaimDto }) {
     api: `/api/ai/claims/${claim.id}/draft`,
     streamProtocol: 'text',
     headers,
+    credentials: 'include',
     onError: () => toast.error('Draft could not be generated'),
   });
 
@@ -85,6 +86,7 @@ function ClaimDetail({ claim }: { claim: ClaimDto }) {
     api: `/api/ai/claims/${claim.id}/mediate`,
     schema: ClaimMediationSchema,
     headers,
+    credentials: 'include',
     onError: () => toast.error('AI mediation could not be generated'),
   });
 

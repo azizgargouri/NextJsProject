@@ -87,6 +87,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const result = streamObject({
       model: aiModel(),
       schema: ClaimMediationSchema,
+      maxRetries: 0,
       system:
         'You are the Senior Dispute Arbitrator & Compensation Calculator for MoveUp (Tunisia). ' +
         'Evaluate the claim objectively using the client statement, Vision AI evidence, mover history, ' +

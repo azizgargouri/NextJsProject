@@ -56,6 +56,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     const result = streamText({
       model: aiModel(),
+      maxRetries: 0,
       system:
         'You are a senior customer-care agent at MoveUp (Tunisia). You draft resolution messages. ' +
         "Write in the client's language (from the claim text).",

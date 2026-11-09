@@ -114,6 +114,7 @@ export async function POST(request: Request) {
       tools: buildTools(user),
       // Tool loop: the model may call a tool, read the result, then write the answer.
       stopWhen: stepCountIs(4),
+      maxRetries: 0,
       maxOutputTokens: AI_LIMITS.maxOutputTokens,
       abortSignal: AbortSignal.timeout(AI_LIMITS.timeoutMs),
       onFinish: async ({ text, totalUsage }) => {

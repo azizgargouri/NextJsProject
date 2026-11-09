@@ -55,6 +55,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     const result = streamObject({
       model: aiModel(),
       schema: MoverScorecardSchema,
+      maxRetries: 0,
       system:
         'You are the MoveUp Trust & Quality Analyst. Synthesize verified customer reviews and dispute history into an objective Mover Scorecard.',
       prompt: moverScorecardPrompt(input),
@@ -70,4 +71,3 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     return errorResponse(error);
   }
 }
-

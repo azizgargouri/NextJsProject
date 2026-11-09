@@ -94,7 +94,8 @@ export async function isAiAvailable(): Promise<boolean> {
       model: aiModel(),
       prompt: 'Reply with OK',
       maxOutputTokens: 5,
-      abortSignal: AbortSignal.timeout(6_000),
+      maxRetries: 0,
+      abortSignal: AbortSignal.timeout(2_000),
     });
     lastProbeOk = true;
   } catch (error) {
@@ -113,8 +114,12 @@ export function aiModel() {
 export const AI_LIMITS = {
   /** Hard ceiling on generated tokens per call. */
   maxOutputTokens: 700,
-  /** Abort the provider call after this many ms and fall back / show an error. */
-  timeoutMs: 25_000,
+  /**
+   * Abort the provider call after this many ms and fall back / show an error.
+   * Capped to 8s so serverless environments (e.g. Vercel Hobby 10s ceiling) abort
+   * cleanly and execute the grounded fallback before Lambda execution times out.
+   */
+  timeoutMs: 8_000,
   /** Chat messages per user per rolling hour. */
   chatPerHour: Number(process.env.AI_RATE_LIMIT_PER_HOUR ?? 30),
   /** Only the latest N chat messages are sent back to the model (cost + context). */
