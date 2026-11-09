@@ -6,6 +6,7 @@ import * as Tooltip from '@radix-ui/react-tooltip';
 import { ChevronsLeft, ChevronsRight, LockKeyhole } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AdminButton } from '@/components/ui/admin-button';
+import { useAdminI18n } from '@/lib/i18n/admin';
 import { adminNavGroups, type AdminNavItem } from './admin-nav';
 
 interface AdminSidebarProps {
@@ -24,6 +25,7 @@ export function AdminSidebar({
   showCollapse = true,
 }: AdminSidebarProps) {
   const pathname = usePathname();
+  const { m } = useAdminI18n();
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-sidebar text-sidebar-foreground">
@@ -32,7 +34,7 @@ export function AdminSidebar({
           href="/admin"
           onClick={onNavigate}
           className="flex min-w-0 items-center gap-2.5 rounded-md outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-          aria-label="MoveUp Admin overview"
+          aria-label={m.shell.homeLabel}
         >
           <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary text-sm font-bold text-primary-foreground">
             M
@@ -40,7 +42,7 @@ export function AdminSidebar({
           {!compact ? (
             <span className="min-w-0 leading-tight">
               <span className="block truncate text-sm font-bold">MoveUp</span>
-              <span className="block truncate text-xs text-muted-foreground">Admin Panel</span>
+              <span className="block truncate text-xs text-muted-foreground">{m.shell.panel}</span>
             </span>
           ) : null}
         </Link>
@@ -48,13 +50,13 @@ export function AdminSidebar({
 
       <nav
         className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-2 py-3"
-        aria-label="Admin"
+        aria-label={m.shell.navLabel}
       >
         {adminNavGroups.map((group, groupIndex) => (
-          <div key={group.label} className={cn(groupIndex > 0 && 'mt-5')}>
+          <div key={group.key} className={cn(groupIndex > 0 && 'mt-5')}>
             {!compact ? (
               <p className="mb-1.5 px-2 text-[11px] font-semibold text-muted-foreground">
-                {group.label}
+                {m.nav.groups[group.key]}
               </p>
             ) : groupIndex > 0 ? (
               <div className="mx-2 mb-2 border-t border-sidebar-border" />
@@ -62,7 +64,7 @@ export function AdminSidebar({
             <div className="space-y-1">
               {group.items.map((item) => (
                 <SidebarItem
-                  key={item.label}
+                  key={item.key}
                   item={item}
                   pathname={pathname}
                   compact={compact}
@@ -81,10 +83,10 @@ export function AdminSidebar({
             size={compact ? 'iconSm' : 'sm'}
             className={cn('text-muted-foreground', !compact && 'w-full justify-start')}
             onClick={onCollapse}
-            aria-label={collapsedState ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-label={collapsedState ? m.shell.expandSidebar : m.shell.collapseSidebar}
           >
             {collapsedState ? <ChevronsRight /> : <ChevronsLeft />}
-            {!compact ? <span>{collapsedState ? 'Pin open' : 'Collapse'}</span> : null}
+            {!compact ? <span>{collapsedState ? m.shell.pinOpen : m.shell.collapse}</span> : null}
           </AdminButton>
         </div>
       ) : null}
@@ -104,6 +106,8 @@ function SidebarItem({
   onNavigate?: () => void;
 }) {
   const Icon = item.icon;
+  const { m } = useAdminI18n();
+  const label = m.nav.items[item.key];
   const active = item.href
     ? item.href === '/admin'
       ? pathname === '/admin'
@@ -114,7 +118,7 @@ function SidebarItem({
     <Link
       href={item.href}
       onClick={onNavigate}
-      aria-label={compact ? item.label : undefined}
+      aria-label={compact ? label : undefined}
       aria-current={active ? 'page' : undefined}
       className={cn(
         'flex h-9 items-center gap-3 rounded-md px-2 text-sm outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50',
@@ -129,10 +133,10 @@ function SidebarItem({
       <Icon className="size-4 shrink-0" />
       {!compact ? (
         <>
-          <span className="min-w-0 flex-1 truncate">{item.label}</span>
+          <span className="min-w-0 flex-1 truncate">{label}</span>
           {item.upcoming ? (
             <span className="rounded-md border border-sidebar-border px-1.5 py-0.5 text-[10px]">
-              Soon
+              {m.shell.soon}
             </span>
           ) : null}
         </>
@@ -151,7 +155,7 @@ function SidebarItem({
           sideOffset={8}
           className="z-[130] flex items-center gap-2 rounded-md border border-border bg-popover px-2 py-1.5 text-xs text-popover-foreground shadow-md"
         >
-          {item.label}
+          {label}
           {item.upcoming ? <LockKeyhole className="size-3 text-muted-foreground" /> : null}
         </Tooltip.Content>
       </Tooltip.Portal>

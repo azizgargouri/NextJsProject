@@ -25,21 +25,10 @@ import { AdminInput } from '@/components/ui/admin-input';
 import { AdminSelect } from '@/components/ui/admin-select';
 import { useAdminPricing, useDeletePricingRule, useUpdatePricingRule } from '@/hooks/content/admin';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
+import { useAdminI18n } from '@/lib/i18n/admin';
 import type { PricingRuleDto, PricingStatus, ServerErrorResponse } from '@/types';
 import { useAdminShell } from '../shell/admin-shell-context';
 import { PricingFormSheet, type PricingFormMode } from './pricing-form-sheet';
-
-const STATUS_OPTIONS = [
-  { value: 'ALL', label: 'All statuses' },
-  { value: 'ACTIVE', label: 'Active' },
-  { value: 'RETIRED', label: 'Retired' },
-];
-
-const money = new Intl.NumberFormat('en-US', {
-  minimumFractionDigits: 3,
-  maximumFractionDigits: 3,
-});
-const dayFormatter = new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium' });
 
 type SortField = 'name' | 'status' | 'createdAt' | 'baseFare';
 type SortDirection = 'ASC' | 'DESC';
@@ -70,15 +59,20 @@ export function PricingPortal() {
   });
   const updateRule = useUpdatePricingRule();
   const deleteRule = useDeletePricingRule();
+  const { m } = useAdminI18n();
+  const statusOptions = (['ALL', 'ACTIVE', 'RETIRED'] as const).map((value) => ({
+    value,
+    label: m.pricing.statusOptions[value],
+  }));
 
   useEffect(() => {
     publishPage({
-      breadcrumbs: [{ label: 'Admin', href: '/admin' }, { label: 'Pricing rules' }],
-      title: 'Pricing rules',
-      description: 'Tune base fares, distance and volume multipliers, and service surcharges.',
+      breadcrumbs: [{ label: m.common.admin, href: '/admin' }, { label: m.pricing.title }],
+      title: m.pricing.title,
+      description: m.pricing.description,
       actions: (
         <AdminButton size="sm" onClick={() => setFormState({ mode: 'create', rule: null })}>
-          <Plus /> New rule
+          <Plus /> {m.pricing.newRule}
         </AdminButton>
       ),
     });
@@ -86,19 +80,19 @@ export function PricingPortal() {
       clearPage();
       clearFooter();
     };
-  }, [clearFooter, clearPage, publishPage]);
+  }, [clearFooter, clearPage, m, publishPage]);
 
   useEffect(() => setPage(1), [debouncedSearch, status, sortField, sortDirection]);
 
   const footer = useMemo(() => {
     if (!pricing.data) {
-      return <p className="text-xs text-muted-foreground">Loading rule pagination…</p>;
+      return <p className="text-xs text-muted-foreground">{m.pricing.loadingPagination}</p>;
     }
     const meta = pricing.data.meta;
     return (
       <div className="flex items-center justify-between">
         <p className="text-xs text-muted-foreground">
-          {meta.itemCount} rules · page {meta.page} of {Math.max(1, meta.pageCount)}
+          {m.pricing.footer(meta.itemCount, meta.page, Math.max(1, meta.pageCount))}
         </p>
         <div className="flex items-center gap-2">
           <AdminButton
@@ -106,23 +100,23 @@ export function PricingPortal() {
             size="sm"
             onClick={() => setPage((current) => Math.max(1, current - 1))}
             disabled={page <= 1}
-            aria-label="Previous pricing page"
+            aria-label={m.pricing.previousPage}
           >
-            <ChevronLeft /> Previous
+            <ChevronLeft /> {m.common.previous}
           </AdminButton>
           <AdminButton
             variant="outline"
             size="sm"
             onClick={() => setPage((current) => current + 1)}
             disabled={!meta.hasNextPage}
-            aria-label="Next pricing page"
+            aria-label={m.pricing.nextPage}
           >
-            Next <ChevronRight />
+            {m.common.next} <ChevronRight />
           </AdminButton>
         </div>
       </div>
     );
-  }, [page, pricing.data]);
+  }, [m, page, pricing.data]);
 
   useEffect(() => {
     setFooter(footer);
@@ -145,12 +139,10 @@ export function PricingPortal() {
       {
         onSuccess: (updated) => {
           toast.success(
-            next === 'ACTIVE'
-              ? `${updated.name} is now the active pricing rule. Other rules were retired.`
-              : `${updated.name} was retired.`,
+            next === 'ACTIVE' ? m.pricing.activated(updated.name) : m.pricing.retired(updated.name),
           );
         },
-        onError: (error) => toast.error(extractErrorMessage(error)),
+        onError: (error) => toast.error(extractErrorMessage(error, m.pricing.changeFailed)),
       },
     );
   };
@@ -159,10 +151,10 @@ export function PricingPortal() {
     if (!pendingDelete) return;
     deleteRule.mutate(pendingDelete.id, {
       onSuccess: (deleted) => {
-        toast.success(`${deleted.name} was deleted.`);
+        toast.success(m.pricing.deleted(deleted.name));
         setPendingDelete(null);
       },
-      onError: (error) => toast.error(extractErrorMessage(error)),
+      onError: (error) => toast.error(extractErrorMessage(error, m.pricing.changeFailed)),
     });
   };
 
@@ -172,15 +164,15 @@ export function PricingPortal() {
         <div className="flex flex-col gap-4 border-b border-border px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2 text-sm font-semibold">
             <BadgeDollarSign className="size-4 text-primary" />
-            Rule registry · one active table at a time
+            {m.pricing.registry}
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <label htmlFor="pricing-search" className="sr-only">
-              Search rules by name
+              {m.pricing.searchLabel}
             </label>
             <AdminInput
               id="pricing-search"
-              placeholder="Search rules…"
+              placeholder={m.pricing.searchPlaceholder}
               className="w-56"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
@@ -188,8 +180,8 @@ export function PricingPortal() {
             <AdminSelect
               value={status}
               onValueChange={(value) => setStatus(value as PricingStatus | 'ALL')}
-              options={STATUS_OPTIONS}
-              ariaLabel="Filter by rule status"
+              options={statusOptions}
+              ariaLabel={m.pricing.filterStatus}
             />
           </div>
         </div>
@@ -216,8 +208,8 @@ export function PricingPortal() {
       <AdminDialog
         open={Boolean(pendingDelete)}
         onOpenChange={(open) => !open && !deleteRule.isPending && setPendingDelete(null)}
-        title="Delete this pricing rule?"
-        description={`${pendingDelete?.name ?? 'This rule'} will be removed from the registry. Rules that were pointing at it keep their version history. This action cannot be undone from the back office.`}
+        title={m.pricing.deleteTitle}
+        description={m.pricing.deleteBody(pendingDelete?.name ?? m.pricing.thisRule)}
         footer={
           <>
             <AdminButton
@@ -225,14 +217,14 @@ export function PricingPortal() {
               onClick={() => setPendingDelete(null)}
               disabled={deleteRule.isPending}
             >
-              Cancel
+              {m.common.cancel}
             </AdminButton>
             <AdminButton
               variant="destructive"
               onClick={confirmDelete}
               disabled={deleteRule.isPending}
             >
-              <Trash2 /> Delete rule
+              <Trash2 /> {m.pricing.deleteRule}
             </AdminButton>
           </>
         }
@@ -260,13 +252,14 @@ function RuleTable({
   onRetire: (rule: PricingRuleDto) => void;
   onDelete: (rule: PricingRuleDto) => void;
 }) {
+  const { m } = useAdminI18n();
   if (rules.isError) {
     return (
       <div className="px-6 py-14 text-center">
         <CircleAlert className="mx-auto size-5 text-destructive" />
-        <p className="mt-3 font-semibold">Pricing rules could not be loaded.</p>
+        <p className="mt-3 font-semibold">{m.pricing.loadFailed}</p>
         <AdminButton className="mt-4" size="sm" onClick={() => rules.refetch()}>
-          <RotateCcw /> Retry
+          <RotateCcw /> {m.common.retry}
         </AdminButton>
       </div>
     );
@@ -279,7 +272,7 @@ function RuleTable({
           <tr>
             <th className="h-10 px-6">
               <SortableHeader
-                label="Rule"
+                label={m.pricing.columns.rule}
                 field="name"
                 active={sortField}
                 direction={sortDirection}
@@ -288,18 +281,18 @@ function RuleTable({
             </th>
             <th className="h-10 px-3">
               <SortableHeader
-                label="Base fare"
+                label={m.pricing.columns.baseFare}
                 field="baseFare"
                 active={sortField}
                 direction={sortDirection}
                 onSort={onSort}
               />
             </th>
-            <th className="h-10 px-3 font-semibold">Formula</th>
-            <th className="h-10 px-3 font-semibold">Effective window</th>
+            <th className="h-10 px-3 font-semibold">{m.pricing.columns.formula}</th>
+            <th className="h-10 px-3 font-semibold">{m.pricing.columns.window}</th>
             <th className="h-10 px-3">
               <SortableHeader
-                label="Status"
+                label={m.pricing.columns.status}
                 field="status"
                 active={sortField}
                 direction={sortDirection}
@@ -308,14 +301,14 @@ function RuleTable({
             </th>
             <th className="h-10 px-3">
               <SortableHeader
-                label="Updated"
+                label={m.pricing.columns.updated}
                 field="createdAt"
                 active={sortField}
                 direction={sortDirection}
                 onSort={onSort}
               />
             </th>
-            <th className="h-10 px-6 text-right font-semibold">Actions</th>
+            <th className="h-10 px-6 text-right font-semibold">{m.common.actions}</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-border">
@@ -331,10 +324,8 @@ function RuleTable({
           {rules.data && rules.data.data.length === 0 ? (
             <tr>
               <td colSpan={7} className="px-6 py-14 text-center">
-                <p className="font-semibold">No pricing rules yet.</p>
-                <p className="mt-1 text-muted-foreground">
-                  Create the first rule to make the quote estimator deterministic.
-                </p>
+                <p className="font-semibold">{m.pricing.empty}</p>
+                <p className="mt-1 text-muted-foreground">{m.pricing.emptyBody}</p>
               </td>
             </tr>
           ) : null}
@@ -367,6 +358,7 @@ function RuleRow({
   onRetire: (rule: PricingRuleDto) => void;
   onDelete: (rule: PricingRuleDto) => void;
 }) {
+  const { m, fmt } = useAdminI18n();
   return (
     <tr className="text-foreground">
       <td className="px-6 py-2.5">
@@ -374,28 +366,32 @@ function RuleRow({
         <span className="block text-[10px] text-muted-foreground">v{rule.version}</span>
       </td>
       <td className="whitespace-nowrap px-3 py-2.5 font-semibold">
-        {money.format(rule.baseFare)} {rule.currency}
+        {fmt.money(rule.baseFare)} {rule.currency}
       </td>
       <td className="whitespace-nowrap px-3 py-2.5 text-muted-foreground">
-        {rule.perKm.toFixed(3)} /km · {rule.perM3.toFixed(3)} /m³ · +{rule.expressSurcharge}%
-        express · min {money.format(rule.minQuote)}
+        {m.pricing.formula(
+          fmt.money(rule.perKm),
+          fmt.money(rule.perM3),
+          rule.expressSurcharge,
+          fmt.money(rule.minQuote),
+        )}
       </td>
       <td className="whitespace-nowrap px-3 py-2.5 text-muted-foreground">
-        {dayFormatter.format(new Date(rule.effectiveFrom))}
-        {rule.effectiveTo ? ` → ${dayFormatter.format(new Date(rule.effectiveTo))}` : ' → open'}
+        {fmt.date(rule.effectiveFrom)}
+        {` → ${rule.effectiveTo ? fmt.date(rule.effectiveTo) : m.pricing.open}`}
       </td>
       <td className="px-3 py-2.5">
         <AdminBadge variant={rule.status === 'ACTIVE' ? 'default' : 'secondary'}>
-          {rule.status === 'ACTIVE' ? 'Active' : 'Retired'}
+          {m.pricing.status[rule.status]}
         </AdminBadge>
       </td>
       <td className="whitespace-nowrap px-3 py-2.5 text-muted-foreground">
-        {dayFormatter.format(new Date(rule.updatedAt))}
+        {fmt.date(rule.updatedAt)}
       </td>
       <td className="px-6 py-2.5 text-right">
         <DropdownMenu.Root>
           <DropdownMenu.Trigger asChild>
-            <AdminButton variant="ghost" size="iconSm" aria-label={`Actions for ${rule.name}`}>
+            <AdminButton variant="ghost" size="iconSm" aria-label={m.common.actionsFor(rule.name)}>
               <MoreHorizontal />
             </AdminButton>
           </DropdownMenu.Trigger>
@@ -409,21 +405,21 @@ function RuleRow({
                 onSelect={() => onEdit(rule)}
                 className="flex h-8 cursor-default select-none items-center gap-2 rounded-md px-2 text-sm outline-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground"
               >
-                <Pencil className="size-4" /> Edit rule
+                <Pencil className="size-4" /> {m.pricing.editRule}
               </DropdownMenu.Item>
               {rule.status === 'ACTIVE' ? (
                 <DropdownMenu.Item
                   onSelect={() => onRetire(rule)}
                   className="flex h-8 cursor-default select-none items-center gap-2 rounded-md px-2 text-sm outline-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground"
                 >
-                  <Stamp className="size-4" /> Retire rule
+                  <Stamp className="size-4" /> {m.pricing.retireRule}
                 </DropdownMenu.Item>
               ) : (
                 <DropdownMenu.Item
                   onSelect={() => onActivate(rule)}
                   className="flex h-8 cursor-default select-none items-center gap-2 rounded-md px-2 text-sm outline-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground"
                 >
-                  <Check className="size-4" /> Make active
+                  <Check className="size-4" /> {m.pricing.makeActive}
                 </DropdownMenu.Item>
               )}
               <DropdownMenu.Separator className="my-1 h-px bg-border" />
@@ -431,7 +427,7 @@ function RuleRow({
                 onSelect={() => onDelete(rule)}
                 className="flex h-8 cursor-default select-none items-center gap-2 rounded-md px-2 text-sm text-destructive outline-none data-[highlighted]:bg-destructive/10"
               >
-                <Trash2 className="size-4" /> Delete rule
+                <Trash2 className="size-4" /> {m.pricing.deleteRule}
               </DropdownMenu.Item>
             </DropdownMenu.Content>
           </DropdownMenu.Portal>
@@ -454,13 +450,14 @@ function SortableHeader({
   direction: SortDirection;
   onSort: (field: SortField) => void;
 }) {
+  const { m } = useAdminI18n();
   const isActive = active === field;
   return (
     <button
       type="button"
       onClick={() => onSort(field)}
       className="inline-flex items-center gap-1 outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-      aria-label={`Sort by ${label}`}
+      aria-label={m.common.sortBy(label)}
     >
       {label}
       <span className="text-[10px]">{isActive ? (direction === 'ASC' ? '▲' : '▼') : '↕'}</span>
@@ -468,7 +465,7 @@ function SortableHeader({
   );
 }
 
-function extractErrorMessage(error: unknown): string {
+function extractErrorMessage(error: unknown, fallback: string): string {
   const response = (error as AxiosError<ServerErrorResponse>).response?.data;
-  return response?.message ?? 'The change could not be applied. Try again.';
+  return response?.message ?? fallback;
 }

@@ -12,6 +12,7 @@ import { AdminInput } from '@/components/ui/admin-input';
 import { AdminSelect } from '@/components/ui/admin-select';
 import { AdminSheet } from '@/components/ui/admin-sheet';
 import { useCreateAdminUser, useUpdateAdminUser } from '@/hooks/content/admin';
+import { useAdminI18n } from '@/lib/i18n/admin';
 import type {
   AdminUserCreatePayload,
   AdminUserUpdatePayload,
@@ -33,23 +34,6 @@ interface UserFormValues {
   status: UserStatus;
 }
 
-const roleOptions = [
-  { value: 'CLIENT', label: 'Client' },
-  { value: 'MOVER', label: 'Mover' },
-  { value: 'ADMIN', label: 'Admin' },
-];
-
-const localeOptions = [
-  { value: 'en', label: 'English' },
-  { value: 'fr', label: 'French' },
-  { value: 'ar', label: 'Arabic' },
-];
-
-const statusOptions = [
-  { value: 'ACTIVE', label: 'Active' },
-  { value: 'BLOCKED', label: 'Blocked' },
-];
-
 export function UserFormSheet({
   open,
   mode,
@@ -68,17 +52,30 @@ export function UserFormSheet({
   const createUser = useCreateAdminUser();
   const updateUser = useUpdateAdminUser();
   const [serverError, setServerError] = useState<string | null>(null);
+  const { m } = useAdminI18n();
+  const roleOptions = (['CLIENT', 'MOVER', 'ADMIN'] as const).map((value) => ({
+    value,
+    label: m.common.roles[value],
+  }));
+  const localeOptions = (['en', 'fr', 'ar'] as const).map((value) => ({
+    value,
+    label: m.languages[value],
+  }));
+  const statusOptions = (['ACTIVE', 'BLOCKED'] as const).map((value) => ({
+    value,
+    label: m.userForm.statusOptions[value],
+  }));
 
   const schema = useMemo(
     () =>
       z
         .object({
-          name: z.string().trim().min(2, 'Name must be at least 2 characters'),
-          email: z.string().trim().email('Enter a valid email address'),
+          name: z.string().trim().min(2, m.common.nameMin),
+          email: z.string().trim().email(m.common.emailInvalid),
           phone: z
             .string()
             .trim()
-            .regex(/^\+?[0-9]{8,15}$/, 'Enter 8–15 digits, optionally starting with +'),
+            .regex(/^\+?[0-9]{8,15}$/, m.common.phoneInvalid),
           password: z.string(),
           role: z.enum(['CLIENT', 'MOVER', 'ADMIN']),
           locale: z.enum(['en', 'fr', 'ar']),
@@ -90,25 +87,25 @@ export function UserFormSheet({
             context.addIssue({
               code: 'custom',
               path: ['password'],
-              message: 'Password must be at least 8 characters',
+              message: m.common.passwordRules.min,
             });
           }
           if (!/[A-Z]/.test(values.password)) {
             context.addIssue({
               code: 'custom',
               path: ['password'],
-              message: 'Add at least one uppercase letter',
+              message: m.common.passwordRules.upper,
             });
           }
           if (!/[0-9]/.test(values.password)) {
             context.addIssue({
               code: 'custom',
               path: ['password'],
-              message: 'Add at least one number',
+              message: m.common.passwordRules.digit,
             });
           }
         }),
-    [mode],
+    [m, mode],
   );
 
   const {
@@ -136,10 +133,11 @@ export function UserFormSheet({
     if (mode === 'create') {
       createUser.mutate(values as AdminUserCreatePayload, {
         onSuccess: (created) => {
-          toast.success(`${created.name} was created.`);
+          toast.success(m.userForm.created(created.name));
           onSaved(created);
         },
-        onError: (error) => applyServerError(error, setError, setServerError),
+        onError: (error) =>
+          applyServerError(error, setError, setServerError, m.userForm.saveFailed),
       });
       return;
     }
@@ -158,10 +156,11 @@ export function UserFormSheet({
       { id: user.id, payload },
       {
         onSuccess: (updated) => {
-          toast.success(`${updated.name} was updated.`);
+          toast.success(m.userForm.updated(updated.name));
           onSaved(updated);
         },
-        onError: (error) => applyServerError(error, setError, setServerError),
+        onError: (error) =>
+          applyServerError(error, setError, setServerError, m.userForm.saveFailed),
       },
     );
   };
@@ -170,16 +169,12 @@ export function UserFormSheet({
     <AdminSheet
       open={open}
       onOpenChange={(next) => !next && !isPending && onClose()}
-      title={mode === 'create' ? 'Create user account' : `Edit ${user?.name ?? 'account'}`}
-      description={
-        mode === 'create'
-          ? 'Create credentials and assign platform access.'
-          : 'Update identity, role, locale, status, or credentials.'
-      }
+      title={mode === 'create' ? m.userForm.createTitle : m.userForm.editTitle(user?.name ?? '')}
+      description={mode === 'create' ? m.userForm.createBody : m.userForm.editBody}
       footer={
         <>
           <AdminButton type="button" variant="secondary" onClick={onClose} disabled={isPending}>
-            Cancel
+            {m.common.cancel}
           </AdminButton>
           <AdminButton type="submit" form="admin-user-form" disabled={isPending}>
             {isPending ? (
@@ -189,13 +184,13 @@ export function UserFormSheet({
             ) : (
               <Save />
             )}
-            {mode === 'create' ? 'Create account' : 'Save changes'}
+            {mode === 'create' ? m.userForm.create : m.common.saveChanges}
           </AdminButton>
         </>
       }
     >
       <form id="admin-user-form" onSubmit={handleSubmit(submit)} noValidate className="space-y-5">
-        <FormField label="Full name" htmlFor="admin-user-name" error={errors.name?.message}>
+        <FormField label={m.userForm.name} htmlFor="admin-user-name" error={errors.name?.message}>
           <AdminInput
             id="admin-user-name"
             autoComplete="name"
@@ -204,7 +199,11 @@ export function UserFormSheet({
           />
         </FormField>
 
-        <FormField label="Email" htmlFor="admin-user-email" error={errors.email?.message}>
+        <FormField
+          label={m.userForm.email}
+          htmlFor="admin-user-email"
+          error={errors.email?.message}
+        >
           <AdminInput
             id="admin-user-email"
             type="email"
@@ -214,7 +213,11 @@ export function UserFormSheet({
           />
         </FormField>
 
-        <FormField label="Phone" htmlFor="admin-user-phone" error={errors.phone?.message}>
+        <FormField
+          label={m.userForm.phone}
+          htmlFor="admin-user-phone"
+          error={errors.phone?.message}
+        >
           <AdminInput
             id="admin-user-phone"
             type="tel"
@@ -225,12 +228,10 @@ export function UserFormSheet({
         </FormField>
 
         <FormField
-          label={mode === 'create' ? 'Password' : 'New password'}
+          label={mode === 'create' ? m.userForm.password : m.userForm.newPassword}
           htmlFor="admin-user-password"
           description={
-            mode === 'edit'
-              ? 'Leave blank to keep the current password. Changing it revokes active sessions.'
-              : 'At least 8 characters, one uppercase letter, and one number.'
+            mode === 'edit' ? m.userForm.passwordEditHint : m.userForm.passwordCreateHint
           }
           error={errors.password?.message}
         >
@@ -244,7 +245,7 @@ export function UserFormSheet({
         </FormField>
 
         <div className="grid gap-5 sm:grid-cols-2 min-[1500px]:grid-cols-1">
-          <FormField label="Role" htmlFor="admin-user-role" error={errors.role?.message}>
+          <FormField label={m.userForm.role} htmlFor="admin-user-role" error={errors.role?.message}>
             <Controller
               name="role"
               control={control}
@@ -254,14 +255,18 @@ export function UserFormSheet({
                   value={field.value}
                   onValueChange={field.onChange}
                   options={roleOptions}
-                  ariaLabel="Account role"
+                  ariaLabel={m.userForm.roleLabel}
                   className="w-full"
                   disabled={isSelf}
                 />
               )}
             />
           </FormField>
-          <FormField label="Locale" htmlFor="admin-user-locale" error={errors.locale?.message}>
+          <FormField
+            label={m.userForm.locale}
+            htmlFor="admin-user-locale"
+            error={errors.locale?.message}
+          >
             <Controller
               name="locale"
               control={control}
@@ -271,7 +276,7 @@ export function UserFormSheet({
                   value={field.value}
                   onValueChange={field.onChange}
                   options={localeOptions}
-                  ariaLabel="Preferred locale"
+                  ariaLabel={m.userForm.localeLabel}
                   className="w-full"
                 />
               )}
@@ -280,9 +285,9 @@ export function UserFormSheet({
         </div>
 
         <FormField
-          label="Access status"
+          label={m.userForm.status}
           htmlFor="admin-user-status"
-          description={isSelf ? 'Your own admin account cannot be deactivated.' : undefined}
+          description={isSelf ? m.userForm.selfStatus : undefined}
           error={errors.status?.message}
         >
           <Controller
@@ -294,7 +299,7 @@ export function UserFormSheet({
                 value={field.value}
                 onValueChange={field.onChange}
                 options={statusOptions}
-                ariaLabel="Account access status"
+                ariaLabel={m.userForm.statusLabel}
                 className="w-full"
                 disabled={isSelf}
               />
@@ -369,6 +374,7 @@ function applyServerError(
   error: unknown,
   setError: ReturnType<typeof useForm<UserFormValues>>['setError'],
   setServerError: (message: string) => void,
+  fallback: string,
 ) {
   const response = (error as AxiosError<ServerErrorResponse>).response?.data;
   const details = response?.details as
@@ -380,5 +386,5 @@ function applyServerError(
       }
     }
   }
-  setServerError(response?.message ?? 'The account could not be saved. Try again.');
+  setServerError(response?.message ?? fallback);
 }

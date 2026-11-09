@@ -10,14 +10,9 @@ import { AdminCard } from '@/components/ui/admin-card';
 import { AdminInput } from '@/components/ui/admin-input';
 import { AdminSelect } from '@/components/ui/admin-select';
 import { useAdminContent, useResetContent, useSaveContent } from '@/hooks/content/admin';
+import { useAdminI18n, type AdminMessages } from '@/lib/i18n/admin';
 import type { ContentEntryDto, ContentSectionDto, ServerErrorResponse } from '@/types';
 import { useAdminShell } from '../shell/admin-shell-context';
-
-const LOCALE_OPTIONS = [
-  { value: 'en', label: 'English (default site)' },
-  { value: 'fr', label: 'Français' },
-  { value: 'ar', label: 'العربية' },
-];
 
 type Draft = Record<string, string>;
 
@@ -29,18 +24,27 @@ export function ContentPortal() {
   const saveContent = useSaveContent();
   const resetContent = useResetContent();
   const [savingSection, setSavingSection] = useState<string | null>(null);
+  const { m } = useAdminI18n();
+  const localeOptions = useMemo(
+    () =>
+      (['en', 'fr', 'ar'] as const).map((value) => ({
+        value,
+        label: m.content.localeOptions[value],
+      })),
+    [m],
+  );
 
   useEffect(() => {
     publishPage({
-      breadcrumbs: [{ label: 'Admin', href: '/admin' }, { label: 'Content' }],
-      title: 'Content',
-      description: 'Edit the public landing copy per locale. Saved values are served live.',
+      breadcrumbs: [{ label: m.common.admin, href: '/admin' }, { label: m.content.title }],
+      title: m.content.title,
+      description: m.content.description,
       actions: (
         <AdminSelect
           value={locale}
           onValueChange={(value) => setLocale(value as 'en' | 'fr' | 'ar')}
-          options={LOCALE_OPTIONS}
-          ariaLabel="Content locale"
+          options={localeOptions}
+          ariaLabel={m.content.localeLabel}
         />
       ),
     });
@@ -48,7 +52,7 @@ export function ContentPortal() {
       clearPage();
       clearFooter();
     };
-  }, [clearFooter, clearPage, locale, publishPage]);
+  }, [clearFooter, clearPage, locale, localeOptions, m, publishPage]);
 
   // Hydrate the draft whenever the fetched bundle changes.
   useEffect(() => {
@@ -62,7 +66,7 @@ export function ContentPortal() {
 
   useEffect(() => {
     if (!content.data) {
-      setFooter(<p className="text-xs text-muted-foreground">Loading content entries…</p>);
+      setFooter(<p className="text-xs text-muted-foreground">{m.content.loading}</p>);
       return;
     }
     const overridden = content.data.sections.reduce(
@@ -71,13 +75,15 @@ export function ContentPortal() {
     );
     setFooter(
       <p className="text-xs text-muted-foreground">
-        {content.data.sections.reduce((count, section) => count + section.entries.length, 0)}{' '}
-        managed keys · {overridden} overridden in {content.data.locale.toUpperCase()} · unsaved
-        edits are marked on each field
+        {m.content.footer(
+          content.data.sections.reduce((count, section) => count + section.entries.length, 0),
+          overridden,
+          content.data.locale.toUpperCase(),
+        )}
       </p>,
     );
     return clearFooter;
-  }, [clearFooter, content.data, setFooter]);
+  }, [clearFooter, content.data, m, setFooter]);
 
   const dirtyKeys = useMemo(() => {
     if (!content.data) return new Set<string>();
@@ -105,10 +111,10 @@ export function ContentPortal() {
       {
         onSuccess: (result) => {
           toast.success(
-            `${section.title} copy saved (${result.saved} keys, ${locale.toUpperCase()}).`,
+            m.content.saved(sectionCopy(m, section).title, result.saved, locale.toUpperCase()),
           );
         },
-        onError: (error) => toast.error(extractErrorMessage(error)),
+        onError: (error) => toast.error(extractErrorMessage(error, m.content.saveFailed)),
         onSettled: () => setSavingSection(null),
       },
     );
@@ -120,11 +126,9 @@ export function ContentPortal() {
       { locale, keys: section.entries.map((entry) => entry.key) },
       {
         onSuccess: (result) => {
-          toast.success(
-            `${section.title} restored to the in-code defaults (${result.reset} keys).`,
-          );
+          toast.success(m.content.restored(sectionCopy(m, section).title, result.reset));
         },
-        onError: (error) => toast.error(extractErrorMessage(error)),
+        onError: (error) => toast.error(extractErrorMessage(error, m.content.saveFailed)),
         onSettled: () => setSavingSection(null),
       },
     );
@@ -136,9 +140,9 @@ export function ContentPortal() {
         {content.isError ? (
           <AdminCard className="p-10 text-center">
             <TriangleAlert className="mx-auto size-5 text-destructive" />
-            <p className="mt-3 font-semibold">Content could not be loaded.</p>
+            <p className="mt-3 font-semibold">{m.content.loadFailed}</p>
             <AdminButton className="mt-4" size="sm" onClick={() => content.refetch()}>
-              <RefreshCcw /> Retry
+              <RefreshCcw /> {m.common.retry}
             </AdminButton>
           </AdminCard>
         ) : null}
@@ -194,6 +198,8 @@ function SectionCard({
   onSave: () => void;
   onReset: () => void;
 }) {
+  const { m } = useAdminI18n();
+  const copy = sectionCopy(m, section);
   const sectionDirty = section.entries.some((entry) => dirtyKeys.has(entry.key));
   const anyPending = pending || saving;
 
@@ -203,10 +209,12 @@ function SectionCard({
         <div>
           <p className="flex items-center gap-2 text-sm font-semibold">
             <Languages className="size-4 text-primary" />
-            {section.title}
-            {sectionDirty ? <AdminBadge variant="secondary">Unsaved edits</AdminBadge> : null}
+            {copy.title}
+            {sectionDirty ? (
+              <AdminBadge variant="secondary">{m.content.unsavedEdits}</AdminBadge>
+            ) : null}
           </p>
-          <p className="mt-1 text-xs text-muted-foreground">{section.description}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{copy.description}</p>
         </div>
         <div className="flex items-center gap-2">
           <AdminButton
@@ -214,12 +222,12 @@ function SectionCard({
             size="sm"
             onClick={onReset}
             disabled={anyPending}
-            aria-label={`Restore ${section.title} defaults`}
+            aria-label={m.content.restoreLabel(copy.title)}
           >
-            {pending ? <Loader2 className="animate-spin" /> : <RotateCcw />} Defaults
+            {pending ? <Loader2 className="animate-spin" /> : <RotateCcw />} {m.content.defaults}
           </AdminButton>
           <AdminButton size="sm" onClick={onSave} disabled={anyPending}>
-            {pending ? <Loader2 className="animate-spin" /> : <Save />} Save section
+            {pending ? <Loader2 className="animate-spin" /> : <Save />} {m.content.saveSection}
           </AdminButton>
         </div>
       </div>
@@ -250,22 +258,24 @@ function EntryRow({
   dirty: boolean;
   onChange: (value: string) => void;
 }) {
+  const { m } = useAdminI18n();
+  const label = m.content.labels[entry.key] ?? entry.label;
   const id = `content-${entry.key.replace(/[^a-z0-9]/gi, '-')}`;
   return (
     <div className="space-y-1.5 px-6 py-4">
       <div className="flex flex-wrap items-center gap-2">
         <label htmlFor={id} className="text-xs font-semibold">
-          {entry.label}
+          {label}
         </label>
         <span className="mono text-[10px] text-muted-foreground">{entry.key}</span>
         {dirty ? (
-          <AdminBadge>Unsaved</AdminBadge>
+          <AdminBadge>{m.content.badges.unsaved}</AdminBadge>
         ) : entry.overridden ? (
-          <AdminBadge variant="secondary">Managed</AdminBadge>
+          <AdminBadge variant="secondary">{m.content.badges.managed}</AdminBadge>
         ) : entry.value !== entry.default && entry.value.length > 0 ? (
-          <AdminBadge variant="secondary">Edited</AdminBadge>
+          <AdminBadge variant="secondary">{m.content.badges.edited}</AdminBadge>
         ) : (
-          <AdminBadge variant="secondary">Default</AdminBadge>
+          <AdminBadge variant="secondary">{m.content.badges.default}</AdminBadge>
         )}
       </div>
       {entry.multiline ? (
@@ -274,7 +284,7 @@ function EntryRow({
           value={value}
           onChange={(event) => onChange(event.target.value)}
           rows={3}
-          aria-label={entry.label}
+          aria-label={label}
           className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs outline-none transition-[border-color,box-shadow] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
         />
       ) : (
@@ -284,7 +294,16 @@ function EntryRow({
   );
 }
 
-function extractErrorMessage(error: unknown): string {
+function sectionCopy(m: AdminMessages, section: ContentSectionDto) {
+  return (
+    m.content.sections[section.section] ?? {
+      title: section.title,
+      description: section.description,
+    }
+  );
+}
+
+function extractErrorMessage(error: unknown, fallback: string): string {
   const response = (error as AxiosError<ServerErrorResponse>).response?.data;
-  return response?.message ?? 'The content could not be saved. Try again.';
+  return response?.message ?? fallback;
 }

@@ -8,7 +8,7 @@ import { authService } from './auth.service';
 import { serializeAuthSession, type AuthSessionResponse } from './auth.serializer';
 import { RefreshTokenSchema, SignInSchema, SignUpSchema } from './auth.schema';
 
-const REFRESH_COOKIE = 'moveup_refresh';
+export const REFRESH_COOKIE = 'moveup_refresh';
 
 /**
  * Auth controller — thin HTTP adapter: parse/validate (Zod), call service,
@@ -18,7 +18,9 @@ class AuthController {
   async signUp(request: NextRequest): Promise<NextResponse> {
     try {
       const input = await this.validate(request, SignUpSchema);
-      const session = await authService.signUp(input);
+      const session = await authService.signUp(input, {
+        userAgent: request.headers.get('user-agent'),
+      });
 
       logEvent({
         event: EventType.SIGNUP,
@@ -36,7 +38,9 @@ class AuthController {
   async signIn(request: NextRequest): Promise<NextResponse> {
     try {
       const input = await this.validate(request, SignInSchema);
-      const session = await authService.signIn(input);
+      const session = await authService.signIn(input, {
+        userAgent: request.headers.get('user-agent'),
+      });
 
       logEvent({
         event: EventType.SIGNIN,

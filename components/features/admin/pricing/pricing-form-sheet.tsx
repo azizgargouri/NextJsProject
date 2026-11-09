@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -12,6 +12,7 @@ import { AdminInput } from '@/components/ui/admin-input';
 import { AdminSelect } from '@/components/ui/admin-select';
 import { AdminSheet } from '@/components/ui/admin-sheet';
 import { useCreatePricingRule, useUpdatePricingRule } from '@/hooks/content/admin';
+import { useAdminI18n, type AdminMessages } from '@/lib/i18n/admin';
 import type { PricingRuleDto, PricingRulePayload, ServerErrorResponse } from '@/types';
 
 export type PricingFormMode = 'create' | 'edit';
@@ -28,36 +29,37 @@ interface FormValues {
   effectiveTo: string;
 }
 
-const numeric = (label: string) =>
-  z
-    .string()
-    .min(1, `${label} is required`)
-    .refine((value) => /^\d+(\.\d+)?$/.test(value), `${label} must be a number`)
-    .refine((value) => Number(value) >= 0, `${label} cannot be negative`);
-
-const schema = z
-  .object({
-    name: z.string().trim().min(2, 'Name must be at least 2 characters').max(64),
-    status: z.enum(['ACTIVE', 'RETIRED']),
-    baseFare: numeric('Base fare'),
-    perKm: numeric('Per km'),
-    perM3: numeric('Per m³'),
-    expressSurcharge: z
+function buildSchema(m: AdminMessages) {
+  const e = m.pricingForm.errors;
+  const f = m.pricingForm.fieldNames;
+  const numeric = (label: string) =>
+    z
       .string()
-      .min(1, 'Express surcharge is required')
-      .refine((value) => /^\d+(\.\d+)?$/.test(value), 'Must be a number')
-      .refine(
-        (value) => Number(value) >= 0 && Number(value) <= 100,
-        'Express surcharge is a percentage (0–100)',
-      ),
-    minQuote: numeric('Minimum quote'),
-    effectiveFrom: z.string().min(1, 'Effective start date is required'),
-    effectiveTo: z.string(),
-  })
-  .refine((values) => !values.effectiveTo || values.effectiveTo > values.effectiveFrom, {
-    message: 'The window must end after it starts',
-    path: ['effectiveTo'],
-  });
+      .min(1, e.required(label))
+      .refine((value) => /^\d+(\.\d+)?$/.test(value), e.number(label))
+      .refine((value) => Number(value) >= 0, e.negative(label));
+
+  return z
+    .object({
+      name: z.string().trim().min(2, e.nameMin).max(64),
+      status: z.enum(['ACTIVE', 'RETIRED']),
+      baseFare: numeric(f.baseFare),
+      perKm: numeric(f.perKm),
+      perM3: numeric(f.perM3),
+      expressSurcharge: z
+        .string()
+        .min(1, e.required(f.express))
+        .refine((value) => /^\d+(\.\d+)?$/.test(value), e.number(f.express))
+        .refine((value) => Number(value) >= 0 && Number(value) <= 100, e.percent),
+      minQuote: numeric(f.minQuote),
+      effectiveFrom: z.string().min(1, e.fromRequired),
+      effectiveTo: z.string(),
+    })
+    .refine((values) => !values.effectiveTo || values.effectiveTo > values.effectiveFrom, {
+      message: e.window,
+      path: ['effectiveTo'],
+    });
+}
 
 export function PricingFormSheet({
   open,
@@ -73,6 +75,8 @@ export function PricingFormSheet({
   const createRule = useCreatePricingRule();
   const updateRule = useUpdatePricingRule();
   const [serverError, setServerError] = useState<string | null>(null);
+  const { m } = useAdminI18n();
+  const schema = useMemo(() => buildSchema(m), [m]);
 
   const {
     register,
@@ -119,13 +123,13 @@ export function PricingFormSheet({
           }
         }
       }
-      setServerError(response?.message ?? 'The rule could not be saved. Try again.');
+      setServerError(response?.message ?? m.pricingForm.saveFailed);
     };
 
     if (mode === 'create') {
       createRule.mutate(payload, {
         onSuccess: (created) => {
-          toast.success(`${created.name} was created.`);
+          toast.success(m.pricingForm.created(created.name));
           onClose();
         },
         onError,
@@ -138,7 +142,7 @@ export function PricingFormSheet({
       { id: rule.id, payload },
       {
         onSuccess: (updated) => {
-          toast.success(`${updated.name} was updated to v${updated.version}.`);
+          toast.success(m.pricingForm.updated(updated.name, updated.version));
           onClose();
         },
         onError,
@@ -150,16 +154,14 @@ export function PricingFormSheet({
     <AdminSheet
       open={open}
       onOpenChange={(next) => !next && !isPending && onClose()}
-      title={mode === 'create' ? 'Create pricing rule' : `Edit ${rule?.name ?? 'rule'}`}
-      description={
-        mode === 'create'
-          ? 'Define the quote formula. Creating an active rule retires the previous one.'
-          : 'Changes create a new version. Activation takes over exclusivity automatically.'
+      title={
+        mode === 'create' ? m.pricingForm.createTitle : m.pricingForm.editTitle(rule?.name ?? '')
       }
+      description={mode === 'create' ? m.pricingForm.createBody : m.pricingForm.editBody}
       footer={
         <>
           <AdminButton variant="secondary" onClick={onClose} disabled={isPending}>
-            Cancel
+            {m.common.cancel}
           </AdminButton>
           <AdminButton type="submit" form="admin-pricing-form" disabled={isPending}>
             {isPending ? (
@@ -169,7 +171,7 @@ export function PricingFormSheet({
             ) : (
               <Save />
             )}
-            {mode === 'create' ? 'Create rule' : 'Save new version'}
+            {mode === 'create' ? m.pricingForm.create : m.pricingForm.saveVersion}
           </AdminButton>
         </>
       }
@@ -180,7 +182,11 @@ export function PricingFormSheet({
         noValidate
         className="space-y-5"
       >
-        <FormField label="Rule name" htmlFor="admin-pricing-name" error={errors.name?.message}>
+        <FormField
+          label={m.pricingForm.name}
+          htmlFor="admin-pricing-name"
+          error={errors.name?.message}
+        >
           <AdminInput
             id="admin-pricing-name"
             autoComplete="off"
@@ -191,7 +197,7 @@ export function PricingFormSheet({
 
         <div className="grid gap-5 sm:grid-cols-3">
           <FormField
-            label="Base fare (TND)"
+            label={m.pricingForm.baseFare}
             htmlFor="admin-pricing-base"
             error={errors.baseFare?.message}
           >
@@ -203,7 +209,11 @@ export function PricingFormSheet({
               {...register('baseFare')}
             />
           </FormField>
-          <FormField label="Per km (TND)" htmlFor="admin-pricing-km" error={errors.perKm?.message}>
+          <FormField
+            label={m.pricingForm.perKm}
+            htmlFor="admin-pricing-km"
+            error={errors.perKm?.message}
+          >
             <AdminInput
               id="admin-pricing-km"
               inputMode="decimal"
@@ -212,7 +222,11 @@ export function PricingFormSheet({
               {...register('perKm')}
             />
           </FormField>
-          <FormField label="Per m³ (TND)" htmlFor="admin-pricing-m3" error={errors.perM3?.message}>
+          <FormField
+            label={m.pricingForm.perM3}
+            htmlFor="admin-pricing-m3"
+            error={errors.perM3?.message}
+          >
             <AdminInput
               id="admin-pricing-m3"
               inputMode="decimal"
@@ -225,7 +239,7 @@ export function PricingFormSheet({
 
         <div className="grid gap-5 sm:grid-cols-2">
           <FormField
-            label="Express surcharge (%)"
+            label={m.pricingForm.express}
             htmlFor="admin-pricing-express"
             error={errors.expressSurcharge?.message}
           >
@@ -238,7 +252,7 @@ export function PricingFormSheet({
             />
           </FormField>
           <FormField
-            label="Minimum quote (TND)"
+            label={m.pricingForm.minQuote}
             htmlFor="admin-pricing-min"
             error={errors.minQuote?.message}
           >
@@ -254,7 +268,7 @@ export function PricingFormSheet({
 
         <div className="grid gap-5 sm:grid-cols-2">
           <FormField
-            label="Effective from"
+            label={m.pricingForm.from}
             htmlFor="admin-pricing-from"
             error={errors.effectiveFrom?.message}
           >
@@ -266,9 +280,9 @@ export function PricingFormSheet({
             />
           </FormField>
           <FormField
-            label="Effective until (optional)"
+            label={m.pricingForm.to}
             htmlFor="admin-pricing-to"
-            description="Leave empty for an open-ended window."
+            description={m.pricingForm.toHint}
             error={errors.effectiveTo?.message}
           >
             <AdminInput id="admin-pricing-to" type="date" {...register('effectiveTo')} />
@@ -276,10 +290,10 @@ export function PricingFormSheet({
         </div>
 
         <FormField
-          label="Status"
+          label={m.pricingForm.status}
           htmlFor="admin-pricing-status"
           error={errors.status?.message}
-          description="Only one rule can be active. Activation retires every other rule."
+          description={m.pricingForm.statusHint}
         >
           <Controller
             name="status"
@@ -290,10 +304,10 @@ export function PricingFormSheet({
                 value={field.value}
                 onValueChange={field.onChange}
                 options={[
-                  { value: 'ACTIVE', label: 'Active — the live quote table' },
-                  { value: 'RETIRED', label: 'Retired — kept for history' },
+                  { value: 'ACTIVE', label: m.pricingForm.statusOptions.ACTIVE },
+                  { value: 'RETIRED', label: m.pricingForm.statusOptions.RETIRED },
                 ]}
-                ariaLabel="Pricing rule status"
+                ariaLabel={m.pricingForm.statusLabel}
                 className="w-full"
               />
             )}

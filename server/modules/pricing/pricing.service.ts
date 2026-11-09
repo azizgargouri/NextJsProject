@@ -14,6 +14,15 @@ export class PricingService {
     return this.repository.findPaginated(searchParams);
   }
 
+  /** Public read for the landing estimator — never throws; null means "no live rule". */
+  async findActivePublic(): Promise<PricingRuleResponse | null> {
+    try {
+      return await this.repository.findActive();
+    } catch {
+      return null;
+    }
+  }
+
   async findOneById(id: string): Promise<PricingRuleResponse> {
     const rule = await this.repository.findOneById(id);
     if (!rule) throw new NotFoundError('Pricing rule');

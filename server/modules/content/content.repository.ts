@@ -3,7 +3,7 @@ import {
   ContentEntryModel,
   type ContentEntryDoc,
 } from '../../shared/database/models/content-entry.model';
-import { CONTENT_DEFAULTS } from './content.constants';
+import { contentDefaults } from './content.constants';
 
 /** Content data access — the only place that knows about the `contententries` collection. */
 export class ContentRepository {
@@ -16,7 +16,7 @@ export class ContentRepository {
   async mergedValues(locale: string): Promise<Record<string, string>> {
     const docs = await (await this.model()).find({ locale }).lean<ContentEntryDoc[]>();
 
-    const values: Record<string, string> = { ...CONTENT_DEFAULTS };
+    const values: Record<string, string> = { ...contentDefaults(locale) };
     for (const doc of docs) values[doc.key] = doc.value;
     return values;
   }

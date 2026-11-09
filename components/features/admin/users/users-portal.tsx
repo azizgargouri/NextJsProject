@@ -35,6 +35,8 @@ import { AdminSheet } from '@/components/ui/admin-sheet';
 import { useAdminUsers, useDeleteAdminUser, useUserStatus } from '@/hooks/content/admin';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { useAuthStore } from '@/hooks/stores/auth-store';
+import { useAdminI18n, type AdminMessages } from '@/lib/i18n/admin';
+import { UserAvatar } from '@/components/ui/user-avatar';
 import type { ResponseUserDto, ServerErrorResponse, UserRole, UserStatus } from '@/types';
 import { useAdminShell } from '../shell/admin-shell-context';
 import { UserFormSheet, type UserFormMode } from './user-form-sheet';
@@ -53,21 +55,17 @@ interface UserFormState {
   user: ResponseUserDto | null;
 }
 
-const ROLE_OPTIONS = [
-  { value: 'ALL', label: 'All roles' },
-  { value: 'CLIENT', label: 'Clients' },
-  { value: 'MOVER', label: 'Movers' },
-  { value: 'ADMIN', label: 'Admins' },
-];
-
-const STATUS_OPTIONS = [
-  { value: 'ALL', label: 'All statuses' },
-  { value: 'ACTIVE', label: 'Active' },
-  { value: 'BLOCKED', label: 'Blocked' },
-];
-
 export function UsersPortal() {
   const { setPage: publishPage, clearPage, setFooter, clearFooter } = useAdminShell();
+  const { m } = useAdminI18n();
+  const roleOptions = (['ALL', 'CLIENT', 'MOVER', 'ADMIN'] as const).map((value) => ({
+    value,
+    label: m.common.rolesPlural[value],
+  }));
+  const statusOptions = (['ALL', 'ACTIVE', 'BLOCKED'] as const).map((value) => ({
+    value,
+    label: m.users.statusOptions[value],
+  }));
   const currentUserId = useAuthStore((state) => state.user?.id);
   const updateCurrentProfile = useAuthStore((state) => state.updateProfile);
   const [search, setSearch] = useState('');
@@ -103,12 +101,12 @@ export function UsersPortal() {
 
   useEffect(() => {
     publishPage({
-      breadcrumbs: [{ label: 'Admin', href: '/admin' }, { label: 'User accounts' }],
-      title: 'User accounts',
-      description: 'Create, inspect, update, deactivate, and remove platform accounts.',
+      breadcrumbs: [{ label: m.common.admin, href: '/admin' }, { label: m.users.title }],
+      title: m.users.title,
+      description: m.users.description,
       actions: (
         <AdminButton size="sm" onClick={openCreate}>
-          <Plus /> New account
+          <Plus /> {m.users.newAccount}
         </AdminButton>
       ),
     });
@@ -116,13 +114,13 @@ export function UsersPortal() {
       clearPage();
       clearFooter();
     };
-  }, [clearFooter, clearPage, openCreate, publishPage]);
+  }, [clearFooter, clearPage, m, openCreate, publishPage]);
 
   useEffect(() => setPage(1), [debouncedSearch, role, status, limit, sortField, sortDirection]);
 
   const footer = useMemo(() => {
     if (!users.data) {
-      return <p className="text-xs text-muted-foreground">Loading account pagination…</p>;
+      return <p className="text-xs text-muted-foreground">{m.users.loadingPagination}</p>;
     }
     return (
       <UsersPagination
@@ -134,7 +132,7 @@ export function UsersPortal() {
         onPageChange={setPage}
       />
     );
-  }, [limit, users.data]);
+  }, [limit, m, users.data]);
 
   useEffect(() => {
     setFooter(footer);
@@ -169,13 +167,13 @@ export function UsersPortal() {
         onSuccess: (updated) => {
           toast.success(
             updated.status === 'BLOCKED'
-              ? `${updated.name} has been deactivated.`
-              : `${updated.name} has been activated.`,
+              ? m.users.deactivated(updated.name)
+              : m.users.activated(updated.name),
           );
           if (selectedUser?.id === updated.id) setSelectedUser(updated);
           setPendingStatus(null);
         },
-        onError: (error) => toast.error(extractErrorMessage(error)),
+        onError: (error) => toast.error(extractErrorMessage(error, m.users.updateFailed)),
       },
     );
   };
@@ -189,11 +187,11 @@ export function UsersPortal() {
     if (!pendingDelete) return;
     deleteMutation.mutate(pendingDelete.id, {
       onSuccess: (deleted) => {
-        toast.success(`${deleted.name} was deleted.`);
+        toast.success(m.users.deleted(deleted.name));
         setSelectedUser(null);
         setPendingDelete(null);
       },
-      onError: (error) => toast.error(extractErrorMessage(error)),
+      onError: (error) => toast.error(extractErrorMessage(error, m.users.updateFailed)),
     });
   };
 
@@ -206,8 +204,8 @@ export function UsersPortal() {
             <AdminInput
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search name, email, or phone…"
-              aria-label="Search user accounts"
+              placeholder={m.users.searchPlaceholder}
+              aria-label={m.users.searchLabel}
               className="pl-9"
             />
           </div>
@@ -215,20 +213,20 @@ export function UsersPortal() {
             <AdminSelect
               value={role}
               onValueChange={(value) => setRole(value as UserRole | 'ALL')}
-              options={ROLE_OPTIONS}
-              ariaLabel="Filter by role"
+              options={roleOptions}
+              ariaLabel={m.users.filterRole}
               className="min-w-32 flex-1 sm:flex-none"
             />
             <AdminSelect
               value={status}
               onValueChange={(value) => setStatus(value as UserStatus | 'ALL')}
-              options={STATUS_OPTIONS}
-              ariaLabel="Filter by account status"
+              options={statusOptions}
+              ariaLabel={m.users.filterStatus}
               className="min-w-32 flex-1 sm:flex-none"
             />
             {hasFilters ? (
               <AdminButton variant="ghost" size="sm" onClick={resetFilters}>
-                <RotateCcw /> Reset
+                <RotateCcw /> {m.common.reset}
               </AdminButton>
             ) : null}
             <ColumnMenu columns={columns} setColumns={setColumns} />
@@ -245,16 +243,18 @@ export function UsersPortal() {
             <thead className="sticky top-0 z-10 bg-muted text-muted-foreground shadow-[0_1px_0_var(--border)]">
               <tr>
                 <SortableHeader
-                  label="Account"
+                  label={m.users.columns.account}
                   field="name"
                   activeField={sortField}
                   direction={sortDirection}
                   onSort={toggleSort}
                 />
-                {columns.phone ? <th className="h-10 px-3 font-semibold">Phone</th> : null}
+                {columns.phone ? (
+                  <th className="h-10 px-3 font-semibold">{m.users.columns.phone}</th>
+                ) : null}
                 {columns.role ? (
                   <SortableHeader
-                    label="Role"
+                    label={m.users.columns.role}
                     field="role"
                     activeField={sortField}
                     direction={sortDirection}
@@ -263,7 +263,7 @@ export function UsersPortal() {
                 ) : null}
                 {columns.status ? (
                   <SortableHeader
-                    label="Status"
+                    label={m.users.columns.status}
                     field="status"
                     activeField={sortField}
                     direction={sortDirection}
@@ -272,14 +272,14 @@ export function UsersPortal() {
                 ) : null}
                 {columns.createdAt ? (
                   <SortableHeader
-                    label="Joined"
+                    label={m.users.columns.joined}
                     field="createdAt"
                     activeField={sortField}
                     direction={sortDirection}
                     onSort={toggleSort}
                   />
                 ) : null}
-                <th className="h-10 w-14 px-3 text-right font-semibold">Actions</th>
+                <th className="h-10 w-14 px-3 text-right font-semibold">{m.common.actions}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -287,10 +287,10 @@ export function UsersPortal() {
               {users.isError ? (
                 <tr>
                   <td colSpan={visibleColumnCount(columns)} className="h-52 px-4 text-center">
-                    <p className="font-semibold">Accounts could not be loaded.</p>
-                    <p className="mt-1 text-muted-foreground">Check the connection and retry.</p>
+                    <p className="font-semibold">{m.users.loadFailed}</p>
+                    <p className="mt-1 text-muted-foreground">{m.users.loadFailedBody}</p>
                     <AdminButton className="mt-4" size="sm" onClick={() => users.refetch()}>
-                      Retry
+                      {m.common.retry}
                     </AdminButton>
                   </td>
                 </tr>
@@ -299,10 +299,8 @@ export function UsersPortal() {
                 <tr>
                   <td colSpan={visibleColumnCount(columns)} className="h-64 px-4 text-center">
                     <PackageOpen className="mx-auto size-8 text-muted-foreground" />
-                    <p className="mt-3 font-semibold">No accounts match this view.</p>
-                    <p className="mt-1 text-muted-foreground">
-                      Adjust the search or reset filters.
-                    </p>
+                    <p className="mt-3 font-semibold">{m.users.empty}</p>
+                    <p className="mt-1 text-muted-foreground">{m.users.emptyBody}</p>
                   </td>
                 </tr>
               ) : null}
@@ -349,14 +347,12 @@ export function UsersPortal() {
         open={Boolean(pendingStatus)}
         onOpenChange={(open) => !open && !statusMutation.isPending && setPendingStatus(null)}
         title={
-          pendingStatus?.status === 'BLOCKED'
-            ? 'Deactivate this account?'
-            : 'Activate this account?'
+          pendingStatus?.status === 'BLOCKED' ? m.users.deactivateTitle : m.users.activateTitle
         }
         description={
           pendingStatus?.status === 'BLOCKED'
-            ? `${pendingStatus.user.name} will lose access to MoveUp and all active sessions will be revoked.`
-            : `${pendingStatus?.user.name ?? 'This user'} will regain access to MoveUp immediately.`
+            ? m.users.deactivateBody(pendingStatus.user.name)
+            : m.users.activateBody(pendingStatus?.user.name ?? m.users.thisUser)
         }
         footer={
           <>
@@ -365,7 +361,7 @@ export function UsersPortal() {
               onClick={() => setPendingStatus(null)}
               disabled={statusMutation.isPending}
             >
-              Cancel
+              {m.common.cancel}
             </AdminButton>
             <AdminButton
               variant={pendingStatus?.status === 'BLOCKED' ? 'destructive' : 'default'}
@@ -373,7 +369,9 @@ export function UsersPortal() {
               disabled={statusMutation.isPending}
             >
               {statusMutation.isPending ? <Loader2 className="animate-spin" /> : null}
-              {pendingStatus?.status === 'BLOCKED' ? 'Deactivate account' : 'Activate account'}
+              {pendingStatus?.status === 'BLOCKED'
+                ? m.users.deactivateAccount
+                : m.users.activateAccount}
             </AdminButton>
           </>
         }
@@ -382,8 +380,8 @@ export function UsersPortal() {
       <AdminDialog
         open={Boolean(pendingDelete)}
         onOpenChange={(open) => !open && !deleteMutation.isPending && setPendingDelete(null)}
-        title="Delete this account?"
-        description={`${pendingDelete?.name ?? 'This user'} will be removed from the account registry and all sessions will be revoked. This action cannot be undone from the back office.`}
+        title={m.users.deleteTitle}
+        description={m.users.deleteBody(pendingDelete?.name ?? m.users.thisUser)}
         footer={
           <>
             <AdminButton
@@ -391,7 +389,7 @@ export function UsersPortal() {
               onClick={() => setPendingDelete(null)}
               disabled={deleteMutation.isPending}
             >
-              Cancel
+              {m.common.cancel}
             </AdminButton>
             <AdminButton
               variant="destructive"
@@ -399,7 +397,7 @@ export function UsersPortal() {
               disabled={deleteMutation.isPending}
             >
               {deleteMutation.isPending ? <Loader2 className="animate-spin" /> : <Trash2 />}
-              Delete account
+              {m.users.deleteAccount}
             </AdminButton>
           </>
         }
@@ -425,13 +423,7 @@ function UserRow({
   onStatusChange: () => void;
   onDelete: () => void;
 }) {
-  const initials = user.name
-    .split(' ')
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join('')
-    .toUpperCase();
-
+  const { m, fmt } = useAdminI18n();
   return (
     <tr className="transition-colors hover:bg-muted/50">
       <td className="px-3 py-2">
@@ -440,9 +432,7 @@ function UserRow({
           onClick={onView}
           className="flex max-w-72 items-center gap-3 rounded-sm text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
         >
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-secondary text-[11px] font-bold text-secondary-foreground">
-            {initials}
-          </span>
+          <UserAvatar name={user.name} avatarUrl={user.avatarUrl} />
           <span className="min-w-0">
             <span className="block truncate font-semibold text-foreground">{user.name}</span>
             <span className="block truncate text-muted-foreground">{user.email}</span>
@@ -453,7 +443,7 @@ function UserRow({
       {columns.role ? (
         <td className="px-3 py-2">
           <AdminBadge variant={user.role === 'ADMIN' ? 'default' : 'secondary'}>
-            {formatRole(user.role)}
+            {m.common.roles[user.role]}
           </AdminBadge>
         </td>
       ) : null}
@@ -461,13 +451,13 @@ function UserRow({
         <td className="px-3 py-2">
           <AdminBadge variant={user.status === 'ACTIVE' ? 'success' : 'destructive'}>
             <span className="size-1.5 rounded-full bg-current" aria-hidden />
-            {user.status === 'ACTIVE' ? 'Active' : 'Deactivated'}
+            {m.common.accountStatus[user.status]}
           </AdminBadge>
         </td>
       ) : null}
       {columns.createdAt ? (
         <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">
-          {formatDate(user.createdAt)}
+          {fmt.date(user.createdAt)}
         </td>
       ) : null}
       <td className="px-3 py-2 text-right">
@@ -499,10 +489,11 @@ function UserActions({
   onStatusChange: () => void;
   onDelete: () => void;
 }) {
+  const { m } = useAdminI18n();
   return (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger asChild>
-        <AdminButton variant="ghost" size="iconSm" aria-label={`Actions for ${user.name}`}>
+        <AdminButton variant="ghost" size="iconSm" aria-label={m.common.actionsFor(user.name)}>
           <MoreHorizontal />
         </AdminButton>
       </DropdownMenu.Trigger>
@@ -516,13 +507,13 @@ function UserActions({
             onSelect={onView}
             className="flex h-8 cursor-default select-none items-center gap-2 rounded-md px-2 text-sm outline-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground"
           >
-            <Eye className="size-4" /> View account
+            <Eye className="size-4" /> {m.users.viewAccount}
           </DropdownMenu.Item>
           <DropdownMenu.Item
             onSelect={onEdit}
             className="flex h-8 cursor-default select-none items-center gap-2 rounded-md px-2 text-sm outline-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground"
           >
-            <Edit3 className="size-4" /> Edit account
+            <Edit3 className="size-4" /> {m.users.editAccount}
           </DropdownMenu.Item>
           <DropdownMenu.Item
             disabled={isSelf}
@@ -534,7 +525,7 @@ function UserActions({
             ) : (
               <ShieldCheck className="size-4" />
             )}
-            {user.status === 'ACTIVE' ? 'Deactivate account' : 'Activate account'}
+            {user.status === 'ACTIVE' ? m.users.deactivateAccount : m.users.activateAccount}
           </DropdownMenu.Item>
           <DropdownMenu.Separator className="my-1 h-px bg-border" />
           <DropdownMenu.Item
@@ -542,7 +533,7 @@ function UserActions({
             onSelect={onDelete}
             className="flex h-8 cursor-default select-none items-center gap-2 rounded-md px-2 text-sm text-destructive outline-none data-[disabled]:opacity-50 data-[highlighted]:bg-destructive/10"
           >
-            <Trash2 className="size-4" /> Delete account
+            <Trash2 className="size-4" /> {m.users.deleteAccount}
           </DropdownMenu.Item>
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
@@ -563,6 +554,7 @@ function SortableHeader({
   direction: SortDirection;
   onSort: (field: SortField) => void;
 }) {
+  const { m } = useAdminI18n();
   const Icon = activeField !== field ? ArrowUpDown : direction === 'ASC' ? ArrowUp : ArrowDown;
   return (
     <th
@@ -574,6 +566,7 @@ function SortableHeader({
       <button
         type="button"
         onClick={() => onSort(field)}
+        aria-label={m.common.sortBy(label)}
         className="inline-flex h-8 items-center gap-1 rounded-md px-1 outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
       >
         {label} <Icon className="size-3.5" />
@@ -589,17 +582,18 @@ function ColumnMenu({
   columns: Record<ToggleColumn, boolean>;
   setColumns: React.Dispatch<React.SetStateAction<Record<ToggleColumn, boolean>>>;
 }) {
+  const { m } = useAdminI18n();
   const labels: Record<ToggleColumn, string> = {
-    phone: 'Phone',
-    role: 'Role',
-    status: 'Status',
-    createdAt: 'Joined date',
+    phone: m.users.columns.phone,
+    role: m.users.columns.role,
+    status: m.users.columns.status,
+    createdAt: m.users.columns.joinedDate,
   };
 
   return (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger asChild>
-        <AdminButton variant="outline" size="icon" aria-label="Choose visible columns">
+        <AdminButton variant="outline" size="icon" aria-label={m.users.chooseColumns}>
           <Columns3 />
         </AdminButton>
       </DropdownMenu.Trigger>
@@ -609,7 +603,9 @@ function ColumnMenu({
           sideOffset={4}
           className="z-[120] min-w-44 rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md"
         >
-          <p className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Visible columns</p>
+          <p className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+            {m.users.visibleColumns}
+          </p>
           {(Object.keys(columns) as ToggleColumn[]).map((column) => (
             <DropdownMenu.CheckboxItem
               key={column}
@@ -648,20 +644,21 @@ function UserDetailsSheet({
   onStatusChange: () => void;
   onDelete: () => void;
 }) {
+  const { m, fmt } = useAdminI18n();
   return (
     <AdminSheet
       open={Boolean(user)}
       onOpenChange={(open) => !open && onClose()}
-      title={user?.name ?? 'Account details'}
-      description="Stored identity and platform access information."
+      title={user?.name ?? m.users.detailsTitle}
+      description={m.users.detailsBody}
       footer={
         user ? (
           <>
             <AdminButton variant="secondary" onClick={onClose}>
-              Close
+              {m.common.close}
             </AdminButton>
             <AdminButton onClick={onEdit}>
-              <Edit3 /> Edit account
+              <Edit3 /> {m.users.editAccount}
             </AdminButton>
           </>
         ) : null
@@ -670,58 +667,48 @@ function UserDetailsSheet({
       {user ? (
         <div className="space-y-6">
           <div className="flex items-center gap-3">
-            <span className="flex size-11 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
-              {user.name
-                .split(' ')
-                .slice(0, 2)
-                .map((part) => part[0])
-                .join('')
-                .toUpperCase()}
-            </span>
+            <UserAvatar name={user.name} avatarUrl={user.avatarUrl} size="md" />
             <div>
               <p className="font-semibold">{user.name}</p>
               <p className="text-sm text-muted-foreground">{user.email}</p>
             </div>
           </div>
           <dl className="divide-y divide-border rounded-lg border border-border">
-            <DetailRow label="Role" value={formatRole(user.role)} />
-            <DetailRow label="Status" value={user.status === 'ACTIVE' ? 'Active' : 'Deactivated'} />
-            <DetailRow label="Phone" value={user.phone} />
-            <DetailRow label="Locale" value={user.locale.toUpperCase()} />
-            <DetailRow label="Created" value={formatDateTime(user.createdAt)} />
-            <DetailRow label="Last updated" value={formatDateTime(user.updatedAt)} />
-            <DetailRow label="Account ID" value={user.id} mono />
+            <DetailRow label={m.users.details.role} value={m.common.roles[user.role]} />
+            <DetailRow label={m.users.details.status} value={m.common.accountStatus[user.status]} />
+            <DetailRow label={m.users.details.phone} value={user.phone} />
+            <DetailRow label={m.users.details.locale} value={localeName(m, user.locale)} />
+            <DetailRow label={m.users.details.created} value={fmt.dateTime(user.createdAt)} />
+            <DetailRow label={m.users.details.updated} value={fmt.dateTime(user.updatedAt)} />
+            <DetailRow label={m.users.details.id} value={user.id} mono />
           </dl>
           {isSelf ? (
             <p className="rounded-md bg-muted px-3 py-2 text-xs leading-5 text-muted-foreground">
-              This is your current admin account. Role changes, deactivation, and deletion are
-              disabled to prevent lockout.
+              {m.users.selfNote}
             </p>
           ) : null}
           <div className="border-t border-border pt-5">
-            <h3 className="text-sm font-semibold">Account access</h3>
-            <p className="mt-1 text-xs leading-5 text-muted-foreground">
-              Deactivation revokes active sessions. Deletion removes the account from the registry.
-            </p>
+            <h3 className="text-sm font-semibold">{m.users.access}</h3>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">{m.users.accessBody}</p>
             <div className="mt-4 flex flex-wrap gap-2">
               <AdminButton
                 variant={user.status === 'ACTIVE' ? 'outline' : 'default'}
                 size="sm"
                 onClick={onStatusChange}
                 disabled={isSelf}
-                title={isSelf ? 'You cannot deactivate your own admin account' : undefined}
+                title={isSelf ? m.users.cannotDeactivateSelf : undefined}
               >
                 {user.status === 'ACTIVE' ? <ShieldBan /> : <ShieldCheck />}
-                {user.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
+                {user.status === 'ACTIVE' ? m.users.deactivate : m.users.activate}
               </AdminButton>
               <AdminButton
                 variant="destructive"
                 size="sm"
                 onClick={onDelete}
                 disabled={isSelf}
-                title={isSelf ? 'You cannot delete your own admin account' : undefined}
+                title={isSelf ? m.users.cannotDeleteSelf : undefined}
               >
-                <Trash2 /> Delete account
+                <Trash2 /> {m.users.deleteAccount}
               </AdminButton>
             </div>
           </div>
@@ -763,13 +750,14 @@ function UsersPagination({
   onLimitChange: (limit: number) => void;
   onPageChange: (page: number) => void;
 }) {
+  const { m } = useAdminI18n();
   const safePageCount = Math.max(pageCount, 1);
   return (
     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-center gap-3 text-xs text-muted-foreground">
-        <span>{itemCount} accounts</span>
+        <span>{m.users.accountCount(itemCount)}</span>
         <div className="flex items-center gap-1">
-          <span>Rows</span>
+          <span>{m.users.rows}</span>
           {[10, 25, 50].map((size) => (
             <button
               key={size}
@@ -786,27 +774,31 @@ function UsersPagination({
       </div>
       <div className="flex items-center gap-1">
         <span className="mr-2 text-xs text-muted-foreground">
-          Page {page} of {safePageCount}
+          {m.common.pageOf(page, safePageCount)}
         </span>
-        <PaginationButton label="First page" disabled={page <= 1} onClick={() => onPageChange(1)}>
+        <PaginationButton
+          label={m.common.firstPage}
+          disabled={page <= 1}
+          onClick={() => onPageChange(1)}
+        >
           <ChevronFirst />
         </PaginationButton>
         <PaginationButton
-          label="Previous page"
+          label={m.common.previousPage}
           disabled={page <= 1}
           onClick={() => onPageChange(page - 1)}
         >
           <ChevronLeft />
         </PaginationButton>
         <PaginationButton
-          label="Next page"
+          label={m.common.nextPage}
           disabled={page >= safePageCount}
           onClick={() => onPageChange(page + 1)}
         >
           <ChevronRight />
         </PaginationButton>
         <PaginationButton
-          label="Last page"
+          label={m.common.lastPage}
           disabled={page >= safePageCount}
           onClick={() => onPageChange(safePageCount)}
         >
@@ -859,29 +851,11 @@ function visibleColumnCount(columns: Record<ToggleColumn, boolean>) {
   return 2 + Object.values(columns).filter(Boolean).length;
 }
 
-function formatRole(role: UserRole) {
-  return role.charAt(0) + role.slice(1).toLowerCase();
+function localeName(m: AdminMessages, locale: string) {
+  return locale in m.languages ? m.languages[locale as keyof AdminMessages['languages']] : locale;
 }
 
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  }).format(new Date(value));
-}
-
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(value));
-}
-
-function extractErrorMessage(error: unknown): string {
+function extractErrorMessage(error: unknown, fallback: string): string {
   const axiosError = error as AxiosError<ServerErrorResponse>;
-  return axiosError.response?.data?.message ?? 'The account could not be updated. Try again.';
+  return axiosError.response?.data?.message ?? fallback;
 }

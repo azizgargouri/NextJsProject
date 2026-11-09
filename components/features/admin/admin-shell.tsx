@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/hooks/stores/auth-store';
 import { useSignOut } from '@/hooks/content/auth/use-sign-out';
 import { AdminButton } from '@/components/ui/admin-button';
+import { AdminI18nProvider, useAdminI18n } from '@/lib/i18n/admin';
 import { AdminShellProvider, useAdminShell } from './shell/admin-shell-context';
 import { AdminSidebar } from './shell/admin-sidebar';
 import { AdminHeader } from './shell/admin-header';
@@ -27,6 +28,14 @@ import { AdminPageHeader } from './shell/admin-page-header';
 const SIDEBAR_COOKIE = 'moveup_admin_sidebar';
 
 export function AdminShell({ children }: { children: ReactNode }) {
+  return (
+    <AdminI18nProvider>
+      <AdminShellGate>{children}</AdminShellGate>
+    </AdminI18nProvider>
+  );
+}
+
+function AdminShellGate({ children }: { children: ReactNode }) {
   const router = useRouter();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const [hydrated, setHydrated] = useState(false);
@@ -77,6 +86,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
 
 function AdminWorkspace({ children }: { children: ReactNode }) {
   const { footer, mobileNavOpen, setMobileNavOpen } = useAdminShell();
+  const { m } = useAdminI18n();
   const [collapsed, setCollapsed] = useState(false);
   const [hoverExpanded, setHoverExpanded] = useState(false);
 
@@ -146,7 +156,7 @@ function AdminWorkspace({ children }: { children: ReactNode }) {
         <Dialog.Portal>
           <Dialog.Overlay className="admin-dialog-overlay fixed inset-0 z-[90] bg-black/50 md:hidden" />
           <Dialog.Content className="admin-mobile-nav fixed inset-y-0 left-0 z-[100] w-72 border-r border-sidebar-border bg-sidebar shadow-lg outline-none md:hidden">
-            <Dialog.Title className="sr-only">Admin navigation</Dialog.Title>
+            <Dialog.Title className="sr-only">{m.shell.mobileNavTitle}</Dialog.Title>
             <AdminSidebar
               compact={false}
               showCollapse={false}
@@ -157,7 +167,7 @@ function AdminWorkspace({ children }: { children: ReactNode }) {
                 variant="ghost"
                 size="iconSm"
                 className="absolute right-2 top-4"
-                aria-label="Close navigation"
+                aria-label={m.shell.closeNavigation}
               >
                 <X />
               </AdminButton>
@@ -170,11 +180,12 @@ function AdminWorkspace({ children }: { children: ReactNode }) {
 }
 
 function AdminShellLoading() {
+  const { m } = useAdminI18n();
   return (
     <div className="admin-surface fixed inset-0 z-50 flex items-center justify-center bg-background text-foreground">
       <div className="text-center">
         <span className="mx-auto block size-6 animate-spin rounded-full border-2 border-muted border-t-primary" />
-        <p className="mt-3 text-sm font-medium">Loading admin workspace…</p>
+        <p className="mt-3 text-sm font-medium">{m.shell.loading}</p>
       </div>
     </div>
   );
@@ -183,17 +194,16 @@ function AdminShellLoading() {
 function AdminShellFailure({ onRetry }: { onRetry: () => void }) {
   const router = useRouter();
   const signOut = useSignOut();
+  const { m } = useAdminI18n();
 
   return (
     <div className="admin-surface fixed inset-0 z-50 flex items-center justify-center bg-background p-6 text-foreground">
       <div className="w-full max-w-sm rounded-xl border border-border bg-card p-6 text-card-foreground shadow-sm">
-        <h1 className="text-lg font-semibold">Admin session could not be verified</h1>
-        <p className="mt-2 text-sm leading-5 text-muted-foreground">
-          Retry the connection. If your account was blocked or changed, sign in again.
-        </p>
+        <h1 className="text-lg font-semibold">{m.shell.failureTitle}</h1>
+        <p className="mt-2 text-sm leading-5 text-muted-foreground">{m.shell.failureBody}</p>
         <div className="mt-6 flex justify-end gap-2">
           <AdminButton variant="secondary" onClick={onRetry}>
-            Retry
+            {m.common.retry}
           </AdminButton>
           <AdminButton
             onClick={() =>
@@ -201,7 +211,7 @@ function AdminShellFailure({ onRetry }: { onRetry: () => void }) {
             }
             disabled={signOut.isPending}
           >
-            Sign out
+            {m.shell.signOut}
           </AdminButton>
         </div>
       </div>

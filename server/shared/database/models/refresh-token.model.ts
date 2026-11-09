@@ -10,6 +10,10 @@ export interface RefreshTokenDoc {
   tokenHash: string;
   expiresAt: Date;
   revokedAt: Date | null;
+  /** Raw User-Agent of the device that opened the session (display only). */
+  userAgent: string | null;
+  /** When the session was first opened; preserved across token rotation. */
+  sessionStartedAt: Date | null;
   createdAt: Date;
 
   _id: Types.ObjectId;
@@ -22,6 +26,8 @@ const RefreshTokenSchema = new Schema<RefreshTokenDoc>(
     // TTL index (expires: 0) purges the document the moment expiresAt passes.
     expiresAt: { type: Date, required: true, index: { expires: 0 } },
     revokedAt: { type: Date, default: null },
+    userAgent: { type: String, default: null },
+    sessionStartedAt: { type: Date, default: null },
   },
   { timestamps: true },
 );

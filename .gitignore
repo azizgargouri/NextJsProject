@@ -31,3 +31,5 @@ yarn-error.log
 
 # local agent review artifacts
 /.impeccable
+# Playwright CLI output (may contain credentials)
+.playwright-cli/

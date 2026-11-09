@@ -10,9 +10,13 @@
   --color-paper-soft: #eae8e1;
   --color-ink: #101010;
   --color-ink-80: #3a3a38;
+  --color-ink-60: #5c5b56;
   --color-ink-40: #8b8a84;
   --color-hazard: #e61919;
   --color-hazard-dark: #b81414;
+  /* Small hazard text: dark on paper (5.7:1), light on ink (6.6:1). */
+  --color-hazard-ink: #b81414;
+  --color-hazard-glow: #ff6a5c;
 }
 
 /*
@@ -363,6 +367,83 @@ body:has(.admin-surface).grain::before {
   text-transform: uppercase;
 }
 
+/* Lenis smooth scroll (public pages only; the admin shell owns its own scroll) */
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+
+.lenis.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+
+/* Public focus ring: visible on paper and on ink */
+.landing :focus-visible {
+  outline: 2px solid var(--color-hazard);
+  outline-offset: 3px;
+}
+
+.landing .on-ink :focus-visible {
+  outline-color: var(--color-hazard-glow);
+}
+
+/* Range input in the print system */
+.ledger-range {
+  appearance: none;
+  height: 2px;
+  width: 100%;
+  background: linear-gradient(
+    to right,
+    var(--color-ink) 0 var(--fill, 0%),
+    color-mix(in srgb, var(--color-ink) 25%, transparent) var(--fill, 0%) 100%
+  );
+  cursor: pointer;
+}
+
+.ledger-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  background: var(--color-hazard);
+  border: 2px solid var(--color-ink);
+  border-radius: 0;
+  transition: transform 150ms ease-out;
+}
+
+.ledger-range::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  background: var(--color-hazard);
+  border: 2px solid var(--color-ink);
+  border-radius: 0;
+}
+
+.ledger-range:active::-webkit-slider-thumb {
+  transform: scale(1.15);
+}
+
+/* Inventory assistant: indeterminate scan bar while the local model works */
+.inventory-scan {
+  animation: inventory-scan 1.4s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+
+@keyframes inventory-scan {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(300%);
+  }
+}
+
 /* Hide scrollbars for horizontal carriers */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
@@ -372,8 +453,15 @@ body:has(.admin-surface).grain::before {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .marquee-track {
+  .marquee-track,
+  .inventory-scan {
     animation: none !important;
+  }
+
+  .landing *,
+  .landing *::before,
+  .landing *::after {
+    transition-duration: 0.01ms !important;
   }
 
   .admin-dialog-overlay,

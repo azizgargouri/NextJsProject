@@ -1,18 +1,27 @@
 'use client';
 
+import { useEffect } from 'react';
 import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
+import { useAdminI18n } from '@/lib/i18n/admin';
 import { useAdminShell } from './admin-shell-context';
 
 export function AdminPageHeader() {
   const { page } = useAdminShell();
+  const { m } = useAdminI18n();
+
+  // Route metadata is static English; keep the tab title in the active language.
+  useEffect(() => {
+    if (page?.title) document.title = `${page.title} — MoveUp`;
+  }, [page?.title]);
+
   if (!page) return null;
 
   return (
     <section className="shrink-0 border-b border-border bg-background px-4 py-5 min-[426px]:px-10">
       {page.breadcrumbs.length ? (
         <nav
-          aria-label="Breadcrumb"
+          aria-label={m.shell.breadcrumb}
           className="mb-2 flex items-center gap-1 text-xs text-muted-foreground"
         >
           {page.breadcrumbs.map((item, index) => (
