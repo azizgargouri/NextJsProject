@@ -60,20 +60,30 @@ Checks after the merge: type check clean, lint clean (0 errors), 150/150 mover t
 
 Still open from this branch (see MOVER_SIDE.md section 9): offers need client move creation and admin dispatch/mover approval, which aren't built; `sweep()` needs a cron route; mover uploads use local disk (`.uploads`) and should move to the RustFS/S3 storage already used for avatars.
 
+### `main` → `dev` sync — 2026-11-09, merge `677e919`
+
+A teammate merged `unified-all-features`, `smart-room`, `rh-and-employee-tracking`, `feat/member6-quality-ai-v2`, `requests-and-inventory` and the first `mover-side` commit straight into `main` (36 commits, about 500 files). `dev` took all of it:
+
+- **Conflicts:** `env.ts`, `mongoose.ts`, the API and model barrels, `types/index.ts` and `package.json` scripts all kept both sides. `mongoose.ts` keeps `dev`'s configurable `MONGODB_DB_NAME` plus `main`'s in-memory fallback when a local MongoDB is not running. `types/index.ts` re-exports the mover types by name because `MoveItemDto` exists in both `homes` and `mover`.
+- **Fixed from `main`:** 3 lint errors (unused variables in contracts and leave-requests), `package-lock.json` removed again, `.env.example` lost the storage and Ollama sections and named the blockchain variables wrongly (`CHAIN_*` instead of `NEXT_PUBLIC_CHAIN_ID`, `NEXT_PUBLIC_RPC_URL`, `NEXT_PUBLIC_CONTRACT_ADDRESS`, `CONTRACT_ADMIN_PRIVATE_KEY`, which `env.ts` reads); all restored.
+- **Checks:** tsc clean, eslint 0 errors, `yarn test` 18/18, `yarn test:mover` 150/150, `next build` succeeds (one warning from inside `@ai-sdk/provider-utils`, not our code).
+
+**Rule going forward:** nobody pushes features straight to `main`. Merge into `dev`, verify, then open a pull request from `dev` to `main`.
+
+### `smart-room` (Omar Degani) — merged 2026-11-09, merge `791d0c1`
+
+Description: `SMART_ROOM_LAYOUT_PLAN.md` on the branch. Most of the branch had already reached `dev` through `main`; only the "1 item / 2 items" pluralisation fix was new. No conflicts.
+
+Shared setting to know about: the smart room planner and the landing inventory assistant both read `OLLAMA_MODEL` (a text model). The planner falls back to Groq (`GROQ_API_KEY`) when Ollama is missing or slow; the inventory assistant says it is offline instead.
+
 ## Waiting to be integrated
 
-Measured against `dev` on 2026-11-09:
+Measured against `dev` on 2026-11-09, after the `main` sync:
 
-| Branch                       | Author         | Ahead | Behind | Files | Description file            |
-| ---------------------------- | -------------- | ----- | ------ | ----- | --------------------------- |
-| `requests-and-inventory`     | aziz           | 2     | 35     | 172   | none                        |
-| `rh-and-employee-tracking`   | fedibenman     | 8     | 35     | 192   | none                        |
-| `smart-room`                 | Omar Degani    | 6     | 24     | 67    | `SMART_ROOM_LAYOUT_PLAN.md` |
-| `feat/member6-quality-ai-v2` | abderrahmen007 | 2     | 24     | 100   | none                        |
-| `unified-all-features`       | Omar Degani    | 26    | 20     | 281   | `SMART_ROOM_LAYOUT_PLAN.md` |
-
-Notes for the next merges:
-
-- **`unified-all-features`** already combines several branches and probably overlaps with `smart-room`. Check what it contains before merging both, so the same work isn't merged twice.
-- **`requests-and-inventory`** likely touches client move creation, which the mover side is waiting for (MOVER_SIDE.md section 8). It should create `MoveRequest` documents the way `dispatchMove()` expects, and its inventory should reuse `lib/inventory/catalogue.ts` and the AI inventory endpoint already on `dev`.
-- Branches without a description file: ask the author for one, or write it from the diff as part of the merge.
+| Branch                       | Author         | Not yet in `dev`                                                                      |
+| ---------------------------- | -------------- | ------------------------------------------------------------------------------------- |
+| `rh-and-employee-tracking`   | fedibenman     | 6 commits, 11 files: voice check-in fixes (16 kHz WAV, stored recordings) and RH docs |
+| `requests-and-inventory`     | aziz           | nothing (fully merged)                                                                |
+| `feat/member6-quality-ai-v2` | abderrahmen007 | nothing (fully merged)                                                                |
+| `unified-all-features`       | aziz           | nothing (fully merged)                                                                |
+| `mover-side`                 | Salhi Firas    | nothing (fully merged)                                                                |

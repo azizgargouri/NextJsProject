@@ -153,10 +153,10 @@ Mongoose v9 specifics: no `FilterQuery` export (use `Record<string, unknown>`), 
 
 ## Git workflow
 
-- Remote: HTTPS only — `https://github.com/azizgargouri/NextJsProject.git` (SSH fails on this machine; `gh` CLI not installed).
+- Remote: HTTPS only — `https://github.com/mAmineSouissi/NextJsProject.git` (SSH fails on this machine; `gh` CLI not installed).
 - Integrating team branches: follow `INTEGRATION.md` (merge, never rebase; conflict rules; verification; log of merged and waiting branches). Update it after every merge.
 - Branches: `main` is stable and demo-ready; `dev` (cut from `main`) is the integration branch. Do new work on `dev` or on feature branches (`feat/<name>`, `fix/<name>`) cut from `dev` and merged back into `dev`; merge `dev` into `main` only when it is verified.
-- Push pattern: `git push https://github.com/azizgargouri/NextJsProject.git <branch>` — then `git fetch origin` so status stops showing "ahead" (URL pushes do not update the origin ref).
+- Push pattern: `git push https://github.com/mAmineSouissi/NextJsProject.git <branch>` — then `git fetch origin` so status stops showing "ahead" (URL pushes do not update the origin ref).
 - Make short, atomic, conventional commits; keep `git status` clean (nothing untracked except ignored artifacts). commit splits so far: api/backend / admin UI / landing / db seed.
 
 ## UI verification protocols (quick reference)
