@@ -23,6 +23,17 @@ export type ClaimStatus = (typeof CLAIM_STATUSES)[number];
 export const CLAIM_OUTCOMES = ['FULL_REFUND', 'PARTIAL_REFUND', 'REPAIR', 'NO_ACTION'] as const;
 export type ClaimOutcome = (typeof CLAIM_OUTCOMES)[number];
 
+export const DAMAGE_SEVERITIES = ['NONE', 'MINOR', 'MODERATE', 'SEVERE', 'TOTAL_LOSS'] as const;
+export type DamageSeverity = (typeof DAMAGE_SEVERITIES)[number];
+
+export const DAMAGE_SEVERITY_LABELS: Record<DamageSeverity, string> = {
+  NONE: 'No visible damage',
+  MINOR: 'Minor cosmetic wear',
+  MODERATE: 'Moderate — repairable',
+  SEVERE: 'Severe — major repair',
+  TOTAL_LOSS: 'Total loss — replacement',
+};
+
 /** Allowed status moves. RESOLVED / REJECTED can only be reopened into review by staff. */
 export const CLAIM_TRANSITIONS: Record<ClaimStatus, readonly ClaimStatus[]> = {
   OPEN: ['UNDER_REVIEW', 'REJECTED'],

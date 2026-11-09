@@ -65,7 +65,9 @@ export class ClaimsRepository {
   /** Atomic update + timeline append in one round-trip. */
   async update(
     id: string,
-    set: Partial<Pick<ClaimDoc, 'status' | 'priority' | 'resolution'>>,
+    set: Partial<
+      Pick<ClaimDoc, 'status' | 'priority' | 'resolution' | 'aiMediation' | 'visionAnalysis'>
+    >,
     events: ClaimEvent[],
   ): Promise<ClaimDoc | null> {
     return (await this.model())
@@ -73,7 +75,7 @@ export class ClaimsRepository {
         id,
         {
           ...(Object.keys(set).length ? { $set: set } : {}),
-          $push: { timeline: { $each: events } },
+          ...(events.length ? { $push: { timeline: { $each: events } } } : {}),
         },
         { new: true },
       )

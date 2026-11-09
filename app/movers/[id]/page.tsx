@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { reviewsService, ReviewNotFoundError } from '@/server/modules/reviews';
 import { RatingSummary } from '@/components/features/workspace/rating-summary';
+import { MoverScorecardCard } from '@/components/features/workspace/mover-scorecard';
 import { Stars } from '@/components/features/workspace/workspace-ui';
 import { formatDate } from '@/components/features/workspace/workspace-blocks';
 import type { RatingSummaryDto } from '@/types';
@@ -49,6 +50,7 @@ export default async function MoverPublicPage({ params }: { params: Promise<{ id
         <h1 className="display mt-2 text-4xl md:text-6xl">{profile.mover.name.toUpperCase()}.</h1>
       </header>
       <RatingSummary summary={profile.summary as unknown as RatingSummaryDto} />
+      <MoverScorecardCard moverId={profile.mover.id} moverName={profile.mover.name} />
       <ul className="space-y-4">
         {profile.latest.map((review) => (
           <li key={review.id} className="border border-ink p-5">

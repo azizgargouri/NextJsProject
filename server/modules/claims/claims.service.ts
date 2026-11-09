@@ -2,8 +2,17 @@ import { createPageDto, type PageDto } from '../../shared/database/pagination';
 import { BadRequestError, ForbiddenError } from '../../shared/database/errors';
 import { findActiveMover, findUserRefs } from '../../shared/database/user-refs';
 import { canTransitionClaim, type ClaimStatus, type Role } from '../../shared/database/enums';
-import type { ClaimDoc, ClaimEvent } from '../../shared/database/models/claim.model';
-import { triageClaim } from '../ai/ai.analysis';
+import type {
+  ClaimDoc,
+  ClaimEvent,
+  ClaimMediationDoc,
+  ClaimVisionAnalysisDoc,
+} from '../../shared/database/models/claim.model';
+import {
+  analyzeClaimEvidencePhotos,
+  suggestClaimThreadMessage,
+  triageClaim,
+} from '../ai/ai.analysis';
 import { claimsRepository } from './claims.repository';
 import {
   claimUserIds,
@@ -89,11 +98,35 @@ export class ClaimsService {
       if (open) throw new DuplicateOpenClaimError(open.reference);
     }
 
+    const evidencePhotos = Array.isArray(input.evidencePhotos) ? input.evidencePhotos : [];
+
+    // Vision AI runs on attached photos (or uses the pre-scanned client result).
+    let visionAnalysis: ClaimVisionAnalysisDoc | null = null;
+    if (input.visionAnalysisJson) {
+      visionAnalysis = {
+        ...input.visionAnalysisJson,
+        source: 'rules',
+        model: null,
+        analyzedAt: new Date(),
+      };
+    } else if (evidencePhotos.length > 0) {
+      const vision = await analyzeClaimEvidencePhotos({
+        images: evidencePhotos,
+        hint: `${input.subject} — ${input.description}`,
+      });
+      visionAnalysis = {
+        ...vision.result,
+        source: vision.source,
+        model: vision.model,
+        analyzedAt: new Date(),
+      };
+    }
+
     // AI triage (or rule fallback) runs before saving so staff see it immediately.
     const triage = await triageClaim({
       subject: input.subject,
       description: input.description,
-      amountClaimed: input.amountClaimed ?? null,
+      amountClaimed: input.amountClaimed ?? visionAnalysis?.recommendedClaimAmountTnd ?? null,
       category: input.category,
     });
 
@@ -108,12 +141,15 @@ export class ClaimsService {
       subject: input.subject,
       description: input.description,
       amountClaimed: input.amountClaimed ?? null,
+      evidencePhotos,
+      visionAnalysis,
       aiTriage: {
         ...triage.result,
         source: triage.source,
         model: triage.model,
         createdAt: new Date(),
       },
+      aiMediation: null,
       resolution: null,
       timeline: [event(actor, 'CREATED', 'Claim submitted', 'OPEN')],
     });
@@ -144,11 +180,36 @@ export class ClaimsService {
     return this.presentOne(updated, actor.role === 'ADMIN' ? 'staff' : 'party');
   }
 
+  /** AI communication coach (generateText in Server Action): drafts a polite reply for the claim thread. */
+  async suggestMessage(actor: Actor, id: string) {
+    const doc = await this.loadVisible(actor, id);
+    const actorRole = actor.role === 'MOVER' ? 'MOVER' : 'CLIENT';
+    const lastMessage = [...(doc.timeline ?? [])]
+      .reverse()
+      .find((ev) => ev.kind === 'MESSAGE' && ev.text?.trim());
+    const visionSummary = doc.visionAnalysis
+      ? `${doc.visionAnalysis.detectedItems.length} item(s), overall damage rate ${doc.visionAnalysis.overallDamageRatePct ?? 65}%, recommended ${doc.visionAnalysis.recommendedClaimAmountTnd} TND`
+      : null;
+
+    return suggestClaimThreadMessage({
+      actorRole,
+      reference: doc.reference,
+      category: doc.category,
+      subject: doc.subject,
+      amountClaimed: doc.amountClaimed ?? null,
+      visionSummary,
+      lastMessageText: lastMessage?.text ?? null,
+    });
+  }
+
   async adminList(query: ClaimAdminQuery): Promise<PageDto<ClaimResponse>> {
     const where: Record<string, unknown> = {};
     if (query.status !== 'ALL') where.status = query.status;
     if (query.priority !== 'ALL') where.priority = query.priority;
     if (query.category !== 'ALL') where.category = query.category;
+    if (query.severity && query.severity !== 'ALL') {
+      where['visionAnalysis.overallSeverity'] = query.severity;
+    }
     if (query.search) {
       const escaped = query.search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       where.$or = [
@@ -205,6 +266,15 @@ export class ClaimsService {
     return this.presentOne(updated, 'staff');
   }
 
+  async saveMediation(id: string, mediation: ClaimMediationDoc): Promise<void> {
+    await claimsRepository.update(id, { aiMediation: mediation }, []);
+  }
+
+  async countForMover(moverId: string): Promise<number> {
+    const page = await claimsRepository.paginate({ moverId }, 1, 1);
+    return page.itemCount;
+  }
+
   async stats() {
     const [byStatus, urgentOpen, avgResolutionHours] = await Promise.all([
       claimsRepository.countByStatus(),
@@ -229,7 +299,7 @@ export class ClaimsService {
       subject: doc.subject,
       status: doc.status,
       category: doc.category,
-      updatedAt: doc.updatedAt.toISOString().slice(0, 10),
+      updatedAt: new Date(doc.updatedAt ?? doc.createdAt ?? Date.now()).toISOString().slice(0, 10),
       resolution: doc.resolution ? `${doc.resolution.outcome}: ${doc.resolution.note}` : null,
     }));
   }

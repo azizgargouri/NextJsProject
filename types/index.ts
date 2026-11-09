@@ -696,11 +696,20 @@ export type {
   ClaimOutcome,
   ClaimPriority,
   ClaimStatus,
+  DamageSeverity,
   ReviewStatus,
   ReviewTopic,
   Sentiment,
 } from '@/lib/quality/constants';
-export type { ClaimTriage, ReviewInsights, ReviewModeration } from '@/lib/quality/ai-schemas';
+export type {
+  ClaimMediation,
+  ClaimTriage,
+  CompensationBreakdownItem,
+  DamageVision,
+  DamageVisionItem,
+  ReviewInsights,
+  ReviewModeration,
+} from '@/lib/quality/ai-schemas';
 
 import type {
   AnalysisSource,
@@ -708,6 +717,7 @@ import type {
   ClaimOutcome,
   ClaimPriority,
   ClaimStatus,
+  DamageSeverity,
   ReviewStatus,
   ReviewTopic,
   Sentiment,
@@ -729,6 +739,53 @@ export interface ClaimEventDto {
   createdAt: string;
 }
 
+export interface ClaimVisionAnalysisDto {
+  source: AnalysisSource;
+  model: string | null;
+  detectedItems: {
+    name: string;
+    material: string;
+    damageType: string;
+    severity: DamageSeverity;
+    damageRatePct?: number;
+    roiCoveragePct?: number;
+    repairable: boolean;
+    estimatedCostTnd: number;
+  }[];
+  overallSeverity: DamageSeverity;
+  overallDamageRatePct?: number;
+  suggestedCategory: ClaimCategory;
+  estimatedRepairMinTnd: number;
+  estimatedRepairMaxTnd: number;
+  recommendedClaimAmountTnd: number;
+  suggestedSubject: string;
+  suggestedDescription: string;
+  authenticityNotes?: string;
+  confidence: number;
+  analyzedAt: string;
+}
+
+export interface ClaimMediationDto {
+  source: AnalysisSource;
+  model: string | null;
+  recommendedOutcome: ClaimOutcome;
+  recommendedAmountTnd: number;
+  clientLiabilityPct: number;
+  moverLiabilityPct: number;
+  confidenceScore: number;
+  riskLevel: ClaimPriority;
+  executiveSummary: string;
+  policyCitations: string[];
+  evidenceFactors: string[];
+  compensationBreakdown: {
+    item: string;
+    amountTnd: number;
+    rationale: string;
+  }[];
+  draftResolutionNote: string;
+  generatedAt: string;
+}
+
 export interface ClaimDto {
   id: string;
   reference: string;
@@ -738,6 +795,8 @@ export interface ClaimDto {
   description: string;
   amountClaimed: number | null;
   moveReference: string | null;
+  evidencePhotos?: string[];
+  visionAnalysis?: ClaimVisionAnalysisDto | null;
   client: UserRefDto | null;
   mover: UserRefDto | null;
   resolution: {
@@ -760,6 +819,7 @@ export interface ClaimDto {
     confidence: number;
     model: string | null;
   } | null;
+  aiMediation?: ClaimMediationDto | null;
 }
 
 export interface AdminClaimsQuery extends QueryParams {
