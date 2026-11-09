@@ -9,6 +9,7 @@ import {
   MoveRequestModel,
   type MoveRequestDoc,
 } from '../../shared/database/models/move-request.model';
+import { JobOfferModel } from '../../shared/database/models/job-offer.model';
 import { moverRepository } from '../mover/mover.repository';
 import { dispatchMove } from '../mover/mover.dispatch';
 import { confirmDelivery, updateJobStatus } from '../mover/mover.jobs';
@@ -157,6 +158,8 @@ const SLOT_START_HOUR: Record<string, number> = { MORNING: 8, AFTERNOON: 13, FUL
 function requestTimeline(
   move: MoveRequestDoc,
   history: { toStatus: string; note: string; createdAt: Date }[],
+  /** Open offers + quotes awaiting the client; 0 while waiting means nobody is free yet. */
+  pendingAnswers = 1,
 ) {
   const reached = MOVE_STAGES_SPEC.findIndex((stage) => stage.key === requestStage(move));
   const firstEvent = (status: string) =>
@@ -179,15 +182,23 @@ function requestTimeline(
   return MOVE_STAGES_SPEC.map((stage, index) => {
     if (index > 1) cursor += (MOVE_STAGES_SPEC[index - 1]?.minutes ?? 0) * 60_000;
     const done = index <= reached ? (doneAt[stage.key] ?? move.updatedAt) : null;
+    const nobodyFree = waiting && pendingAnswers === 0;
     const detail =
-      stage.key === 'CONFIRMED' && waiting
-        ? 'Your request was sent to verified movers. You will see the mover here once one accepts.'
-        : stage.key === 'COMPLETED' && move.status === 'DELIVERED'
-          ? 'The mover marked the move as delivered. Confirm delivery, or open a claim if something is wrong.'
-          : stage.detail;
+      stage.key === 'CONFIRMED' && nobodyFree
+        ? `No verified mover in ${move.pickup.city} is free on ${move.moveDate} yet. Your request stays open and is offered again as movers become available.`
+        : stage.key === 'CONFIRMED' && waiting
+          ? 'Your request was sent to verified movers. You will see the mover here once one accepts.'
+          : stage.key === 'COMPLETED' && move.status === 'DELIVERED'
+            ? 'The mover marked the move as delivered. Confirm delivery, or open a claim if something is wrong.'
+            : stage.detail;
     return {
       key: stage.key,
-      title: stage.key === 'CONFIRMED' && waiting ? 'Request sent to movers' : stage.title,
+      title:
+        stage.key === 'CONFIRMED' && nobodyFree
+          ? 'No mover available yet'
+          : stage.key === 'CONFIRMED' && waiting
+            ? 'Request sent to movers'
+            : stage.title,
       detail,
       durationMinutes: stage.minutes,
       estimatedAt: (done ?? new Date(cursor)).toISOString(),
@@ -249,9 +260,11 @@ export class MovesService {
    */
   private async serializeRequest(move: MoveRequestDoc, includeQuotes = false) {
     const moveId = String(move._id);
-    const [quotes, history] = await Promise.all([
+    const [quotes, history, openOffers] = await Promise.all([
       includeQuotes ? moverRepository.listQuotesForMove(moveId) : Promise.resolve([]),
       moverRepository.listStatusEvents(moveId),
+      // Movers currently holding an offer: what "N movers notified" must show on every load.
+      JobOfferModel.countDocuments({ moveId, status: 'PENDING', expiresAt: { $gt: new Date() } }),
     ]);
     const quoteData = await Promise.all(
       quotes.map(async (quote) => {
@@ -318,7 +331,7 @@ export class MovesService {
         : { userId: undefined, name: 'Awaiting a mover', phone: '', companyName: '' },
       pickup: move.pickup,
       dropoff: move.dropoff,
-      offersSent: 0,
+      offersSent: openOffers,
       quotes: quoteData,
       history: history.map((event) => ({
         fromStatus: event.fromStatus,
@@ -326,7 +339,11 @@ export class MovesService {
         note: event.note,
         createdAt: event.createdAt.toISOString(),
       })),
-      stages: requestTimeline(move, history),
+      stages: requestTimeline(
+        move,
+        history,
+        openOffers + quoteData.filter((quote) => quote.status === 'SENT').length,
+      ),
       createdAt: move.createdAt.toISOString(),
       updatedAt: move.updatedAt.toISOString(),
     };

@@ -54,6 +54,15 @@ export interface MoveItemDto {
   quantity: number;
 }
 
+export interface MoveMessageDto {
+  id: string;
+  senderRole: 'CLIENT' | 'MOVER' | 'ADMIN';
+  mine: boolean;
+  body: string;
+  readAt: string | null;
+  createdAt: string;
+}
+
 export interface MoveDataDto {
   id: string;
   reference: string;
@@ -130,6 +139,23 @@ export const movesApi = {
   advance: async (id: string, stage: string): Promise<MoveResponse> => {
     const { data } = await axiosClient.patch<MoveResponse>(`/api/moves/${id}`, { stage });
     return data;
+  },
+
+  /** The client ↔ mover chat thread of a booked request. */
+  messages: async (moveId: string): Promise<MoveMessageDto[]> => {
+    const { data } = await axiosClient.get<{ messages: MoveMessageDto[] }>(
+      `/api/moves/${moveId}/messages`,
+      { params: { thread: 'MOVER_CLIENT' } },
+    );
+    return data.messages;
+  },
+
+  sendMessage: async (moveId: string, body: string): Promise<MoveMessageDto> => {
+    const { data } = await axiosClient.post<{ message: MoveMessageDto }>(
+      `/api/moves/${moveId}/messages`,
+      { thread: 'MOVER_CLIENT', body },
+    );
+    return data.message;
   },
 
   acceptQuote: async (moveId: string, quoteId: string): Promise<{ jobId: string }> => {
