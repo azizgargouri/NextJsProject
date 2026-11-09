@@ -3,7 +3,7 @@
 The whole app (public site, client, mover and admin) runs on this computer with no internet.
 
 ```bash
-npm run offline
+yarn offline
 ```
 
 Then open http://localhost:3000. Press Ctrl+C to stop.
@@ -11,7 +11,7 @@ Then open http://localhost:3000. Press Ctrl+C to stop.
 If port 3000 is taken, choose another one:
 
 ```bash
-PORT=3100 npm run offline
+PORT=3100 yarn offline
 ```
 
 ## What the command does
@@ -19,7 +19,7 @@ PORT=3100 npm run offline
 1. Creates `.env` from `.env.example` if it is missing, with a new JWT secret.
 2. Uses the local MongoDB if it is running. Otherwise it starts `mongod` with its data in `.offline/db`.
 3. Adds the demo data only if the database has no users, so your data is kept between runs.
-4. Builds into `.next-offline` when the source or `.env` has changed. This folder is separate from the `.next` folder that `npm run dev` uses.
+4. Builds into `.next-offline` when the source or `.env` has changed. This folder is separate from the `.next` folder that `yarn dev` uses.
 5. Serves the production build, and prints the address for phones on the same Wi-Fi.
 
 ## Using it from a phone
@@ -45,7 +45,7 @@ The mover workspace starts empty, with no offers, jobs or earnings. Offers appea
 These need to be in place before it goes offline:
 
 - Node.js and MongoDB (`mongod` on the `PATH`, or set `MONGOD_PATH`).
-- `node_modules`, from `npm install` or `yarn install`.
+- `node_modules`, from `yarn install`.
 
 ## Limits
 

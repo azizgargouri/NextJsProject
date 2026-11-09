@@ -1,6 +1,6 @@
 # Mover side: what was built and how it fits together
 
-This page explains the work on the `mover-side` branch for anyone joining the project or connecting their part to it. It covers what each feature does, where the code is, the decisions behind it, and what the rest of the app still needs to provide.
+This page explains the work on the `mover-side` branch (merged into `dev` on 2026-11-09, see [INTEGRATION.md](INTEGRATION.md)) for anyone joining the project or connecting their part to it. It covers what each feature does, where the code is, the decisions behind it, and what the rest of the app still needs to provide.
 
 Related docs: [OFFLINE.md](OFFLINE.md) (running without internet), [DESIGN.md](DESIGN.md) (visual rules), [PRODUCT.md](PRODUCT.md) (product spec).
 
@@ -22,15 +22,15 @@ Related docs: [OFFLINE.md](OFFLINE.md) (running without internet), [DESIGN.md](D
 ## 1. Quick start
 
 ```bash
-npm install
-npm run db:seed        # demo accounts, pricing rule, landing copy
-npm run dev            # http://localhost:3000
+yarn install
+yarn db:seed        # demo accounts, pricing rule, landing copy
+yarn dev            # http://localhost:3000
 ```
 
 Or, with no internet at all (see [OFFLINE.md](OFFLINE.md)):
 
 ```bash
-npm run offline
+yarn offline
 ```
 
 **Demo accounts** (created by `server/seed.ts`, for development only):
@@ -45,11 +45,11 @@ The mover workspace starts empty. A mover only gets offers once a move is submit
 
 **Other commands:**
 
-| Command              | What it does                                           |
-| -------------------- | ------------------------------------------------------ |
-| `npm run test:mover` | Runs the mover tests (150) against `TEST_MONGODB_URI`  |
-| `npm run ai:train`   | Trains the duration model now and prints its accuracy  |
-| `npm run offline`    | Builds and runs the whole app locally with no internet |
+| Command           | What it does                                           |
+| ----------------- | ------------------------------------------------------ |
+| `yarn test:mover` | Runs the mover tests (150) against `TEST_MONGODB_URI`  |
+| `yarn ai:train`   | Trains the duration model now and prints its accuracy  |
+| `yarn offline`    | Builds and runs the whole app locally with no internet |
 
 ---
 
@@ -195,7 +195,7 @@ log(actual hours) = log(basic estimate) + intercept + Σ weight × feature + mov
 **When it trains:**
 
 - automatically when a job is delivered, once there are at least **30** clean finished jobs, and again after every **10** more,
-- or by hand: `npm run ai:train`.
+- or by hand: `yarn ai:train`.
 
 Only one server trains at a time (a lock document in MongoDB).
 
@@ -203,7 +203,7 @@ Only one server trains at a time (a lock document in MongoDB).
 
 **Before 30 jobs:** the basic rule is used, and each estimate is labelled "Rough estimate". A staged approach (learning one overall correction from about 5 jobs) was discussed but isn't built.
 
-**Measuring accuracy:** when a mover accepts or quotes, the estimate they saw is saved on the offer. `npm run ai:train` prints how far those estimates were from the real working time.
+**Measuring accuracy:** when a mover accepts or quotes, the estimate they saw is saved on the offer. `yarn ai:train` prints how far those estimates were from the real working time.
 
 **Off switch:** `PROFIT_MODEL=off` in `.env` makes the estimate ignore the model and use the basic rule only.
 
@@ -223,9 +223,9 @@ Only one server trains at a time (a lock document in MongoDB).
 
 ## 5. Real data only
 
-- **The fake mover seed was removed** (`server/seed-mover.ts` and `npm run db:seed:mover`). It created fake clients, moves, offers, payouts and extra accounts. The only demo accounts left are the ones in `server/seed.ts`.
+- **The fake mover seed was removed** (`server/seed-mover.ts` and its `db:seed:mover` script). It created fake clients, moves, offers, payouts and extra accounts. The only demo accounts left are the ones in `server/seed.ts`.
 - **The mover screens use no hard-coded data.** Every screen loads from the API and shows an empty state when there's nothing yet.
-- **Landing page stats** ([metrics.tsx](components/features/landing/metrics.tsx)) now come from the database: completed moves, approved movers, the review-weighted rating and the six real zones. A figure with no data behind it is hidden, and so is the whole strip if the database can't be reached. The query is in [mover.public.ts](server/modules/mover/mover.public.ts).
+- **Landing page stats:** on this branch the metrics strip read live figures from the database (completed moves, approved movers, the review-weighted rating and the six real zones), hiding any figure with no data behind it. When the branch was merged into `dev`, the landing had been rebuilt without a metrics strip, so `metrics.tsx` was not kept. The query is still available as `getPublicMetrics()` in [mover.public.ts](server/modules/mover/mover.public.ts) if a live strip comes back. See [INTEGRATION.md](INTEGRATION.md).
 - **Sign-in panel** ([auth-panel.tsx](components/features/auth/auth-panel.tsx)): the invented "MOVER QUEUE: 237" is gone, and the zone count reads 6.
 
 The landing footer still says "Serving Tunisia's main corridors since 2024". That's a business claim, so check it before launch.
@@ -234,7 +234,7 @@ The landing footer still says "Serving Tunisia's main corridors since 2024". Tha
 
 ## 6. Offline mode and phones
 
-`npm run offline` runs the whole app on one computer with no internet: local MongoDB, local fonts and images, and a production build in `.next-offline`. Full details are in [OFFLINE.md](OFFLINE.md).
+`yarn offline` runs the whole app on one computer with no internet: local MongoDB, local fonts and images, and a production build in `.next-offline`. Full details are in [OFFLINE.md](OFFLINE.md).
 
 Changes made on this branch:
 
@@ -321,7 +321,7 @@ A full project audit was run on this branch. The build, type check, lint (0 erro
 
 **Not built yet:** client move creation, admin dispatch and mover approval, and the admin moves, assignments, disputes and review pages.
 
-**Housekeeping:** tests only cover the mover module and there's no CI; there's no README; `npm run lint` uses the deprecated `next lint`; both `yarn.lock` and `package-lock.json` are committed.
+**Housekeeping:** tests only cover the mover module and there's no CI; there's no README; `yarn lint` uses the deprecated `next lint`; the project uses yarn only (`package-lock.json` was removed when this branch was merged into `dev`).
 
 ---
 
@@ -330,7 +330,7 @@ A full project audit was run on this branch. The build, type check, lint (0 erro
 The mover tests run against a real MongoDB and refuse to wipe any database whose name doesn't end in `_test`:
 
 ```bash
-TEST_MONGODB_URI=mongodb://localhost:27017 npm run test:mover
+TEST_MONGODB_URI=mongodb://localhost:27017 yarn test:mover
 ```
 
 150 tests cover access rules, offers, jobs, box scanning, profiles, rules, and the profitability estimate and duration model. The duration model tests check that:
