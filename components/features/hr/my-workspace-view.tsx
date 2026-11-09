@@ -95,38 +95,44 @@ function VoiceCheckinSection() {
     if (serverSentence) setTranscript(serverSentence);
   }, [serverSentence]);
 
-  const stopAndVerify = (rec: MediaRecorder) => {
-    setHolding(false);
-    setVerifying(true);
-    const chunks: Blob[] = [];
-    rec.ondataavailable = (event) => {
-      if (event.data.size > 0) chunks.push(event.data);
-    };
-    rec.onstop = () => {
-      void (async () => {
-        try {
-          const blob = new Blob(chunks, { type: rec.mimeType || 'audio/webm' });
-          const file = new File([blob], 'voice.webm', { type: blob.type || 'audio/webm' });
-          const audio_b64 = await fileToBase64(file);
-          const response = await voice.mutateAsync({
-            audio_b64,
-            transcript,
-            job_id: jobId,
-            challenge: serverChallenge,
-            lat: 36.8784,
-            lng: 10.3249,
-          });
-          setResult(
-            `${response.decision.toUpperCase()} · speaker ${response.speaker_score.toFixed(2)} (${response.voice_label}) · score ${response.threshold.toFixed(2)} · ${response.reasons.join(', ') || '—'}`,
-          );
-        } catch (error) {
-          setResult(extractErrorMessage(error, 'Voice check-in failed.'));
-        } finally {
-          setVerifying(false);
-        }
-      })();
-    };
-    rec.stop();
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+
+  const clearPreview = () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(null);
+    setPendingFile(null);
+  };
+
+  const discardPreview = () => {
+    clearPreview();
+    setResult('Discarded. Hold the button to record again.');
+  };
+
+  const sendPreview = () => {
+    if (!pendingFile) return;
+    void (async () => {
+      setVerifying(true);
+      try {
+        const audio_b64 = await fileToBase64(pendingFile);
+        const response = await voice.mutateAsync({
+          audio_b64,
+          transcript,
+          job_id: jobId,
+          challenge: serverChallenge,
+          lat: 36.8784,
+          lng: 10.3249,
+        });
+        setResult(
+          `${response.decision.toUpperCase()} · speaker ${response.speaker_score.toFixed(2)} (${response.voice_label}) · score ${response.threshold.toFixed(2)} · ${response.reasons.join(', ') || '—'}`,
+        );
+        clearPreview();
+      } catch (error) {
+        setResult(extractErrorMessage(error, 'Voice check-in failed.'));
+      } finally {
+        setVerifying(false);
+      }
+    })();
   };
 
   const startHold = () => {
@@ -149,14 +155,28 @@ function VoiceCheckinSection() {
 
   const endHold = () => {
     if (!recorder) return;
-    if (recorder.state !== 'inactive') {
-      try {
-        stopAndVerify(recorder);
-      } catch {
-        setVerifying(false);
-      }
-    }
+    const rec = recorder;
     setRecorder(null);
+    setHolding(false);
+    if (rec.state === 'inactive') return;
+
+    // On release: stop, then present playback before sending.
+    clearPreview();
+    const chunks: Blob[] = [];
+    rec.ondataavailable = (event) => {
+      if (event.data.size > 0) chunks.push(event.data);
+    };
+    rec.onstop = () => {
+      const blob = new Blob(chunks, { type: rec.mimeType || 'audio/webm' });
+      const file = new File([blob], 'voice.webm', { type: blob.type || 'audio/webm' });
+      if (file.size === 0) {
+        setResult('Recording was empty. Hold the button again and speak.');
+        return;
+      }
+      setPendingFile(file);
+      setPreviewUrl(URL.createObjectURL(blob));
+    };
+    rec.stop();
   };
 
   return (
@@ -182,7 +202,7 @@ function VoiceCheckinSection() {
           {verifying ? (
             <Loader2 size={14} className="animate-spin" />
           ) : null}
-          {verifying ? 'VERIFYING…' : holding ? 'RELEASE TO SEND' : 'HOLD TO RECORD'}
+          {verifying ? 'VERIFYING…' : holding ? 'RELEASE TO LISTEN' : 'HOLD TO RECORD'}
         </Button>
       </div>
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
@@ -205,9 +225,37 @@ function VoiceCheckinSection() {
         </FieldRow>
       </div>
       <p className="mono mt-2 text-[9px] text-ink-40">
-        THE SENTENCE + CODE WORD ARE GENERATED SERVER-SIDE. IF YOU SAY A DIFFERENT WORD, THE
-        VERIFIER REJECTS IT AND IT SHOWS IN RH&apos;S VOICE ALERTS.
+        HOLD TO RECORD, RELEASE TO HEAR IT BACK. THEN CHOOSE RECORD AGAIN OR SEND.
       </p>
+      {previewUrl && pendingFile && (
+        <div className="mt-3 border border-ink/20 bg-paper-soft px-3 py-2">
+          <p className="mono text-[9px] text-ink-40">
+            YOUR TAKE — LISTEN BEFORE SENDING. RH KEEPS THE AUDIO FOR FAULTY CHECK-INS.
+          </p>
+          <audio src={previewUrl} controls className="mt-2 w-full" />
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 px-3 text-[9px]"
+              disabled={verifying}
+              onClick={discardPreview}
+            >
+              Record again
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              className="h-8 px-3 text-[9px]"
+              disabled={verifying}
+              onClick={sendPreview}
+            >
+              {verifying ? <Loader2 size={12} className="animate-spin" /> : null}
+              Send for verification
+            </Button>
+          </div>
+        </div>
+      )}
       {result && (
         <p className="mono mt-3 border border-ink/20 bg-paper-soft px-3 py-2 text-[9px] normal-case tracking-normal text-ink-80">
           {result}

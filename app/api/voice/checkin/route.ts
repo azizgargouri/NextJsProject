@@ -56,6 +56,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     try {
       const profile = await employeesService.findMyProfile(user.email);
       await connectMongo();
+      const audio = Buffer.from(String((payload as { audio_b64?: string }).audio_b64 ?? ''), 'base64');
       await VoiceCheckinModel.create({
         userId: user.sub,
         employeeId: profile?.id ?? null,
@@ -67,6 +68,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         jobOk: body?.job_ok ?? false,
         distanceM: Number(body?.distance_m ?? 0),
         reasons: Array.isArray(body?.reasons) ? body.reasons : [],
+        audio,
+        mimeType: 'audio/webm',
       });
     } catch {
       // best effort only
