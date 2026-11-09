@@ -11,7 +11,8 @@
     "db:seed": "tsx server/seed.ts",
     "db:reset": "mongosh moveup --eval 'db.dropDatabase()' && yarn db:seed",
     "db:seed:quality": "tsx server/quality.seed.ts",
-    "test": "tsx --test tests/*.test.ts"
+    "test": "tsx --test tests/*.test.ts",
+    "test:e2e": "node tests/e2e/smart-room.e2e.mjs"
   },
   "dependencies": {
     "@ai-sdk/google": "^2.0.0",
