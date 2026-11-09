@@ -16,6 +16,9 @@ export interface VoiceCheckinDoc {
   jobOk: boolean;
   distanceM: number;
   reasons: string[];
+  /** Recorded clip kept so RH can listen back on faulty check-ins. */
+  audio: Buffer;
+  mimeType: string;
   createdAt: Date;
   _id: Types.ObjectId;
 }
@@ -32,6 +35,8 @@ const VoiceCheckinSchema = new Schema<VoiceCheckinDoc>(
     jobOk: { type: Boolean, required: true },
     distanceM: { type: Number, required: true },
     reasons: { type: [String], default: [] },
+    audio: { type: Buffer, required: true },
+    mimeType: { type: String, required: true, default: 'audio/webm' },
   },
   { timestamps: true },
 );

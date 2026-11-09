@@ -104,6 +104,7 @@ export const en = {
     },
     items: {
       overview: 'Overview',
+      hr: 'HR workspace',
       moves: 'Move requests',
       assignments: 'Assignments',
       disputes: 'Disputes',

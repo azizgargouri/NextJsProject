@@ -33,8 +33,17 @@ export interface VoiceCheckinRecord {
   createdAt: string;
 }
 
+export interface VoiceChallenge {
+  challenge: string;
+  sentence: string;
+}
+
 /** Forwards a voice check-in to the Kaggle voice service via the app API. */
 export const voiceApi = {
+  challenge: async (): Promise<VoiceChallenge> => {
+    const { data } = await axiosClient.get<VoiceChallenge>('/api/voice/challenge');
+    return data;
+  },
   checkin: async (payload: VoiceCheckinPayload): Promise<VoiceCheckinResult> => {
     const { data } = await axiosClient.post<VoiceCheckinResult>('/api/voice/checkin', payload, {
       timeout: 90_000,

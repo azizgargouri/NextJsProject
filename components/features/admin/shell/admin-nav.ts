@@ -1,5 +1,6 @@
 import {
   BadgeDollarSign,
+  BriefcaseBusiness,
   ClipboardList,
   FileText,
   Gauge,
@@ -34,7 +35,11 @@ export interface AdminNavGroup {
 export const adminNavGroups: AdminNavGroup[] = [
   {
     key: 'workspace',
-    items: [{ key: 'overview', href: '/admin', icon: Gauge }],
+    items: [
+      { key: 'overview', href: '/admin', icon: Gauge },
+      // HR lives in the staff workspace (employees, attendance, leave, contracts).
+      { key: 'hr', href: '/dashboard', icon: BriefcaseBusiness },
+    ],
   },
   {
     key: 'operations',

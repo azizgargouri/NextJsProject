@@ -111,6 +111,7 @@ export const fr: AdminMessages = {
     },
     items: {
       overview: "Vue d'ensemble",
+      hr: 'Espace RH',
       moves: 'Déménagements',
       assignments: 'Affectations',
       disputes: 'Litiges',

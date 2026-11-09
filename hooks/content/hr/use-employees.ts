@@ -11,10 +11,11 @@ export function useEmployees() {
 }
 
 /** Employee profile linked to the signed-in account (null when none). */
-export function useMyEmployee() {
+export function useMyEmployee(enabled = true) {
   return useQuery({
     queryKey: ['employees', 'me'],
     queryFn: () => api.employees.me(),
+    enabled,
   });
 }
 
