@@ -68,14 +68,20 @@ export class MovesService {
     return { street: value, city, zone, postalCode: '', floor: 0, hasElevator: false, accessNotes: '' };
   }
 
-  private serializeRequest(move: MoveRequestDoc) {
+  private async serializeRequest(move: MoveRequestDoc, includeQuotes = false) {
+    const quotes = includeQuotes ? await moverRepository.listQuotesForMove(String(move._id)) : [];
+    const quoteData = await Promise.all(quotes.map(async (quote) => {
+      const mover = await moverRepository.findUser(quote.moverId);
+      return { id: String(quote._id), moverId: quote.moverId, moverName: mover?.name ?? 'Verified mover', amount: quote.amount, currency: quote.currency, message: quote.message, status: quote.status, validUntil: quote.validUntil.toISOString() };
+    }));
     return {
       id: String(move._id), reference: move.reference, clientId: move.clientId,
       pickupAddress: move.pickup.street, destinationAddress: move.dropoff.street,
       distance: 0, volume: move.volumeM3, estimatedPrice: move.estimatedPrice ?? 0,
-      currentStage: move.status, items: move.items.map((item, index) => ({ id: String(index), name: item.name, volume: 0, weight: 0, quantity: item.quantity })),
+      currentStage: move.status, items: move.items.map((item, index) => ({ id: String(index), name: item.name, volume: item.volume ?? 0, weight: item.weight ?? 0, quantity: item.quantity })),
       vehicle: { name: 'To be confirmed by mover', capacity: 0, payload: 0 },
       mover: { userId: move.assignedMoverId ?? undefined, name: move.assignedMoverId ? 'Assigned mover' : 'Awaiting mover offers', phone: '', companyName: '' },
+      pickup: move.pickup, dropoff: move.dropoff, offersSent: 0, quotes: quoteData,
       stages: [], createdAt: move.createdAt.toISOString(), updatedAt: move.updatedAt.toISOString(),
     };
   }
@@ -95,17 +101,17 @@ export class MovesService {
     const move = await moverRepository.createMove({
       reference,
       clientId,
-      pickup: this.address(input.pickupAddress), dropoff: this.address(input.destinationAddress),
+      pickup: { ...this.address(input.pickupAddress), ...input.pickup }, dropoff: { ...this.address(input.destinationAddress), ...input.dropoff },
       moveDate: input.moveDate ?? new Date(Date.now() + 86_400_000).toISOString().slice(0, 10), timeSlot: input.timeSlot ?? 'FULL_DAY',
-      housingType: '', sizeRooms: 0, volumeM3: volume, extraServices: [], notes: '',
-      items: input.items.map((item) => ({ name: item.name, quantity: item.quantity, category: '', isFragile: false, needsDisassembly: false })),
+      housingType: input.housingType ?? '', sizeRooms: input.sizeRooms ?? 0, volumeM3: volume, extraServices: input.extraServices ?? [], notes: input.notes ?? '',
+      items: input.items.map((item) => ({ name: item.name, quantity: item.quantity, category: item.category ?? '', isFragile: item.isFragile ?? false, needsDisassembly: item.needsDisassembly ?? false, volume: item.volume, weight: item.weight, room: item.room ?? '' })),
       status: 'SUBMITTED', progressStage: null,
       estimatedPrice: price,
       finalPrice: null, assignedMoverId: null, assignedAt: null, deliveredAt: null, completedAt: null,
     });
     const { offersSent } = await dispatchMove(String(move._id), { actorId: clientId });
     const refreshed = (await MoveRequestModel.findById(move._id).lean()) as MoveRequestDoc | null;
-    return { ...this.serializeRequest(refreshed ?? move), offersSent };
+    return { ...(await this.serializeRequest(refreshed ?? move, true)), offersSent };
   }
 
   async findOne(identifier: string, trackingToken?: string | null, actor?: AccessTokenPayload | null) {
@@ -128,7 +134,7 @@ export class MovesService {
         (actor.role === 'MOVER' && request.assignedMoverId === actor.sub)
       );
       if (!allowed) throw new ForbiddenError('Please sign in to track this move');
-      return this.serializeRequest(request);
+      return this.serializeRequest(request, actor?.role === 'CLIENT' && request.clientId === actor.sub);
     }
 
     // Access authorization check
@@ -178,7 +184,8 @@ export class MovesService {
         ? { assignedMoverId: actor.sub }
         : {};
     const requests = await MoveRequestModel.find(requestQuery).sort({ createdAt: -1 }).limit(50).lean<MoveRequestDoc[]>();
-    return [...moves.map(serialize), ...requests.map((request) => this.serializeRequest(request))]
+    const serializedRequests = await Promise.all(requests.map((request) => this.serializeRequest(request, actor.role === 'CLIENT')));
+    return [...moves.map(serialize), ...serializedRequests]
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
 

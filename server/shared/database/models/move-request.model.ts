@@ -25,6 +25,10 @@ export interface MoveItem {
   category: string;
   isFragile: boolean;
   needsDisassembly: boolean;
+  /** Client inventory metadata retained through dispatch and completion. */
+  volume?: number;
+  weight?: number;
+  room?: string;
 }
 
 /** What the mover recorded and confirmed once the vehicle was loaded. */
@@ -90,6 +94,9 @@ const ItemSchema = new Schema<MoveItem>(
     category: { type: String, default: '' },
     isFragile: { type: Boolean, default: false },
     needsDisassembly: { type: Boolean, default: false },
+    volume: { type: Number, default: 0, min: 0 },
+    weight: { type: Number, default: 0, min: 0 },
+    room: { type: String, default: '', trim: true },
   },
   { _id: false },
 );

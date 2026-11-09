@@ -98,7 +98,7 @@ export function MoveBooking() {
   const [isOffline, setIsOffline] = useState(false);
   const [chosenVehicle, setChosenVehicle] = useState<string>('AUTO');
   const [moveDate, setMoveDate] = useState<string>(() => new Date().toISOString().split('T')[0]!);
-  const [timeSlot, setTimeSlot] = useState<string>('09:00 - 12:00');
+  const [timeSlot, setTimeSlot] = useState<'MORNING' | 'AFTERNOON' | 'FULL_DAY'>('MORNING');
   const [scheduleMode, setScheduleMode] = useState<'TODAY' | 'TOMORROW' | 'CUSTOM'>('TODAY');
   const [floorLevel, setFloorLevel] = useState<number>(0);
   const [hasElevator, setHasElevator] = useState<boolean>(true);
@@ -124,7 +124,7 @@ export function MoveBooking() {
         if (parsed.destinationAddress) setDestinationAddress(parsed.destinationAddress);
         if (parsed.chosenVehicle) setChosenVehicle(parsed.chosenVehicle);
         if (parsed.moveDate) setMoveDate(parsed.moveDate);
-        if (parsed.timeSlot) setTimeSlot(parsed.timeSlot);
+        if (parsed.timeSlot === 'MORNING' || parsed.timeSlot === 'AFTERNOON' || parsed.timeSlot === 'FULL_DAY') setTimeSlot(parsed.timeSlot);
         if (parsed.scheduleMode) setScheduleMode(parsed.scheduleMode);
       }
     } catch {
@@ -277,7 +277,9 @@ export function MoveBooking() {
         items,
         vehicleName: vehicle.name,
         moveDate,
-        timeSlot: timeSlot as 'MORNING' | 'AFTERNOON' | 'FULL_DAY',
+        timeSlot,
+        pickup: { floor: floorLevel, hasElevator },
+        dropoff: { floor: floorLevel, hasElevator },
       });
 
       // Clear draft on successful creation
@@ -565,7 +567,7 @@ export function MoveBooking() {
                   onClick={() => {
                     const today = new Date().toISOString().split('T')[0]!;
                     setMoveDate(today);
-                    setTimeSlot('ASAP Express');
+                    setTimeSlot('FULL_DAY');
                     setScheduleMode('TODAY');
                   }}
                   className={`border p-2 text-center font-semibold transition ${
@@ -582,7 +584,7 @@ export function MoveBooking() {
                   onClick={() => {
                     const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0]!;
                     setMoveDate(tomorrow);
-                    setTimeSlot('09:00 - 12:00');
+                    setTimeSlot('MORNING');
                     setScheduleMode('TOMORROW');
                   }}
                   className={`border p-2 text-center font-semibold transition ${
@@ -631,26 +633,12 @@ export function MoveBooking() {
                   </label>
                   <select
                     value={timeSlot}
-                    onChange={(e) => setTimeSlot(e.target.value)}
+                    onChange={(e) => setTimeSlot(e.target.value as 'MORNING' | 'AFTERNOON' | 'FULL_DAY')}
                     className="w-full border-2 border-ink bg-paper px-2.5 py-1.5 text-xs font-semibold focus:outline-none focus:border-hazard"
                   >
-                    <option value="ASAP Express (Next available)">
-                      ASAP Express (Next available)
-                    </option>
-                    <option value="08:00 - 11:00 (Early Morning)">
-                      08:00 - 11:00 (Early Morning)
-                    </option>
-                    <option value="09:00 - 12:00 (Morning Slot)">
-                      09:00 - 12:00 (Morning Slot)
-                    </option>
-                    <option value="11:00 - 14:00 (Midday Slot)">11:00 - 14:00 (Midday Slot)</option>
-                    <option value="14:00 - 17:00 (Afternoon Slot)">
-                      14:00 - 17:00 (Afternoon Slot)
-                    </option>
-                    <option value="17:00 - 20:00 (Evening Slot)">
-                      17:00 - 20:00 (Evening Slot)
-                    </option>
-                    <option value="Flexible All-Day">Flexible All-Day</option>
+                    <option value="MORNING">Morning (08:00–12:00)</option>
+                    <option value="AFTERNOON">Afternoon (12:00–17:00)</option>
+                    <option value="FULL_DAY">Flexible all day</option>
                   </select>
                 </div>
               </div>

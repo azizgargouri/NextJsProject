@@ -249,6 +249,20 @@ export function MoveTracking({
     });
   };
 
+  const acceptQuote = (quoteId: string) => {
+    if (!move) return;
+    startTransition(async () => {
+      try {
+        await api.moves.acceptQuote(move.id, quoteId);
+        const refreshed = await api.moves.getOne(move.id);
+        setMove(refreshed.move);
+      } catch (err: unknown) {
+        const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+        setLoadError(message || 'This quote is no longer available.');
+      }
+    });
+  };
+
   const currentStages = move?.stages?.length ? move.stages : FALLBACK_STAGES;
   const matchedStageIndex = move ? currentStages.findIndex((s) => s.key === move.currentStage) : 2;
   const currentIndex = matchedStageIndex >= 0 ? matchedStageIndex : 2;
@@ -338,6 +352,31 @@ export function MoveTracking({
         </div>
       </header>
       <ClientWorkspaceBar />
+
+      {user?.role === 'CLIENT' && move && (move.offersSent !== undefined || move.quotes?.length) && (
+        <section className="border-b border-ink bg-paper-soft px-4 py-4">
+          <div className="mx-auto max-w-7xl">
+            <p className="mono text-[10px] font-bold text-hazard">MOVER QUOTES / LIVE REQUEST STATUS</p>
+            {move.quotes?.length ? (
+              <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {move.quotes.map((quote) => (
+                  <div key={quote.id} className="border-2 border-ink bg-paper p-3">
+                    <p className="font-bold text-sm">{quote.moverName}</p>
+                    <p className="mono mt-1 text-lg font-bold">{quote.amount} {quote.currency}</p>
+                    {quote.message && <p className="mt-1 text-xs text-ink-60">{quote.message}</p>}
+                    <p className="mt-2 mono text-[9px] text-ink-40">VALID UNTIL {new Date(quote.validUntil).toLocaleString()}</p>
+                    {quote.status === 'SENT' && move.currentStage === 'QUOTING' && (
+                      <Button className="mt-3 w-full" disabled={isPending} onClick={() => acceptQuote(quote.id)}>ACCEPT QUOTE</Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-2 text-sm text-ink-60">{move.offersSent ? `${move.offersSent} eligible mover${move.offersSent === 1 ? '' : 's'} notified. Quotes will appear here as they respond.` : 'No eligible mover is currently available. Your request remains open for dispatch; no mover has been assigned.'}</p>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* User's Active Moves bar (if signed in) */}
       {userMoves.length > 0 && (
