@@ -7,6 +7,7 @@
  * audit → revalidate the affected pages → return a serialisable state for useActionState.
  */
 import { revalidatePath } from 'next/cache';
+import { qualityPaths } from '@/lib/quality/paths';
 import type { z } from 'zod';
 import { requireActionUser } from '@/server/shared/auth/session';
 import { DomainError, ValidationError } from '@/server/shared/database/errors';
@@ -57,7 +58,7 @@ export async function createClaimAction(
       api: 'createClaimAction',
       logInfo: { claimId: claim.id, reference: claim.reference },
     });
-    revalidatePath('/dashboard/claims');
+    qualityPaths('/claims').forEach((path) => revalidatePath(path));
     return {
       ok: true,
       message: `Claim ${claim.reference} submitted. Our team will get back to you.`,
@@ -84,7 +85,7 @@ export async function postClaimMessageAction(
       api: 'postClaimMessageAction',
       logInfo: { claimId },
     });
-    revalidatePath(`/dashboard/claims/${claimId}`);
+    qualityPaths(`/claims/${claimId}`).forEach((path) => revalidatePath(path));
     return { ok: true, message: 'Message sent' };
   } catch (error) {
     return failure(error, formData);
@@ -129,7 +130,7 @@ export async function createReviewAction(
       api: 'createReviewAction',
       logInfo: { reviewId: review.id, status: review.status },
     });
-    revalidatePath('/dashboard/reviews');
+    qualityPaths('/reviews').forEach((path) => revalidatePath(path));
     return {
       ok: true,
       message:
@@ -157,7 +158,7 @@ export async function replyToReviewAction(
       api: 'replyToReviewAction',
       logInfo: { reviewId },
     });
-    revalidatePath('/dashboard/reviews');
+    qualityPaths('/reviews').forEach((path) => revalidatePath(path));
     return { ok: true, message: 'Reply published' };
   } catch (error) {
     return failure(error, formData);

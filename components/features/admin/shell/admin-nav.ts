@@ -45,9 +45,9 @@ export const adminNavGroups: AdminNavGroup[] = [
   {
     key: 'operations',
     items: [
-      { key: 'moves', href: '/admin/moves', icon: ClipboardList, upcoming: true },
-      { key: 'assignments', href: '/admin/assignments', icon: Truck, upcoming: true },
-      { key: 'disputes', href: '/admin/disputes', icon: Gavel, upcoming: true },
+      { key: 'moves', href: '/admin/moves', icon: ClipboardList },
+      { key: 'assignments', href: '/admin/assignments', icon: Truck },
+      { key: 'disputes', href: '/admin/disputes', icon: Gavel },
     ],
   },
   {
@@ -59,7 +59,6 @@ export const adminNavGroups: AdminNavGroup[] = [
         key: 'customerReviews',
         href: '/admin/customer-reviews',
         icon: MessageSquareText,
-        upcoming: true,
       },
     ],
   },

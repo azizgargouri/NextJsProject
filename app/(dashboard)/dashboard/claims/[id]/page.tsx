@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { qualityBase } from '@/lib/quality/paths';
 import { ArrowLeft } from 'lucide-react';
 import { requirePageUser } from '@/server/shared/auth/session';
 import { ClaimNotFoundError, claimsService } from '@/server/modules/claims';
@@ -43,7 +44,7 @@ export default async function ClaimDetailPage({ params }: { params: Promise<{ id
     <div className="space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Link
-          href="/dashboard/claims"
+          href={`${qualityBase(user.role)}/claims`}
           className="mono inline-flex items-center gap-2 text-[11px] hover:text-hazard"
         >
           <ArrowLeft className="size-4" /> All claims

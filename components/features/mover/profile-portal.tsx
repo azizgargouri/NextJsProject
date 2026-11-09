@@ -5,7 +5,11 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
+import Link from 'next/link';
+import { ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { MoverScorecardCard } from '@/components/features/workspace/mover-scorecard';
+import { useAuthStore } from '@/hooks/stores/auth-store';
 import { FieldError, Label } from '@/components/ui/field';
 import {
   useMoverProfile,
@@ -731,6 +735,31 @@ function DocumentsPanel({ documents }: { documents: MoverDocumentDto[] }) {
 }
 
 /** Item 11: profile, vehicles, team and documents (M-10 + spec 9.3). */
+/** Member 6's AI trust scorecard and the public page clients see before booking. */
+function ReputationPanel({ companyName }: { companyName: string }) {
+  const user = useAuthStore((state) => state.user);
+  if (!user) return null;
+  return (
+    <Panel
+      title="Reputation"
+      className="lg:col-span-2"
+      action={
+        <Link
+          href={`/movers/${user.id}`}
+          target="_blank"
+          className="mono inline-flex items-center gap-1.5 text-[11px] underline-offset-4 hover:text-hazard hover:underline"
+        >
+          Public page <ExternalLink className="size-3.5" aria-hidden />
+        </Link>
+      }
+    >
+      <div className="p-4">
+        <MoverScorecardCard moverId={user.id} moverName={companyName || user.name} />
+      </div>
+    </Panel>
+  );
+}
+
 export function ProfilePortal() {
   const profile = useMoverProfile();
   if (profile.isPending) return <LoadingState label="Loading profile" />;
@@ -746,6 +775,7 @@ export function ProfilePortal() {
         <VehiclesPanel vehicles={profile.data.vehicles} />
         <TeamPanel team={profile.data.team} />
         <CostsPanel key={JSON.stringify(profile.data.costs)} profile={profile.data} />
+        <ReputationPanel companyName={profile.data.companyName} />
       </div>
     </>
   );
