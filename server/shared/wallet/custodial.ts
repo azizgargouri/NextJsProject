@@ -1,6 +1,7 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 import { Wallet, type TypedDataDomain, type TypedDataField } from 'ethers';
 import { env } from '../../config/env';
+import { ServiceUnavailableError } from '../database/errors';
 
 /**
  * Custodial app wallets.
@@ -33,11 +34,16 @@ export interface StoredWallet {
   encryptedPrivateKey: string;
 }
 
+/** True when custodial wallets can be created (the encryption key is set). */
+export function walletsConfigured(): boolean {
+  return Boolean(env().WALLET_ENCRYPTION_KEY?.trim());
+}
+
 function encryptionKey(): Buffer {
   const raw = env().WALLET_ENCRYPTION_KEY?.trim();
   if (!raw) {
-    throw new Error(
-      'WALLET_ENCRYPTION_KEY is not configured. Generate a 32-byte hex key and add it to the app .env before creating or signing with app wallets.',
+    throw new ServiceUnavailableError(
+      'App wallets are not configured (WALLET_ENCRYPTION_KEY is not set), so contracts cannot be signed yet.',
     );
   }
 

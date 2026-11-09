@@ -1,7 +1,7 @@
 import { connectMongo } from '../database/mongoose';
 import { EmployeeModel } from '../database/models/employee.model';
 import { UserModel } from '../database/models/user.model';
-import { generateCustodialWallet, type StoredWallet } from './custodial';
+import { generateCustodialWallet, walletsConfigured, type StoredWallet } from './custodial';
 
 /**
  * Wallet provisioning + email-based synchronisation.
@@ -34,10 +34,7 @@ function generatedWallet(): StoredWallet {
 }
 
 /** Writes the same wallet to the user and employee rows matching this email. */
-export async function syncWalletForEmail(
-  email: string,
-  wallet: StoredWallet,
-): Promise<void> {
+export async function syncWalletForEmail(email: string, wallet: StoredWallet): Promise<void> {
   await connectMongo();
   const normalized = email.trim().toLowerCase();
   const fields = {
@@ -73,6 +70,16 @@ export async function ensureWalletForEmail(email: string): Promise<StoredWallet>
   const wallet = generatedWallet();
   await syncWalletForEmail(normalized, wallet);
   return wallet;
+}
+
+/**
+ * Wallet for a new account, when wallets are configured. Sign-up must never
+ * depend on the HR contract module: without WALLET_ENCRYPTION_KEY the account
+ * is created without one, and the contract flow provisions it on first use.
+ */
+export async function walletForNewAccount(email: string): Promise<StoredWallet | null> {
+  if (!walletsConfigured()) return null;
+  return ensureWalletForEmail(email);
 }
 
 /** Ensures the authenticated user has a wallet (used by the contract flow). */
