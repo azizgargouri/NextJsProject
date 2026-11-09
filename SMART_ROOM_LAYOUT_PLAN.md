@@ -342,6 +342,38 @@ get the warning) → **Delete plan**.
 
 ---
 
+### Installable app (PWA) + offline ✅ verified by me
+
+- **Manifest:** `app/manifest.ts` (Next.js file convention → `/manifest.webmanifest`, linked from
+  every page automatically): name MoveUp, `start_url` `/dashboard`, scope `/`, standalone, icons in
+  `public/icons/` (192, 512, maskable).
+- **Service worker:** `public/sw.js`, scope `/`, registered by `components/shared/service-worker.tsx`.
+  **Touches a shared file:** two lines in `app/layout.tsx` (import + `<ServiceWorker />`), because an
+  app-wide worker must be registered from the root. **Production only** (`yarn build && yarn start`);
+  in `yarn dev` it unregisters itself, because dev chunks are not content-hashed.
+- Caching: `/_next/static/*` cache first · every page + RSC payload network first (page HTML holds
+  no user data) · `GET /api/homes*` network first with **one cache per signed-in user** (JWT `sub`);
+  another account's first request deletes the previous account's saved houses · every other
+  `/api/*` (auth, admin) network only, never stored · writes never cached.
+- Every page you open online (and what it loaded) is saved; a page never opened shows a small
+  "OFFLINE" page. Homes queries use React Query `networkMode: 'offlineFirst'` so they still ask the
+  worker while offline. On the homes pages a black bar says "OFFLINE"; edits made offline wait (in
+  the open tab) until the connection is back. Teammates' pages open offline but their data is not
+  cached (add their `/api/...` prefixes in `sw.js` if they want it).
+- To reset after changing the caching rules: bump `VERSION` in `public/sw.js`.
+- Verified on a production build: manifest linked on `/`, `/sign-in`, `/dashboard`,
+  `/dashboard/homes`, `/admin`; manifest + icons 200; worker scope `/`; server stopped →
+  `/dashboard` (start page, with the houses block) and the house page (rooms, Moving in, Layout
+  drawings) load from cache; no `/api/auth` or `/api/admin` response stored · earlier checks: unknown
+  page → offline page, offline bar, query runs while offline, `yarn dev` → worker removed · `tsc`,
+  `eslint`, prettier, `next build` clean.
+
+**You test:** `yarn build && yarn start` → sign in → open `/dashboard`, `/dashboard/homes` and your
+house → install (install icon at the right of the address bar, or browser menu → "Install MoveUp")
+→ go offline (Wi-Fi off, or DevTools → Network → Offline) → open the installed app.
+
+---
+
 ### Step 5 — Hardening & hand-off
 
 - Same input → saved plan returned (no new AI call); max 10 generations per house per day.

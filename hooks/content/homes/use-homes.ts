@@ -21,11 +21,13 @@ export function useHomesUserId(): string {
   return useAuthStore((state) => state.user?.id ?? 'anonymous');
 }
 
+// offlineFirst: still call the API while offline, so the service worker can answer with the saved copy.
 export function useHomes(query: HomesQuery) {
   const userId = useHomesUserId();
   return useQuery({
     queryKey: homesKeys.list(userId, query),
     queryFn: () => homesApi.list(query),
+    networkMode: 'offlineFirst',
     placeholderData: (previous) => previous,
   });
 }
@@ -36,5 +38,6 @@ export function useClientMoveRequests() {
   return useQuery({
     queryKey: homesKeys.moveRequests(userId),
     queryFn: () => homesApi.moveRequests(),
+    networkMode: 'offlineFirst',
   });
 }

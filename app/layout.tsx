@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { archivo, jetbrainsMono } from '@/lib/fonts';
+import { ServiceWorker } from '@/components/shared/service-worker';
 import { Providers } from './providers';
 import '@/styles/globals.css';
 
@@ -25,6 +26,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" suppressHydrationWarning>
       <body className={`${archivo.variable} ${jetbrainsMono.variable} grain min-h-dvh antialiased`}>
         <Providers>{children}</Providers>
+        <ServiceWorker />
       </body>
     </html>
   );
