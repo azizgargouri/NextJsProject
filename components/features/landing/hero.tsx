@@ -8,6 +8,7 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useGSAP } from '@gsap/react';
 import { fill, type LandingMessages } from '@/lib/i18n/landing';
 import { LANDING_PHOTOS } from './photos';
+import { whenPreloaded } from './preloader';
 
 if (typeof window !== 'undefined') {
   gsap.registerPlugin(ScrollTrigger);
@@ -50,7 +51,8 @@ export function Hero({
     () => {
       if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
-      const tl = gsap.timeline({ defaults: { ease: 'expo.out' } });
+      // Built paused so the from-states hold under the preloader, then plays as the door lifts.
+      const tl = gsap.timeline({ paused: true, defaults: { ease: 'expo.out' } });
       tl.from('[data-hero-char]', {
         yPercent: 105,
         duration: 1.1,
@@ -64,6 +66,7 @@ export function Hero({
           '-=0.9',
         )
         .from('[data-hero-strip] img', { scale: 1.25, duration: 1.8 }, '<');
+      const stopWaiting = whenPreloaded(() => tl.play());
 
       gsap.to('[data-hero-photo]', {
         yPercent: 12,
@@ -75,6 +78,8 @@ export function Hero({
           scrub: true,
         },
       });
+
+      return stopWaiting;
     },
     { scope: rootRef },
   );
@@ -176,6 +181,7 @@ export function Hero({
             alt={t.hero.photoAlt}
             fill
             priority
+            data-preload
             sizes="100vw"
             className="object-cover object-[50%_35%] contrast-125 grayscale"
           />

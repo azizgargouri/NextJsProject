@@ -5,6 +5,11 @@ export const landingFr: LandingMessages = {
   meta: {
     skip: 'Aller au contenu',
   },
+  preloader: {
+    label: 'CHARGEMENT DU CAMION. CHAQUE ÉTAPE CONSIGNÉE.',
+    stages: ['DÉMONTAGE', 'EMBALLAGE', 'CHARGEMENT', 'EN ROUTE', 'LIVRAISON', 'REMONTAGE'],
+    skip: 'ÉCHAP OU CLIC POUR PASSER',
+  },
   nav: {
     home: 'Accueil MoveUp',
     links: {
