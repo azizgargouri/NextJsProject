@@ -70,7 +70,6 @@ async function guarded<T>(operation: () => Promise<T>): Promise<T> {
     if (error instanceof ServiceUnavailableError) throw error;
     const name = (error as { name?: string }).name;
     if (name === 'NoSuchKey' || name === 'NotFound') throw error;
-    if (process.env.NODE_ENV === 'development') console.error('[storage]', error);
     throw new ServiceUnavailableError(storageFailureMessage(error));
   }
 }
@@ -82,7 +81,9 @@ async function guarded<T>(operation: () => Promise<T>): Promise<T> {
 function storageFailureMessage(error: unknown): string {
   const { name, $metadata } = error as { name?: string; $metadata?: { httpStatusCode?: number } };
   const status = $metadata?.httpStatusCode;
-  console.error('[storage]', name, status, (error as Error).message);
+  const code = (error as { code?: string }).code;
+  // One plain string: dev tooling that wraps console.error chokes on AggregateError objects.
+  console.error(`[storage] ${name ?? 'Error'} ${code ?? ''} ${status ?? ''}`.trim());
   // R2 answers both a wrong secret and a read-only key with AccessDenied (403).
   if (name === 'InvalidAccessKeyId' || name === 'SignatureDoesNotMatch' || status === 401) {
     return `Object storage rejected the credentials (${name ?? status}): check S3_ACCESS_KEY and S3_SECRET_KEY.`;
@@ -91,7 +92,7 @@ function storageFailureMessage(error: unknown): string {
     return 'Object storage refused the request (AccessDenied): S3_ACCESS_KEY / S3_SECRET_KEY are wrong, or the key lacks read & write access to the bucket.';
   }
   if (name === 'NoSuchBucket') return 'Object storage bucket not found: check S3_BUCKET.';
-  return `Object storage is unreachable (${name ?? 'network error'}): check S3_ENDPOINT.`;
+  return `Object storage is unreachable (${code ?? name ?? 'network error'}): check S3_ENDPOINT.`;
 }
 
 export function isMissingObjectError(error: unknown): boolean {

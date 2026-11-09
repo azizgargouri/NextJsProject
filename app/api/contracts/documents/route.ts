@@ -9,8 +9,9 @@ import { contractDocumentsService } from '@/server/modules/contracts/contracts-d
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const user = await requireAdmin(request);
-    const form = await request.formData();
-    const file = form.get('file');
+    // A body that is not multipart (e.g. JSON) is a client error, not a crash.
+    const form = await request.formData().catch(() => null);
+    const file = form?.get('file');
 
     if (!file || typeof file === 'string' || typeof file.arrayBuffer !== 'function') {
       return NextResponse.json(
