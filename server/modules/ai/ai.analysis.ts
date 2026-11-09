@@ -8,7 +8,15 @@ import {
   type ReviewModeration,
 } from '../../../lib/quality/ai-schemas';
 import type { AnalysisSource, ClaimCategory } from '../../shared/database/enums';
-import { AI_LIMITS, aiModel, aiModelId, isAiEnabled, markAiFailure } from './ai.provider';
+import {
+  AI_LIMITS,
+  aiModel,
+  aiModelId,
+  isAiEnabled,
+  markAiFailure,
+  aiVisionModel,
+  aiVisionModelId,
+} from './ai.provider';
 import { analyzeDamageByRules, moderateReviewByRules, triageClaimByRules } from './ai.fallback';
 
 /**
@@ -275,7 +283,7 @@ export async function analyzeClaimEvidencePhotos(input: {
     }
 
     const { object } = await generateObject({
-      model: aiModel(),
+      model: aiVisionModel(),
       schema: DamageVisionSchema,
       system:
         'You are the Multimodal Vision AI Damage Inspector for MoveUp, a Tunisian moving-service platform. ' +
@@ -306,7 +314,7 @@ export async function analyzeClaimEvidencePhotos(input: {
       abortSignal: AbortSignal.timeout(AI_LIMITS.timeoutMs),
     });
 
-    return { result: object, source: 'ai', model: aiModelId() };
+    return { result: object, source: 'ai', model: aiVisionModelId() };
   } catch (error) {
     logAiFailure('damage vision analysis', error);
     return runGroundedFallback();

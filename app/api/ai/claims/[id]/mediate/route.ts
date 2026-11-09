@@ -100,14 +100,22 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       onError: ({ error }) => {
         markAiFailure(error);
       },
-      onFinish: async ({ object }) => {
-        if (object) {
+      onFinish: async ({ object, error }) => {
+        if (!object) {
+          console.warn(
+            `[ai] mediation for claim ${id} not saved: ${String(error ?? 'empty answer')}`,
+          );
+          return;
+        }
+        try {
           await claimsService.saveMediation(id, {
             ...object,
             source: 'ai',
             model: aiModelId(),
             generatedAt: new Date(),
           });
+        } catch (saveError) {
+          console.warn(`[ai] mediation for claim ${id} not saved: ${(saveError as Error).message}`);
         }
       },
     });

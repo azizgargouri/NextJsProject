@@ -1,22 +1,31 @@
 import { generateText } from 'ai';
 import { openai } from '@ai-sdk/openai';
 import { google } from '@ai-sdk/google';
+import { groq } from '@ai-sdk/groq';
 
 /**
  * Single place that knows which LLM we talk to (course ch.6 — "Zéro lock-in").
- * Every feature asks for `aiModel()`; switching OpenAI ↔ Gemini is one env var.
- * Keys are read by the providers from OPENAI_API_KEY / GOOGLE_GENERATIVE_AI_API_KEY,
- * server-side only (never NEXT_PUBLIC_*).
+ * Every feature asks for `aiModel()`; switching OpenAI ↔ Gemini ↔ Groq is one env var.
+ * Keys are read by the providers from OPENAI_API_KEY / GOOGLE_GENERATIVE_AI_API_KEY /
+ * GROQ_API_KEY, server-side only (never NEXT_PUBLIC_*).
  */
-export type AiProviderName = 'openai' | 'google';
+export type AiProviderName = 'openai' | 'google' | 'groq';
 
 const DEFAULT_MODELS: Record<AiProviderName, string> = {
   openai: 'gpt-4o-mini',
   google: 'gemini-2.5-flash',
+  // Reliable structured output (generateObject / streamObject) on Groq.
+  groq: 'openai/gpt-oss-120b',
+};
+
+/** Models that can read the claim photos; Groq's default text model cannot. */
+const DEFAULT_VISION_MODELS: Partial<Record<AiProviderName, string>> = {
+  groq: 'qwen/qwen3.8-27b',
 };
 
 export function aiProviderName(): AiProviderName {
-  return process.env.AI_PROVIDER === 'google' ? 'google' : 'openai';
+  const name = process.env.AI_PROVIDER;
+  return name === 'google' || name === 'groq' ? name : 'openai';
 }
 
 export function aiModelId(): string {
@@ -26,9 +35,10 @@ export function aiModelId(): string {
 /** True when a key is configured, regardless of the circuit breaker. */
 export function isAiConfigured(): boolean {
   if (process.env.AI_DISABLED === 'true') return false;
-  return aiProviderName() === 'google'
-    ? Boolean(process.env.GOOGLE_GENERATIVE_AI_API_KEY)
-    : Boolean(process.env.OPENAI_API_KEY);
+  const provider = aiProviderName();
+  if (provider === 'google') return Boolean(process.env.GOOGLE_GENERATIVE_AI_API_KEY);
+  if (provider === 'groq') return Boolean(process.env.GROQ_API_KEY);
+  return Boolean(process.env.OPENAI_API_KEY);
 }
 
 /* ---------- Quota circuit breaker ----------
@@ -58,7 +68,12 @@ export function isQuotaError(error: unknown): boolean {
 
 /** Opens the breaker: the cloud model is skipped until the cooldown expires. */
 export function markAiFailure(error: unknown): void {
-  const message = error instanceof Error ? error.message : String(error);
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === 'object' && error !== null
+        ? JSON.stringify(error)
+        : String(error);
   // Quota/auth errors wait the full window; transient errors (timeout, 5xx) retry sooner.
   const wait = isQuotaError(error) ? COOLDOWN_MS : Math.min(COOLDOWN_MS, 30_000);
   cooldownUntil = Date.now() + wait;
@@ -104,15 +119,32 @@ export async function isAiAvailable(): Promise<boolean> {
   return lastProbeOk;
 }
 
+function modelFor(provider: AiProviderName, id: string) {
+  if (provider === 'google') return google(id);
+  if (provider === 'groq') return groq(id);
+  return openai(id);
+}
+
 export function aiModel() {
-  const id = aiModelId();
-  return aiProviderName() === 'google' ? google(id) : openai(id);
+  return modelFor(aiProviderName(), aiModelId());
+}
+
+/** Model for the claim photo scanner (images in, structured damage report out). */
+export function aiVisionModelId(): string {
+  return process.env.AI_VISION_MODEL || DEFAULT_VISION_MODELS[aiProviderName()] || aiModelId();
+}
+
+export function aiVisionModel() {
+  return modelFor(aiProviderName(), aiVisionModelId());
 }
 
 /** Production guardrails (course ch.6 "maxTokens & Timeout"). */
 export const AI_LIMITS = {
-  /** Hard ceiling on generated tokens per call. */
-  maxOutputTokens: 700,
+  /**
+   * Hard ceiling on generated tokens per call. Groq's default model reasons before it
+   * answers and those tokens count too, so 700 would cut the mediation JSON short.
+   */
+  maxOutputTokens: process.env.AI_PROVIDER === 'groq' ? 3000 : 700,
   /** Abort the provider call after this many ms and fall back / show an error. */
   timeoutMs: 25_000,
   /** Chat messages per user per rolling hour. */
