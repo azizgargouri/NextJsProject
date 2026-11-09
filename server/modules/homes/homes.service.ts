@@ -1,6 +1,7 @@
 import { isValidObjectId } from 'mongoose';
 import { AbstractCrudService } from '../../shared/database/crud-service';
-import { BadRequestError, NotFoundError } from '../../shared/database/errors';
+import { BadRequestError, DomainError, NotFoundError } from '../../shared/database/errors';
+import { moveRequestsService, type ClientRef } from '../room-layout/move-requests.service';
 import { HomeRepository, type HomeRow } from './homes.repository';
 import {
   HOME_LIMITS,
@@ -9,7 +10,17 @@ import {
   type RoomCreateInput,
   type RoomUpdateInput,
 } from './homes.schema';
-import { serializeHome, type HomeResponse } from './homes.serializer';
+import { serializeHome, type HomeDetailResponse } from './homes.serializer';
+
+/** One entry of the client's move requests, with the house it is linked to (if any). */
+export interface ClientMoveRequestResponse {
+  reference: string;
+  pickupAddress: string;
+  destinationAddress: string;
+  moveDate: string;
+  itemCount: number;
+  linkedHome: { id: string; label: string } | null;
+}
 
 /**
  * Homes business logic. Every method is scoped to the calling client:
@@ -22,49 +33,107 @@ export class HomeService extends AbstractCrudService<HomeRow> {
     return this.homes;
   }
 
-  async listMine(clientId: string, searchParams: URLSearchParams) {
-    const page = await this.repository.findPaginatedForClient(clientId, searchParams);
+  async listMine(client: ClientRef, searchParams: URLSearchParams) {
+    const page = await this.repository.findPaginatedForClient(client.id, searchParams);
     return { ...page, data: page.data.map(serializeHome) };
   }
 
-  async getMine(clientId: string, homeId: string): Promise<HomeResponse> {
-    return serializeHome(await this.owned(clientId, homeId));
+  async getMine(client: ClientRef, homeId: string): Promise<HomeDetailResponse> {
+    return this.detail(client, await this.owned(client.id, homeId));
   }
 
-  async createMine(clientId: string, input: HomeCreateInput): Promise<HomeResponse> {
-    const existing = await this.repository.count({ clientId, deletedAt: null });
+  async createMine(client: ClientRef, input: HomeCreateInput): Promise<HomeDetailResponse> {
+    const existing = await this.repository.count({ clientId: client.id, deletedAt: null });
     if (existing >= HOME_LIMITS.homesPerClient) {
       throw new BadRequestError(`You can save up to ${HOME_LIMITS.homesPerClient} houses`);
     }
-    return serializeHome(await this.repository.create({ ...input, clientId, rooms: [] }));
+    const home = await this.repository.create({
+      ...input,
+      clientId: client.id,
+      moveReference: null,
+      rooms: [],
+    });
+    return this.detail(client, home);
   }
 
-  async updateMine(clientId: string, homeId: string, input: HomeUpdateInput) {
-    await this.owned(clientId, homeId);
-    return serializeHome(await this.repository.update(homeId, input));
+  async updateMine(client: ClientRef, homeId: string, input: HomeUpdateInput) {
+    await this.owned(client.id, homeId);
+    if (input.moveReference) await this.assertLinkable(client, homeId, input.moveReference);
+    return this.detail(client, await this.repository.update(homeId, input));
   }
 
-  async deleteMine(clientId: string, homeId: string): Promise<HomeResponse> {
-    await this.owned(clientId, homeId);
-    return serializeHome(await this.repository.delete(homeId));
+  async deleteMine(client: ClientRef, homeId: string): Promise<HomeDetailResponse> {
+    await this.owned(client.id, homeId);
+    // A deleted house releases its move request so another house can link it.
+    return this.detail(
+      client,
+      await this.repository.update(homeId, { deletedAt: new Date(), moveReference: null }),
+    );
   }
 
-  async addRoom(clientId: string, homeId: string, input: RoomCreateInput) {
-    const home = await this.owned(clientId, homeId);
+  async addRoom(client: ClientRef, homeId: string, input: RoomCreateInput) {
+    const home = await this.owned(client.id, homeId);
     if (home.rooms.length >= HOME_LIMITS.roomsPerHome) {
       throw new BadRequestError(`A house can have up to ${HOME_LIMITS.roomsPerHome} rooms`);
     }
-    return serializeHome(await this.repository.addRoom(homeId, input));
+    return this.detail(client, await this.repository.addRoom(homeId, input));
   }
 
-  async updateRoom(clientId: string, homeId: string, roomId: string, input: RoomUpdateInput) {
-    await this.ownedRoom(clientId, homeId, roomId);
-    return serializeHome(await this.repository.updateRoom(homeId, roomId, input));
+  async updateRoom(client: ClientRef, homeId: string, roomId: string, input: RoomUpdateInput) {
+    await this.ownedRoom(client.id, homeId, roomId);
+    return this.detail(client, await this.repository.updateRoom(homeId, roomId, input));
   }
 
-  async removeRoom(clientId: string, homeId: string, roomId: string) {
-    await this.ownedRoom(clientId, homeId, roomId);
-    return serializeHome(await this.repository.removeRoom(homeId, roomId));
+  async removeRoom(client: ClientRef, homeId: string, roomId: string) {
+    await this.ownedRoom(client.id, homeId, roomId);
+    return this.detail(client, await this.repository.removeRoom(homeId, roomId));
+  }
+
+  /** The client's move requests for the link picker, marking which house uses each. */
+  async listMoveRequests(client: ClientRef): Promise<ClientMoveRequestResponse[]> {
+    const requests = await moveRequestsService.listForClient(client);
+    const linked = await this.repository.findLinked(
+      client.id,
+      requests.map((request) => request.reference),
+    );
+    return requests.map((request) => {
+      const home = linked.find((candidate) => candidate.moveReference === request.reference);
+      return {
+        reference: request.reference,
+        pickupAddress: request.pickupAddress,
+        destinationAddress: request.destinationAddress,
+        moveDate: request.moveDate,
+        itemCount: request.items.reduce((sum, item) => sum + item.quantity, 0),
+        linkedHome: home ? { id: home.id, label: home.label } : null,
+      };
+    });
+  }
+
+  /** Request must be the client's own and not already used by another of their houses. */
+  private async assertLinkable(client: ClientRef, homeId: string, reference: string) {
+    if (!(await moveRequestsService.findForClient(client, reference))) {
+      throw new NotFoundError('Move request');
+    }
+    const [other] = (await this.repository.findLinked(client.id, [reference])).filter(
+      (home) => home.id !== homeId,
+    );
+    if (other) {
+      throw new DomainError(
+        `${reference} is already linked to “${other.label}”. Unlink it there first.`,
+        409,
+        'MOVE_REQUEST_ALREADY_LINKED',
+      );
+    }
+  }
+
+  private async detail(client: ClientRef, home: HomeRow): Promise<HomeDetailResponse> {
+    const request = home.moveReference
+      ? await moveRequestsService.findForClient(client, home.moveReference)
+      : null;
+    return {
+      ...serializeHome(home),
+      moveRequest: request ? moveRequestsService.expand(request) : null,
+    };
   }
 
   private async owned(clientId: string, homeId: string): Promise<HomeRow> {

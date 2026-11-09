@@ -1,15 +1,18 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { homesApi } from '@/lib/api/homes';
-import type { HomeDto, HomePayload, RoomPayload } from '@/types/homes';
+import type { HomeDetailDto, HomePayload, HomeUpdatePayload, RoomPayload } from '@/types/homes';
 import { homesKeys, useHomesUserId } from './use-homes';
 
 /** Every house/room mutation returns the full house: cache it, then refresh the lists. */
 function useSyncHome() {
   const queryClient = useQueryClient();
   const userId = useHomesUserId();
-  return async (home: HomeDto) => {
+  return async (home: HomeDetailDto) => {
     queryClient.setQueryData(homesKeys.detail(userId, home.id), home);
-    await queryClient.invalidateQueries({ queryKey: homesKeys.lists(userId) });
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: homesKeys.lists(userId) }),
+      queryClient.invalidateQueries({ queryKey: homesKeys.moveRequests(userId) }),
+    ]);
   };
 }
 
@@ -24,7 +27,7 @@ export function useCreateHome() {
 export function useUpdateHome(id: string) {
   const sync = useSyncHome();
   return useMutation({
-    mutationFn: (payload: Partial<HomePayload>) => homesApi.update(id, payload),
+    mutationFn: (payload: HomeUpdatePayload) => homesApi.update(id, payload),
     onSuccess: sync,
   });
 }
@@ -36,7 +39,10 @@ export function useDeleteHome(id: string) {
     mutationFn: () => homesApi.remove(id),
     onSuccess: async () => {
       queryClient.removeQueries({ queryKey: homesKeys.detail(userId, id) });
-      await queryClient.invalidateQueries({ queryKey: homesKeys.lists(userId) });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: homesKeys.lists(userId) }),
+        queryClient.invalidateQueries({ queryKey: homesKeys.moveRequests(userId) }),
+      ]);
     },
   });
 }
