@@ -17,6 +17,7 @@ export interface ResponseUserDto extends DatabaseEntity {
   status: UserStatus;
   /** Public address of the auto-created app wallet. */
   walletAddress: string | null;
+  avatarUrl: string | null;
 }
 
 export interface ApiUserResponse {
@@ -505,6 +506,11 @@ export type AuditEventType =
   | 'PRICING_UPDATE'
   | 'PRICING_DELETE'
   | 'CONTENT_UPDATE'
+  | 'PROFILE_UPDATE'
+  | 'AVATAR_UPDATE'
+  | 'PASSWORD_CHANGE'
+  | 'SESSION_REVOKE'
+  | 'STORAGE_DELETE'
   | 'EMPLOYEE_CREATE'
   | 'EMPLOYEE_UPDATE'
   | 'ATTENDANCE_CHECKIN'
@@ -618,6 +624,16 @@ export interface ContentResetPayload {
   locale: 'en' | 'fr' | 'ar';
   keys: string[];
 }
+
+export interface ProfileUpdatePayload { name?: string; phone?: string; locale?: 'en' | 'fr' | 'ar' }
+export interface PasswordChangePayload { currentPassword: string; newPassword: string; confirmPassword: string; signOutOtherSessions: boolean }
+export interface AccountSessionDto { id: string; userAgent: string | null; startedAt: string; lastActiveAt: string; expiresAt: string; current: boolean }
+export interface AccountNotificationDto { id: string; event: AuditEventType; createdAt: string; unread: boolean; actor: { id: string; name: string; email: string } | null; logInfo: Record<string, string | undefined> }
+export interface AccountNotificationsPage { data: AccountNotificationDto[]; unreadCount: number; seenAt: string | null; nextBefore: string | null }
+export interface StorageStatusDto { reachable: boolean; bucket: string; endpoint: string; objectCount: number | null; totalBytes: number | null; prefixes: { prefix: string; objectCount: number; totalBytes: number }[] }
+export interface StorageObjectDto { key: string; size: number; lastModified: string | null; etag: string | null; owner: { id: string; name: string; email: string } | null; referenced: boolean }
+export interface StorageObjectsPage { data: StorageObjectDto[]; nextCursor: string | null }
+export interface StorageObjectsQuery { prefix?: string; cursor?: string; limit?: number }
 
 export * from './homes';
 /* ------------------------------------------------------------------ */

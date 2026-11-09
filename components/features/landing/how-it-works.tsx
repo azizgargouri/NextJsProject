@@ -6,98 +6,80 @@ import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useGSAP } from '@gsap/react';
 import { SectionHeading } from '@/components/shared/section-heading';
+import { fill, type LandingMessages } from '@/lib/i18n/landing';
+import { LANDING_PHOTOS, type LandingPhotoSlug } from './photos';
 
 if (typeof window !== 'undefined') {
   gsap.registerPlugin(ScrollTrigger);
 }
 
-/**
- * How it works — Desire block.
- * Pinned section; vertical scroll drives a horizontal carrier (containerAnimation).
- * The horizontal tween MUST use ease:"none" for a 1:1 scroll mapping.
- */
-const STEPS = [
-  {
-    stage: 'STEP 01',
-    status: 'DRAFT → SUBMITTED',
-    title: 'REQUEST THE MOVE',
-    body: 'Pickup, destination, floors, elevator, date. Five minutes, saved as a draft until you submit it.',
-    seed: 'moveup-step1',
-  },
-  {
-    stage: 'STEP 02',
-    status: 'QUOTING',
-    title: 'RECEIVE THE QUOTES',
-    body: 'The society reviews the request and sends it to vetted movers in your zone with live vehicles.',
-    seed: 'moveup-step2',
-  },
-  {
-    stage: 'STEP 03',
-    status: 'ASSIGNED',
-    title: 'ACCEPT AND MEET YOUR MOVER',
-    body: 'Compare price and rating, accept a quote, see the assigned crew profile, vehicle and reviews.',
-    seed: 'moveup-step3',
-  },
-  {
-    stage: 'STEP 04',
-    status: 'EN ROUTE → COMPLETED',
-    title: 'FOLLOW IT TO THE LAST BOX',
-    body: 'Track every status change, chat with the mover, sign off delivery, pay and rate the job.',
-    seed: 'moveup-step4',
-  },
+const STEP_PHOTOS: LandingPhotoSlug[] = [
+  'step-open-box',
+  'step-sealed-box',
+  'step-dolly',
+  'step-street-truck',
 ];
 
-export function HowItWorks({ steps }: { steps?: { title: string; body: string }[] }) {
+/**
+ * How it works — Desire. On desktop the section is exactly one viewport tall
+ * and pins; vertical scroll drives the horizontal rail (ease "none" keeps the
+ * mapping 1:1) and a progress rule that fills with it. Mobile stacks the steps.
+ */
+export function HowItWorks({
+  steps,
+  t,
+}: {
+  steps: { title: string; body: string }[];
+  t: LandingMessages['how'];
+}) {
   const rootRef = useRef<HTMLElement>(null);
-  const carrierRef = useRef<HTMLDivElement>(null);
-
-  // DB-managed copy (per-step title/body) overrides the designed defaults.
-  const copy = STEPS.map((step, index) => ({
-    ...step,
-    title: steps?.[index]?.title ?? step.title,
-    body: steps?.[index]?.body ?? step.body,
-  }));
+  const carrierRef = useRef<HTMLOListElement>(null);
+  const progressRef = useRef<HTMLDivElement>(null);
 
   useGSAP(
     () => {
-      // Mobile: no pinning, plain stacked reveals.
       gsap
         .matchMedia()
         .add(
           { isDesktop: '(min-width: 768px)', reduce: '(prefers-reduced-motion: reduce)' },
           (context) => {
             const { isDesktop, reduce } = context.conditions ?? {};
-            if (!isDesktop || reduce) return;
-
             const carrier = carrierRef.current;
-            if (!carrier) return;
+            if (!isDesktop || reduce || !carrier) return;
 
-            const horizontalTween = gsap.to(carrier, {
-              x: () => -(carrier.scrollWidth - window.innerWidth),
-              ease: 'none', // required for containerAnimation mapping
+            const distance = () => Math.max(0, carrier.scrollWidth - window.innerWidth);
+            const rail = gsap.to(carrier, {
+              x: () => -distance(),
+              ease: 'none',
               scrollTrigger: {
                 trigger: rootRef.current,
                 pin: true,
-                scrub: 1,
+                scrub: 0.8,
                 start: 'top top',
-                end: () => `+=${carrier.scrollWidth - window.innerWidth}`,
+                end: () => `+=${distance()}`,
                 invalidateOnRefresh: true,
+                onUpdate: (self) => {
+                  if (progressRef.current) gsap.set(progressRef.current, { scaleX: self.progress });
+                },
               },
             });
 
-            gsap.utils.toArray<gsap.TweenTarget>('[data-step-visual]').forEach((visual) => {
-              gsap.from(visual, {
-                scale: 0.8,
-                autoAlpha: 0.2,
-                ease: 'none',
-                scrollTrigger: {
-                  trigger: visual as Element,
-                  containerAnimation: horizontalTween,
-                  start: 'left 90%',
-                  end: 'left 45%',
-                  scrub: true,
+            gsap.utils.toArray<HTMLElement>('[data-step-photo]').forEach((photo) => {
+              gsap.fromTo(
+                photo,
+                { clipPath: 'inset(0% 100% 0% 0%)' },
+                {
+                  clipPath: 'inset(0% 0% 0% 0%)',
+                  ease: 'none',
+                  scrollTrigger: {
+                    trigger: photo,
+                    containerAnimation: rail,
+                    start: 'left 95%',
+                    end: 'left 55%',
+                    scrub: true,
+                  },
                 },
-              });
+              );
             });
           },
         );
@@ -108,77 +90,97 @@ export function HowItWorks({ steps }: { steps?: { title: string; body: string }[
   return (
     <section
       id="how-it-works"
+      tabIndex={-1}
       ref={rootRef}
-      className="overflow-hidden border-b border-ink bg-paper"
+      aria-labelledby="how-title"
+      className="overflow-hidden border-b border-ink bg-paper outline-none md:flex md:h-dvh md:flex-col"
     >
-      <div className="mx-auto max-w-7xl px-4 pt-24 md:px-6 md:pt-32">
-        <SectionHeading index="02 —" title="[ HOW IT WORKS ]" className="mb-12" />
+      <div className="mx-auto w-full max-w-7xl px-4 pt-24 md:px-6 md:pt-20">
+        <SectionHeading id="how-title" index={t.index} title={t.title} className="mb-8" />
       </div>
 
-      {/* Desktop pinned horizontal rail */}
-      <div className="relative hidden md:block">
-        <div className="h-dvh overflow-hidden">
-          <div className="flex h-full items-center pb-16">
-            <div ref={carrierRef} className="flex gap-px bg-ink px-6">
-              {copy.map((step, index) => (
-                <article
-                  key={step.stage}
-                  className="flex w-[68vw] max-w-[880px] shrink-0 gap-0 border bg-paper lg:w-[52vw]"
+      {/* Desktop rail */}
+      <div className="relative hidden min-h-0 flex-1 md:flex md:flex-col">
+        <div className="flex min-h-0 flex-1 items-stretch pb-14">
+          <ol ref={carrierRef} className="flex h-full max-h-[560px] gap-px self-center bg-ink px-6">
+            {steps.map((step, index) => {
+              const photo = LANDING_PHOTOS[STEP_PHOTOS[index] ?? 'step-open-box'];
+              return (
+                <li
+                  key={index}
+                  className="flex h-full w-[min(72vw,880px)] shrink-0 border border-ink bg-paper lg:w-[min(56vw,880px)]"
                 >
-                  <div className="relative w-1/2 shrink-0 overflow-hidden">
-                    <div data-step-visual className="relative z-10 size-full">
+                  <div className="relative w-1/2 shrink-0 overflow-hidden border-r border-ink bg-paper-soft">
+                    <div data-step-photo className="absolute inset-0">
                       <Image
-                        src={`https://picsum.photos/seed/${step.seed}/900/1200`}
-                        alt=""
+                        src={photo.src}
+                        alt={t.photoAlts[index] ?? ''}
                         fill
-                        sizes="(min-width: 1024px) 30vw, 50vw"
-                        className="size-full object-cover grayscale contrast-125"
+                        sizes="(min-width: 1024px) 28vw, 36vw"
+                        className="object-cover contrast-125 grayscale"
                       />
                     </div>
-                    <span className="mono absolute bottom-3 left-3 z-20 bg-ink px-2 py-1 text-[10px] text-paper">
-                      {step.stage}
+                    <span className="mono absolute bottom-3 left-3 bg-ink px-2 py-1 text-[11px] text-paper">
+                      {fill(t.step, { n: `0${index + 1}` })}
                     </span>
-                    <span className="mono absolute top-3 right-3 z-20 bg-hazard px-2 py-1 text-[10px] text-white">
-                      {step.status}
+                    <span className="mono absolute right-3 top-3 bg-hazard-dark px-2 py-1 text-[11px] text-white">
+                      {t.statuses[index]}
                     </span>
                   </div>
 
                   <div className="flex w-1/2 flex-col justify-between p-8">
                     <div>
-                      <p className="mono text-[10px] text-ink-40">MANIFEST / {`0${index + 1}`}</p>
-                      <h3 className="display mt-4 text-4xl lg:text-5xl">{step.title}</h3>
+                      <p className="mono text-[11px] text-ink-60">
+                        {fill(t.of, { n: `0${index + 1}` })}
+                      </p>
+                      <h3 className="display mt-4 text-[clamp(1.75rem,3vw,3rem)]">{step.title}</h3>
                       <p className="mt-5 max-w-[36ch] text-sm leading-relaxed text-ink-80">
                         {step.body}
                       </p>
                     </div>
-                    <p className="mono text-[10px] text-hazard">
-                      {index < STEPS.length - 1 ? 'NEXT >>>' : 'FINAL STAGE'}
+                    <p className="mono text-[11px] text-hazard-ink">
+                      {index < steps.length - 1 ? t.next : t.final}
                     </p>
                   </div>
-                </article>
-              ))}
-            </div>
-          </div>
+                </li>
+              );
+            })}
+          </ol>
         </div>
-        {/* progress rule */}
-        <div className="absolute bottom-8 left-1/2 z-40 w-full max-w-md -translate-x-1/2">
-          <div className="h-px w-full bg-ink/30" />
+        <div className="absolute inset-x-0 bottom-6 mx-auto w-full max-w-md px-6">
+          <div aria-hidden className="relative h-0.5 w-full overflow-hidden bg-ink/20">
+            <div ref={progressRef} className="absolute inset-0 origin-left scale-x-0 bg-hazard" />
+          </div>
         </div>
       </div>
 
-      {/* Mobile stacked fallback */}
+      {/* Mobile stack */}
       <div className="px-4 pb-24 md:hidden">
-        <div className="grid grid-cols-1 gap-px border border-ink bg-ink">
-          {copy.map((step) => (
-            <article key={step.stage} className="bg-paper p-6">
-              <p className="mono text-[10px] text-hazard">
-                {step.stage} — {step.status}
-              </p>
-              <h3 className="display mt-2 text-2xl">{step.title}</h3>
-              <p className="mt-2 text-sm text-ink-80">{step.body}</p>
-            </article>
-          ))}
-        </div>
+        <ol className="grid grid-cols-1 gap-px border border-ink bg-ink">
+          {steps.map((step, index) => {
+            const photo = LANDING_PHOTOS[STEP_PHOTOS[index] ?? 'step-open-box'];
+            return (
+              <li key={index} className="bg-paper">
+                <div className="relative aspect-[16/9] overflow-hidden border-b border-ink">
+                  <Image
+                    src={photo.src}
+                    alt={t.photoAlts[index] ?? ''}
+                    fill
+                    sizes="100vw"
+                    className="object-cover contrast-125 grayscale"
+                  />
+                </div>
+                <div className="p-6">
+                  <p className="mono text-[11px] text-hazard-ink">
+                    {fill(t.step, { n: `0${index + 1}` })} · {t.statuses[index]}
+                  </p>
+                  <h3 className="display mt-2 text-2xl">{step.title}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-ink-80">{step.body}</p>
+                </div>
+              </li>
+            );
+          })}
+        </ol>
       </div>
     </section>
   );

@@ -11,6 +11,7 @@ import { crewsApi } from './crews';
 import { trackingApi } from './tracking';
 import { voiceApi } from './voice';
 import { moverApi } from './mover';
+import { accountApi } from './account';
 import { axiosClient, ensureAccessToken } from './client';
 
 /** API barrel endpoint (replicates `instanct-ui/src/api` with the Object.freeze directive). */
@@ -28,6 +29,7 @@ export const api = Object.freeze({
   tracking: trackingApi,
   voice: voiceApi,
   mover: moverApi,
+  account: accountApi,
 });
 
 export { axiosClient, ensureAccessToken };

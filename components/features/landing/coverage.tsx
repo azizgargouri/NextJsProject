@@ -6,126 +6,105 @@ import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useGSAP } from '@gsap/react';
 import { SectionHeading } from '@/components/shared/section-heading';
+import type { LandingMessages } from '@/lib/i18n/landing';
+import { LANDING_PHOTOS, type LandingPhotoSlug } from './photos';
 
 if (typeof window !== 'undefined') {
   gsap.registerPlugin(ScrollTrigger);
 }
 
-/**
- * Coverage — Desire block.
- * Off-grid editorial: pinned title column left, image ledger scrolling right.
- * Images scale 0.8 → 1 on entry and darken/fade on exit.
- */
-const CITIES = [
-  { code: 'TUN', name: 'TUNIS', note: 'HQ — SAME-DAY DISPATCH', seed: 'moveup-tunis', rows: 2 },
-  { code: 'SFA', name: 'SFAX', note: 'CITY + SUBURB RADIUS', seed: 'moveup-sfax', rows: 1 },
-  { code: 'SOU', name: 'SOUSSE', note: 'COASTAL ROUTE', seed: 'moveup-sousse', rows: 1 },
-  { code: 'BIZ', name: 'BIZERTE', note: 'NORTH SECTOR', seed: 'moveup-bizerte', rows: 2 },
-  { code: 'NAB', name: 'NABEUL', note: 'CAPE ROUTE', seed: 'moveup-nabeul', rows: 1 },
-  { code: 'KAI', name: 'KAIROUAN', note: 'CENTER SECTOR', seed: 'moveup-kairouan', rows: 1 },
-];
+const CITY_PHOTOS: LandingPhotoSlug[] = ['city-tunis', 'city-sfax', 'city-sousse'];
 
-export function Coverage({ intro }: { intro?: string }) {
+/**
+ * Coverage — Desire. Sticky title column; three launch-city plates that open
+ * like shutters as they enter. Only cities MoveUp actually serves are listed.
+ */
+export function Coverage({ intro, t }: { intro: string; t: LandingMessages['coverage'] }) {
   const rootRef = useRef<HTMLElement>(null);
 
   useGSAP(
     () => {
       if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
-      gsap.matchMedia().add('(min-width: 768px)', () => {
-        gsap.to('[data-coverage-list]', {
-          yPercent: -8,
-          ease: 'none',
-          scrollTrigger: {
-            trigger: rootRef.current,
-            start: 'top top',
-            end: 'bottom bottom',
-            scrub: 1,
-          },
-        });
-      });
-
-      gsap.utils.toArray<gsap.TweenTarget>('[data-coverage-card]').forEach((target) => {
-        const card = target as Element;
-        const image = card.querySelector('img');
-
+      gsap.utils.toArray<HTMLElement>('[data-city]').forEach((card, index) => {
+        const plate = card.querySelector('[data-city-plate]');
         gsap.fromTo(
-          card,
-          { autoAlpha: 1, scale: 0.8 },
+          plate,
+          { clipPath: 'inset(0% 0% 100% 0%)' },
           {
-            scale: 1,
-            autoAlpha: 1,
-            ease: 'power2.out',
-            duration: 0.9,
-            scrollTrigger: { trigger: card as Element, start: 'top 88%', once: true },
+            clipPath: 'inset(0% 0% 0% 0%)',
+            duration: 1.3,
+            delay: index * 0.12,
+            ease: 'expo.inOut',
+            scrollTrigger: { trigger: card, start: 'top 85%', once: true },
           },
         );
-
-        if (image) {
-          gsap.to(card, {
-            autoAlpha: 0.2,
+        gsap.fromTo(
+          card.querySelector('img'),
+          { yPercent: -8 },
+          {
+            yPercent: 8,
             ease: 'none',
-            scrollTrigger: {
-              trigger: card as Element,
-              start: 'bottom 30%',
-              end: 'bottom 5%',
-              scrub: true,
-            },
-          });
-        }
+            scrollTrigger: { trigger: card, start: 'top bottom', end: 'bottom top', scrub: true },
+          },
+        );
       });
     },
     { scope: rootRef },
   );
 
   return (
-    <section id="coverage" ref={rootRef} className="border-b border-ink bg-paper">
+    <section
+      id="coverage"
+      tabIndex={-1}
+      ref={rootRef}
+      aria-labelledby="coverage-title"
+      className="scroll-mt-14 border-b border-ink bg-paper outline-none"
+    >
       <div className="mx-auto grid max-w-7xl grid-cols-1 gap-12 px-4 py-24 md:grid-cols-12 md:px-6 md:py-32">
-        {/* Pinned title column */}
         <div className="md:col-span-4">
           <div className="md:sticky md:top-28">
-            <SectionHeading index="03 —" title="[ COVERAGE ]" className="mb-8" />
-            <p className="max-w-[34ch] text-sm leading-relaxed text-ink-80">
-              {intro ??
-                'Six operating centers, city rates, no distance guesswork. The estimator prices by sector — surface, rooms, floors, elevator and address distance are all recorded per request.'}
+            <SectionHeading
+              id="coverage-title"
+              index={t.index}
+              title={t.title}
+              size="column"
+              className="mb-8"
+            />
+            <p className="max-w-[36ch] text-sm leading-relaxed text-ink-80">{intro}</p>
+            <p className="mono mt-6 max-w-[36ch] text-[11px] leading-relaxed text-ink-60">
+              {t.footnote}
             </p>
-            <p className="mono mt-6 text-[10px] text-hazard">V-02 ESTIMATOR — ROADMAP CH.9</p>
           </div>
         </div>
 
-        {/* Scrolling ledger */}
-        <div data-coverage-list className="md:col-span-8 md:pl-16">
-          <div className="grid grid-cols-2 gap-px border border-ink bg-ink sm:grid-cols-3">
-            {CITIES.map((city, index) => (
-              <article
-                key={city.code}
-                data-coverage-card
-                className={`group relative overflow-hidden bg-paper will-change-transform ${
-                  city.rows === 2 ? 'row-span-2' : ''
-                }`}
-              >
-                <div className={`relative ${city.rows === 2 ? 'h-full min-h-72' : 'h-40'}`}>
+        <ul className="grid grid-cols-1 gap-px border border-ink bg-ink sm:grid-cols-3 md:col-span-8">
+          {t.cities.map((city, index) => {
+            const photo = LANDING_PHOTOS[CITY_PHOTOS[index] ?? 'city-tunis'];
+            return (
+              <li key={city.code} data-city className="relative bg-paper">
+                <div data-city-plate className="relative aspect-[3/4] overflow-hidden">
                   <Image
-                    src={`https://picsum.photos/seed/${city.seed}/700/1000`}
-                    alt={city.name}
+                    src={photo.src}
+                    alt={city.alt}
                     fill
-                    sizes="(min-width: 640px) 33vw, 50vw"
-                    className="absolute inset-0 size-full object-cover grayscale contrast-125 opacity-80 transition-all duration-700 group-hover:scale-105 group-hover:opacity-100"
+                    sizes="(min-width: 768px) 22vw, (min-width: 640px) 33vw, 100vw"
+                    className="scale-110 object-cover contrast-125 grayscale"
                   />
+                  <span className="mono absolute left-3 top-3 bg-ink px-2 py-1 text-[11px] text-paper">
+                    {city.note}
+                  </span>
                 </div>
-                <div className="absolute inset-x-0 bottom-0 flex items-center justify-between border-t border-ink bg-paper px-3 py-2">
-                  <span className="mono text-[11px] font-bold">{city.name}</span>
-                  <span className="mono text-[9px] text-hazard">
+                <div className="flex items-center justify-between border-t border-ink px-4 py-3">
+                  <span className="display text-xl">{city.name}</span>
+                  <span className="mono text-[11px] text-hazard-ink">
                     {city.code}/{`0${index + 1}`}
                   </span>
                 </div>
-                <span className="mono absolute left-2 top-2 bg-ink/80 px-1.5 py-0.5 text-[9px] text-paper">
-                  {city.note}
-                </span>
-              </article>
-            ))}
-          </div>
-        </div>
+              </li>
+            );
+          })}
+        </ul>
       </div>
     </section>
   );

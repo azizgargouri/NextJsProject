@@ -1,13 +1,6 @@
 import { axiosClient } from './client';
 import type {
   AdminAuditQuery,
-  AdminClaimUpdatePayload,
-  AdminClaimsQuery,
-  AdminReviewsQuery,
-  ClaimDto,
-  QualityStatsDto,
-  ReviewDto,
-  ReviewStatus,
   AdminOverviewDto,
   AdminPricingQuery,
   AdminUserCreatePayload,
@@ -21,7 +14,11 @@ import type {
   PricingRuleDto,
   PricingRulePayload,
   ResponseUserDto,
+  StorageObjectsPage,
+  StorageObjectsQuery,
+  StorageStatusDto,
   UserStatus,
+  AdminClaimUpdatePayload, AdminClaimsQuery, AdminReviewsQuery, ClaimDto, QualityStatsDto, ReviewDto, ReviewStatus,
 } from '@/types';
 
 export const adminApi = {
@@ -147,55 +144,49 @@ export const adminApi = {
     return data;
   },
 
-  /* ---------- quality: disputes, review moderation, KPIs ---------- */
-
-  quality: async (): Promise<QualityStatsDto> => {
-    const { data } = await axiosClient.get<QualityStatsDto>('/api/admin/quality');
+  storageStatus: async (): Promise<StorageStatusDto> => {
+    const { data } = await axiosClient.get<StorageStatusDto>('/api/admin/storage');
     return data;
   },
 
-  claims: async (query: AdminClaimsQuery): Promise<PageDto<ClaimDto>> => {
+  storageObjects: async (query: StorageObjectsQuery): Promise<StorageObjectsPage> => {
     const params = new URLSearchParams();
-    if (query.page) params.set('page', String(query.page));
+    if (query.prefix) params.set('prefix', query.prefix);
+    if (query.cursor) params.set('cursor', query.cursor);
     if (query.limit) params.set('limit', String(query.limit));
-    if (query.search) params.set('search', query.search);
-    for (const key of ['status', 'priority', 'category'] as const) {
-      const value = query[key];
-      if (value && value !== 'ALL') params.set(key, value);
-    }
-    const { data } = await axiosClient.get<PageDto<ClaimDto>>('/api/admin/claims', { params });
-    return data;
-  },
-
-  claim: async (id: string): Promise<ClaimDto> => {
-    const { data } = await axiosClient.get<{ claim: ClaimDto }>(`/api/admin/claims/${id}`);
-    return data.claim;
-  },
-
-  updateClaim: async (id: string, payload: AdminClaimUpdatePayload): Promise<ClaimDto> => {
-    const { data } = await axiosClient.patch<{ claim: ClaimDto }>(
-      `/api/admin/claims/${id}`,
-      payload,
-    );
-    return data.claim;
-  },
-
-  reviews: async (query: AdminReviewsQuery): Promise<PageDto<ReviewDto>> => {
-    const params = new URLSearchParams();
-    if (query.page) params.set('page', String(query.page));
-    if (query.limit) params.set('limit', String(query.limit));
-    if (query.status && query.status !== 'ALL') params.set('status', query.status);
-    if (query.sentiment && query.sentiment !== 'ALL') params.set('sentiment', query.sentiment);
-    if (query.maxRating) params.set('maxRating', String(query.maxRating));
-    const { data } = await axiosClient.get<PageDto<ReviewDto>>('/api/admin/reviews', { params });
-    return data;
-  },
-
-  moderateReview: async (id: string, status: ReviewStatus, note?: string): Promise<ReviewDto> => {
-    const { data } = await axiosClient.patch<{ review: ReviewDto }>(`/api/admin/reviews/${id}`, {
-      status,
-      note,
+    const { data } = await axiosClient.get<StorageObjectsPage>('/api/admin/storage/objects', {
+      params,
     });
-    return data.review;
+    return data;
   },
+
+  downloadStorageObject: async (key: string): Promise<Blob> => {
+    const { data } = await axiosClient.get<Blob>('/api/admin/storage/objects', {
+      params: { key },
+      responseType: 'blob',
+      timeout: 60000,
+    });
+    return data;
+  },
+
+  deleteStorageObject: async (
+    key: string,
+  ): Promise<{ key: string; detachedUserId: string | null }> => {
+    const { data } = await axiosClient.delete<{ key: string; detachedUserId: string | null }>(
+      '/api/admin/storage/objects',
+      { params: { key } },
+    );
+    return data;
+  },
+
+  quality: async (): Promise<QualityStatsDto> => (await axiosClient.get<QualityStatsDto>('/api/admin/quality')).data,
+  claims: async (query: AdminClaimsQuery): Promise<PageDto<ClaimDto>> =>
+    (await axiosClient.get<PageDto<ClaimDto>>('/api/admin/claims', { params: query })).data,
+  claim: async (id: string): Promise<ClaimDto> => (await axiosClient.get<{ claim: ClaimDto }>(`/api/admin/claims/${id}`)).data.claim,
+  updateClaim: async (id: string, payload: AdminClaimUpdatePayload): Promise<ClaimDto> =>
+    (await axiosClient.patch<{ claim: ClaimDto }>(`/api/admin/claims/${id}`, payload)).data.claim,
+  reviews: async (query: AdminReviewsQuery): Promise<PageDto<ReviewDto>> =>
+    (await axiosClient.get<PageDto<ReviewDto>>('/api/admin/reviews', { params: query })).data,
+  moderateReview: async (id: string, status: ReviewStatus, note?: string): Promise<ReviewDto> =>
+    (await axiosClient.patch<{ review: ReviewDto }>(`/api/admin/reviews/${id}`, { status, note })).data.review,
 };

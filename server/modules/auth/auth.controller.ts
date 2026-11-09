@@ -18,9 +18,7 @@ class AuthController {
   async signUp(request: NextRequest): Promise<NextResponse> {
     try {
       const input = await this.validate(request, SignUpSchema);
-      const session = await authService.signUp(input, {
-        userAgent: request.headers.get('user-agent'),
-      });
+      const session = await authService.signUp(input);
 
       logEvent({
         event: EventType.SIGNUP,
@@ -38,9 +36,7 @@ class AuthController {
   async signIn(request: NextRequest): Promise<NextResponse> {
     try {
       const input = await this.validate(request, SignInSchema);
-      const session = await authService.signIn(input, {
-        userAgent: request.headers.get('user-agent'),
-      });
+      const session = await authService.signIn(input);
 
       logEvent({
         event: EventType.SIGNIN,

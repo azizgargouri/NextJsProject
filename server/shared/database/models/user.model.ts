@@ -18,6 +18,8 @@ export interface UserDoc {
   walletAddress: string | null;
   /** AES-256-GCM encrypted private key — never exposed by the API. */
   walletPrivateKeyEncrypted: string | null;
+  avatarKey: string | null;
+  notificationsSeenAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
@@ -44,6 +46,8 @@ const UserSchema = new Schema<UserDoc>(
     status: { type: String, enum: [...USER_STATUSES], default: 'ACTIVE' },
     walletAddress: { type: String, default: null, lowercase: true, trim: true },
     walletPrivateKeyEncrypted: { type: String, default: null },
+    avatarKey: { type: String, default: null },
+    notificationsSeenAt: { type: Date, default: null },
     deletedAt: { type: Date, default: null },
   },
   { timestamps: true },

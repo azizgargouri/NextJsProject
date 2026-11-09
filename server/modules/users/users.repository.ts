@@ -17,6 +17,8 @@ export interface UserRow {
   status: 'ACTIVE' | 'BLOCKED';
   walletAddress: string | null;
   walletPrivateKeyEncrypted: string | null;
+  avatarKey: string | null;
+  notificationsSeenAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
@@ -35,6 +37,8 @@ export function toUserRow(doc: UserDoc): UserRow {
     status: doc.status as UserRow['status'],
     walletAddress: doc.walletAddress,
     walletPrivateKeyEncrypted: doc.walletPrivateKeyEncrypted,
+    avatarKey: doc.avatarKey ?? null,
+    notificationsSeenAt: doc.notificationsSeenAt ?? null,
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt,
     deletedAt: doc.deletedAt ?? null,
@@ -67,6 +71,11 @@ export class UserRepository extends AbstractRepository<UserRow> {
 
   async findAnyByEmail(email: string): Promise<UserRow | null> {
     const doc = await (await this.model()).findOne({ email: email.toLowerCase() }).lean();
+    return doc ? toUserRow(doc as unknown as UserDoc) : null;
+  }
+
+  async findByAvatarKey(avatarKey: string): Promise<UserRow | null> {
+    const doc = await (await this.model()).findOne({ avatarKey }).lean();
     return doc ? toUserRow(doc as unknown as UserDoc) : null;
   }
 

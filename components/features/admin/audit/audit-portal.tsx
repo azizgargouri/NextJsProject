@@ -10,7 +10,7 @@ import { useAdminAudit } from '@/hooks/content/admin';
 import type { AuditEventType } from '@/types';
 import { useAdminShell } from '../shell/admin-shell-context';
 
-const EVENT_LABELS: Record<AuditEventType, string> = {
+const EVENT_LABELS: Partial<Record<AuditEventType, string>> = {
   SIGNIN: 'Sign in',
   SIGNOUT: 'Sign out',
   SIGNUP: 'Sign up',
@@ -37,7 +37,7 @@ const EVENT_LABELS: Record<AuditEventType, string> = {
   LEAVE_DECIDE: 'Leave decision',
 };
 
-const EVENT_VARIANTS: Record<AuditEventType, 'default' | 'secondary' | 'destructive'> = {
+const EVENT_VARIANTS: Partial<Record<AuditEventType, 'default' | 'secondary' | 'destructive'>> = {
   SIGNIN: 'secondary',
   SIGNOUT: 'secondary',
   SIGNUP: 'secondary',
@@ -68,7 +68,7 @@ const eventOptions = [
   { value: 'ALL', label: 'All events' },
   ...(Object.keys(EVENT_LABELS) as AuditEventType[]).map((event) => ({
     value: event,
-    label: EVENT_LABELS[event],
+    label: EVENT_LABELS[event] ?? event,
   })),
 ];
 
@@ -170,8 +170,8 @@ export function AuditPortal() {
                 {audit.data.data.map((eventRow) => (
                   <tr key={eventRow.id} className="text-foreground">
                     <td className="px-6 py-2.5">
-                      <AdminBadge variant={EVENT_VARIANTS[eventRow.event]}>
-                        {EVENT_LABELS[eventRow.event]}
+                      <AdminBadge variant={EVENT_VARIANTS[eventRow.event] ?? 'secondary'}>
+                        {EVENT_LABELS[eventRow.event] ?? eventRow.event}
                       </AdminBadge>
                     </td>
                     <td className="px-3 py-2.5">

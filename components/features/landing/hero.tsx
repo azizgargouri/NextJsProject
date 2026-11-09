@@ -1,74 +1,76 @@
 'use client';
 
 import { useRef } from 'react';
-import Link from 'next/link';
 import Image from 'next/image';
+import Link from 'next/link';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useGSAP } from '@gsap/react';
+import { fill, type LandingMessages } from '@/lib/i18n/landing';
+import { LANDING_PHOTOS } from './photos';
 
 if (typeof window !== 'undefined') {
   gsap.registerPlugin(ScrollTrigger);
 }
 
 export interface HeroCopy {
-  titleLine1?: string;
-  titleLine2?: string;
-  subtitle?: string;
-  primaryCta?: string;
-  secondaryCta?: string;
+  titleLine1: string;
+  titleLine2: string;
+  subtitle: string;
+  primaryCta: string;
+  secondaryCta: string;
 }
 
-const DEFAULTS: Required<HeroCopy> = {
-  titleLine1: 'EVERY MOVE',
-  titleLine2: 'ON THE RECORD.',
-  subtitle:
-    'One request. Vetted movers. A tracked timeline from quote to keys on the table. MoveUp lets you request a move in under five minutes and watch it happen — with a full record of every address, price and status change.',
-  primaryCta: 'REQUEST A MOVE >>>',
-  secondaryCta: 'SEE HOW IT WORKS',
-};
+export interface PublicRule {
+  name: string;
+  version: number;
+  minQuote: number;
+}
 
 /**
- * Hero — Attention block.
- * Editorial asymmetry: macro display type (2 lines max), telemetry margin
- * columns, full-width image strip that scales in on load and drifts on scroll.
+ * Hero — Attention. Macro display type set word by word (so a line can only
+ * break between words), real pricing telemetry in the margins, and a photo
+ * strip that wipes open on load and drifts with the scroll.
  */
-export function Hero({ copy = {} }: { copy?: HeroCopy }) {
+export function Hero({
+  copy,
+  t,
+  rule,
+  minLabel,
+}: {
+  copy: HeroCopy;
+  t: LandingMessages;
+  rule: PublicRule | null;
+  minLabel: string | null;
+}) {
   const rootRef = useRef<HTMLElement>(null);
+  const photo = LANDING_PHOTOS['hero-piano'];
 
   useGSAP(
     () => {
-      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      if (reduce) return;
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
-      const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
+      const tl = gsap.timeline({ defaults: { ease: 'expo.out' } });
+      tl.from('[data-hero-char]', {
+        yPercent: 105,
+        duration: 1.1,
+        stagger: { each: 0.022 },
+      })
+        .from('[data-hero-fade]', { y: 24, autoAlpha: 0, duration: 0.9, stagger: 0.08 }, '-=0.75')
+        .fromTo(
+          '[data-hero-strip]',
+          { clipPath: 'inset(100% 0% 0% 0%)' },
+          { clipPath: 'inset(0% 0% 0% 0%)', duration: 1.4, ease: 'expo.inOut' },
+          '-=0.9',
+        )
+        .from('[data-hero-strip] img', { scale: 1.25, duration: 1.8 }, '<');
 
-      // Char-split reveal for the display line (no SplitText needed).
-      const chars = rootRef.current?.querySelectorAll('[data-hero-char]');
-      if (chars) {
-        tl.from(chars, {
-          yPercent: 110,
-          autoAlpha: 0,
-          duration: 0.9,
-          stagger: { each: 0.018, from: 'start' },
-          ease: 'power4.out',
-        });
-      }
-
-      tl.from('[data-hero-fade]', { y: 26, autoAlpha: 0, duration: 0.8, stagger: 0.09 }, '-=0.45');
-
-      tl.from(
-        '[data-hero-strip]',
-        { scaleY: 0.2, transformOrigin: 'bottom center', duration: 1.1, ease: 'expo.out' },
-        '-=0.6',
-      );
-
-      gsap.to('[data-hero-strip] img', {
-        scale: 1.12,
+      gsap.to('[data-hero-photo]', {
+        yPercent: 12,
         ease: 'none',
         scrollTrigger: {
-          trigger: rootRef.current,
-          start: 'top top',
+          trigger: '[data-hero-strip]',
+          start: 'top bottom',
           end: 'bottom top',
           scrub: true,
         },
@@ -77,96 +79,111 @@ export function Hero({ copy = {} }: { copy?: HeroCopy }) {
     { scope: rootRef },
   );
 
-  const line1 = copy.titleLine1 ?? DEFAULTS.titleLine1;
-  const line2 = copy.titleLine2 ?? DEFAULTS.titleLine2;
+  const words = (line: string) => line.split(/\s+/).filter(Boolean);
+  const title = `${copy.titleLine1} ${copy.titleLine2}`;
 
   return (
     <section
       ref={rootRef}
-      className="dotgrid relative flex min-h-dvh flex-col justify-end overflow-hidden border-b border-ink pt-24"
+      className="dotgrid relative flex min-h-dvh flex-col justify-end overflow-hidden border-b border-ink pt-20"
     >
-      {/* Telemetry margin — top */}
       <div className="mx-auto w-full max-w-7xl px-4 md:px-6">
         <div
-          className="flex items-start justify-between border-b border-ink/20 pb-3"
+          className="mono flex items-start justify-between gap-6 border-b border-ink/20 pb-3 text-[11px] text-ink-80"
           data-hero-fade
         >
-          <p className="mono text-[10px] text-ink-80">
-            N 36.8065° — E 10.1815°
+          <p>
+            N 36.8065° · E 10.1815°
             <br />
-            TUNIS SFAX SOUSSE
+            {t.hero.cities}
           </p>
-          <p className="mono text-[10px] text-right text-ink-80">
-            SOC-REG / TN-2026-0119
-            <br />
-            ROLE: CLIENT / MOVER / ADMIN
+          <p className="text-right">
+            {rule && minLabel ? (
+              <>
+                {fill(t.hero.estimateFrom, { min: minLabel })}
+                <br />
+                <span className="hidden sm:inline">
+                  {fill(t.hero.rule, { name: rule.name.toUpperCase(), version: rule.version })}
+                </span>
+              </>
+            ) : (
+              t.hero.noRule
+            )}
           </p>
         </div>
       </div>
 
-      {/* Display type */}
-      <div className="mx-auto w-full max-w-7xl px-4 py-16 md:px-6 md:py-24">
-        <h1 className="display max-w-6xl text-[clamp(2.3rem,8.5vw,7.5rem)] text-ink">
-          <span className="block overflow-hidden">
-            {(line1 + ' ').split('').map((char, index) => (
-              <span key={`a-${index}`} data-hero-char className="inline-block whitespace-pre">
-                {char}
-              </span>
-            ))}
-          </span>
-          <span className="block overflow-hidden text-hazard">
-            {line2.split('').map((char, index) => (
-              <span key={`b-${index}`} data-hero-char className="inline-block whitespace-pre">
-                {char}
-              </span>
-            ))}
-          </span>
+      <div className="mx-auto w-full max-w-7xl px-4 py-14 md:px-6 md:py-20">
+        <h1
+          aria-label={title}
+          className="display max-w-6xl text-[clamp(2.6rem,9vw,6rem)] text-ink [overflow-wrap:normal]"
+        >
+          {[copy.titleLine1, copy.titleLine2].map((line, lineIndex) => (
+            <span
+              key={lineIndex}
+              aria-hidden
+              className={lineIndex === 1 ? 'block text-hazard' : 'block'}
+            >
+              {words(line).map((word, wordIndex) => (
+                <span
+                  key={wordIndex}
+                  className="-mt-[0.2em] inline-block overflow-hidden whitespace-nowrap pb-[0.06em] pt-[0.2em] align-top"
+                >
+                  {word.split('').map((char, charIndex) => (
+                    <span key={charIndex} data-hero-char className="inline-block">
+                      {char}
+                    </span>
+                  ))}
+                  {wordIndex < words(line).length - 1 ? (
+                    <span className="inline-block">&nbsp;</span>
+                  ) : null}
+                </span>
+              ))}
+            </span>
+          ))}
         </h1>
 
         <p
           data-hero-fade
-          className="mt-8 max-w-[46ch] text-base leading-relaxed text-ink-80 md:text-lg"
+          className="mt-8 max-w-[52ch] text-base leading-relaxed text-ink-80 md:text-lg"
         >
-          {copy.subtitle ?? DEFAULTS.subtitle}
+          {copy.subtitle}
         </p>
 
-        <div data-hero-fade className="mt-10 flex flex-wrap items-center gap-4">
+        <div data-hero-fade className="mt-10 flex flex-wrap items-center gap-x-6 gap-y-4">
           <Link
-            href="/request"
-            className="mono inline-flex h-14 items-center bg-hazard px-8 text-xs text-white transition-colors hover:bg-ink hover:text-paper"
+            href="/sign-up"
+            className="mono inline-flex h-14 items-center bg-hazard px-8 text-xs text-white transition-colors duration-200 hover:bg-ink"
           >
-            {copy.primaryCta ?? DEFAULTS.primaryCta}
+            {copy.primaryCta}
           </Link>
           <Link
             href="/#how-it-works"
-            className="mono border-b-2 border-ink pb-1 text-[11px] text-ink hover:border-hazard hover:text-hazard"
+            className="mono inline-flex min-h-11 items-center border-b-2 border-ink text-xs text-ink transition-colors hover:border-hazard hover:text-hazard-ink"
           >
-            {copy.secondaryCta ?? DEFAULTS.secondaryCta}
+            {copy.secondaryCta}
           </Link>
         </div>
       </div>
 
-      {/* Full-bleed image strip (drifts on scroll) */}
-      <div
+      <figure
         data-hero-strip
-        className="relative h-[38dvh] w-full overflow-hidden border-t-2 border-ink md:h-[46dvh]"
+        className="relative h-[42dvh] w-full overflow-hidden border-t-2 border-ink md:h-[50dvh]"
       >
-        <Image
-          src="https://picsum.photos/seed/moveup-van/1920/1080"
-          alt="Moving truck loaded with furniture, monochrome"
-          fill
-          priority
-          sizes="100vw"
-          className="size-full object-cover opacity-90 contrast-125 grayscale"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-paper/0 to-paper/20" aria-hidden />
-        <span className="mono absolute bottom-3 left-4 text-[10px] text-white mix-blend-difference">
-          FIG.01 — UNIT IN TRANSIT
-        </span>
-        <span className="mono absolute bottom-3 right-4 text-[10px] text-white mix-blend-difference">
-          REV 2.6
-        </span>
-      </div>
+        <div data-hero-photo className="absolute inset-x-0 -top-[12%] h-[124%]">
+          <Image
+            src={photo.src}
+            alt={t.hero.photoAlt}
+            fill
+            priority
+            sizes="100vw"
+            className="object-cover object-[50%_35%] contrast-125 grayscale"
+          />
+        </div>
+        <figcaption className="mono absolute bottom-3 left-4 bg-ink px-2 py-1 text-[11px] text-paper">
+          {t.hero.figure}
+        </figcaption>
+      </figure>
     </section>
   );
 }

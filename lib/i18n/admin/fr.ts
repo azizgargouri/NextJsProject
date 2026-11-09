@@ -3,7 +3,7 @@ import type { AdminMessages } from './en';
 
 const plural = (count: number, one: string, other: string) => (count <= 1 ? one : other);
 
-const auditEvents: Record<AuditEventType, string> = {
+const auditEvents: Partial<Record<AuditEventType, string>> = {
   SIGNIN: 'Connexion',
   SIGNOUT: 'Déconnexion',
   SIGNUP: 'Inscription',

@@ -6,129 +6,98 @@ import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useGSAP } from '@gsap/react';
 import { SectionHeading } from '@/components/shared/section-heading';
+import type { LandingMessages } from '@/lib/i18n/landing';
+import { LANDING_PHOTOS } from './photos';
 
 if (typeof window !== 'undefined') {
   gsap.registerPlugin(ScrollTrigger);
 }
 
 /**
- * Services — Interest block.
- * Gapless 4-column bento: rows [2+2][2(SV-01 continues)+2][2+2] interlock
- * perfectly — zero empty cells, grid-flow-dense enforces density if content shifts.
+ * Services — Interest. Gapless 4-column bento: SV-01 spans two rows beside
+ * SV-02/SV-03, then SV-04/SV-05 close the grid. No empty cells at any width.
  */
-const SERVICES = [
-  {
-    tag: 'SV-01',
-    title: 'HOUSE MOVES',
-    body: 'Studio to 6-room homes. Floors counted, elevators declared, nothing vague.',
-    span: 'col-span-4 md:col-span-2 row-span-2',
-    image: true,
-    seed: 'moveup-house',
-  },
-  {
-    tag: 'SV-02',
-    title: 'SINGLE-ITEM HAULS',
-    body: 'One sofa, one fridge. City-rate trips without the full-service invoice.',
-    span: 'col-span-4 md:col-span-2',
-    image: false,
-  },
-  {
-    tag: 'SV-03',
-    title: 'PACKING & MATERIALS',
-    body: 'Boxes, film, padded blankets — ordered with the move, packed by the crew.',
-    span: 'col-span-4 md:col-span-2',
-    image: false,
-  },
-  {
-    tag: 'SV-04',
-    title: 'DISASSEMBLY',
-    body: 'Beds, wardrobes, tables. Taken down, wrapped, rebuilt at destination.',
-    span: 'col-span-4 md:col-span-2',
-    image: false,
-  },
-  {
-    tag: 'SV-05',
-    title: 'OFFICE RELOCATIONS',
-    body: 'Business moves run over a weekend — back online before Monday.',
-    span: 'col-span-4 md:col-span-2',
-    image: false,
-  },
-];
-
-export function Services() {
+export function Services({ t }: { t: LandingMessages['services'] }) {
   const rootRef = useRef<HTMLElement>(null);
+  const photo = LANDING_PHOTOS['service-boxes'];
 
   useGSAP(
     () => {
       if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
-      gsap.utils.toArray<gsap.TweenTarget>('[data-service-cell]').forEach((cell) => {
+      gsap.utils.toArray<HTMLElement>('[data-service-cell]').forEach((cell) => {
         gsap.from(cell, {
-          y: 40,
+          y: 32,
           autoAlpha: 0,
-          duration: 0.8,
-          scrollTrigger: { trigger: cell as Element, start: 'top 88%', once: true },
+          duration: 0.9,
+          ease: 'expo.out',
+          scrollTrigger: { trigger: cell, start: 'top 90%', once: true },
         });
       });
 
-      const strip = document.querySelector('[data-service-image]') as HTMLElement | null;
-      if (strip) {
-        gsap.fromTo(
-          strip.querySelector('img'),
-          { scale: 0.85 },
-          {
-            scale: 1,
-            ease: 'none',
-            scrollTrigger: {
-              trigger: strip,
-              start: 'top bottom',
-              end: 'center center',
-              scrub: 1,
-            },
+      gsap.fromTo(
+        '[data-service-image] img',
+        { scale: 1.18 },
+        {
+          scale: 1,
+          ease: 'none',
+          scrollTrigger: {
+            trigger: '[data-service-image]',
+            start: 'top bottom',
+            end: 'bottom center',
+            scrub: true,
           },
-        );
-      }
+        },
+      );
     },
     { scope: rootRef },
   );
 
   return (
-    <section id="services" ref={rootRef} className="border-b border-ink bg-paper-soft">
+    <section
+      id="services"
+      tabIndex={-1}
+      ref={rootRef}
+      aria-labelledby="services-title"
+      className="scroll-mt-14 border-b border-ink bg-paper-soft outline-none"
+    >
       <div className="mx-auto w-full max-w-7xl px-4 py-24 md:px-6 md:py-32">
-        <SectionHeading index="01 —" title="[ WHAT WE MOVE ]" className="mb-12" />
+        <SectionHeading id="services-title" index={t.index} title={t.title} className="mb-12" />
 
-        <div className="grid grid-flow-dense grid-cols-4 gap-px border border-ink bg-ink">
-          {SERVICES.map((service) => (
-            <article
+        <ul className="grid grid-flow-dense grid-cols-4 gap-px border border-ink bg-ink">
+          {t.items.map((service, index) => (
+            <li
               key={service.tag}
-              data-service-cell
-              className={`group relative bg-paper p-6 transition-colors md:p-8 hover:bg-ink hover:text-paper ${service.span}`}
+              className={`group relative bg-paper p-6 transition-colors duration-300 hover:bg-ink hover:text-paper md:p-8 ${
+                index === 0 ? 'col-span-4 md:col-span-2 md:row-span-2' : 'col-span-4 md:col-span-2'
+              }`}
             >
-              {service.image && (
-                <div
-                  data-service-image
-                  className="relative mb-6 h-48 overflow-hidden border border-ink md:h-64"
-                >
-                  <Image
-                    src={`/images/landing/${service.seed}.jpg`}
-                    alt=""
-                    fill
-                    sizes="(min-width: 768px) 50vw, 100vw"
-                    className="object-cover grayscale contrast-125 transition-opacity group-hover:opacity-80"
-                  />
-                </div>
-              )}
-              <p className="mono text-[10px] text-hazard">{service.tag}</p>
-              <h3 className="display mt-2 text-2xl md:text-3xl">{service.title}</h3>
-              <p className="mt-3 max-w-[38ch] text-sm leading-relaxed text-ink-80 group-hover:text-paper-soft/80">
-                {service.body}
-              </p>
-              <span className="mono mt-4 inline-block text-[10px] opacity-0 transition-opacity group-hover:opacity-100">
-                INCLUDED &gt;&gt;&gt;
-              </span>
-            </article>
+              <div data-service-cell>
+                {index === 0 ? (
+                  <div
+                    data-service-image
+                    className="relative mb-6 aspect-[4/3] overflow-hidden border border-ink md:aspect-auto md:h-72"
+                  >
+                    <Image
+                      src={photo.src}
+                      alt={t.photoAlt}
+                      fill
+                      sizes="(min-width: 768px) 40vw, 100vw"
+                      className="object-cover object-[50%_60%] contrast-125 grayscale"
+                    />
+                  </div>
+                ) : null}
+                <p className="mono text-[11px] text-hazard-ink group-hover:text-hazard-glow">
+                  {service.tag}
+                </p>
+                <h3 className="display mt-2 text-2xl md:text-3xl">{service.title}</h3>
+                <p className="mt-3 max-w-[40ch] text-sm leading-relaxed text-ink-80 group-hover:text-paper/80">
+                  {service.body}
+                </p>
+              </div>
+            </li>
           ))}
-        </div>
+        </ul>
       </div>
     </section>
   );

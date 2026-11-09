@@ -11,6 +11,7 @@ export interface AuthUser {
   locale: string;
   /** Public address of the auto-created app wallet. */
   walletAddress: string | null;
+  avatarUrl: string | null;
   createdAt: string;
 }
 
