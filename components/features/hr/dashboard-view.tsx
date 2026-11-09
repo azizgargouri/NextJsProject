@@ -44,7 +44,10 @@ function isVoiceMismatch(label: string, decision: string, reasons: string[]): bo
   return (
     decision === 'reject' ||
     label === 'different_voice' ||
-    reasons.some((reason) => reason.includes('voice') || reason.includes('different'))
+    reasons.some(
+      (reason) =>
+        reason.includes('voice') || reason.includes('different') || reason.includes('challenge'),
+    )
   );
 }
 
