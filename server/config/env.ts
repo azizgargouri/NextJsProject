@@ -15,6 +15,9 @@ const envSchema = z.object({
     .positive()
     .default(60 * 60 * 24 * 30),
   MONGODB_URI: z.string().min(1, 'MONGODB_URI is required'),
+  OFFER_TTL_MINUTES: z.coerce.number().int().positive().default(120),
+  UPLOAD_DIR: z.string().min(1).default('.uploads'),
+  COOKIE_SECURE: z.enum(['true', 'false']).transform((value) => value === 'true').optional(),
   // Web3 is optional: the app still boots without it, but contract endpoints
   // return a clear "not configured" error until these are set.
   NEXT_PUBLIC_CHAIN_ID: z.preprocess(
@@ -73,6 +76,9 @@ export function env(): Env {
     ACCESS_TOKEN_TTL: process.env.ACCESS_TOKEN_TTL,
     REFRESH_TOKEN_TTL: process.env.REFRESH_TOKEN_TTL,
     MONGODB_URI: process.env.MONGODB_URI,
+    OFFER_TTL_MINUTES: process.env.OFFER_TTL_MINUTES,
+    UPLOAD_DIR: process.env.UPLOAD_DIR,
+    COOKIE_SECURE: process.env.COOKIE_SECURE,
     NEXT_PUBLIC_CHAIN_ID: process.env.NEXT_PUBLIC_CHAIN_ID,
     NEXT_PUBLIC_RPC_URL: process.env.NEXT_PUBLIC_RPC_URL,
     NEXT_PUBLIC_CONTRACT_ADDRESS: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS,

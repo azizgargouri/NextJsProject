@@ -775,3 +775,5 @@ export interface ChatHistoryDto {
   limitPerHour: number;
   messages: { id: string; role: 'user' | 'assistant'; content: string; createdAt: string }[];
 }
+
+export type { AvailabilityDayDto, EarningsDto, JobDetailDto, JobsListDto, MessageDto, MoverApplicationDto, MoverDashboardDto, MoverDocumentDto, MoverProfileDto, NotificationDto, NotificationsDto, OfferDto, OffersListDto, PhotoDto, TimeSlot, MoveStatus, ProgressStage, OfferStatus, QuoteStatus, MessageThread, MoverPhotoStage, VehicleType, MoverDocumentType, MoveAreaDto, MoveAddressDto, OfferResponsePayload, VerificationStatus, JobAction, LoadCheckPayload, MoverProfilePayload, TeamMemberPayload, VehiclePayload, MoverActionResult, TeamMemberDto, VehicleDto } from './mover';

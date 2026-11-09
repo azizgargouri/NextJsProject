@@ -12,6 +12,29 @@ export type PricingStatus = (typeof PRICING_STATUSES)[number];
 export const VERIFICATION_STATUSES = ['PENDING', 'APPROVED', 'REJECTED', 'SUSPENDED'] as const;
 export type VerificationStatus = (typeof VERIFICATION_STATUSES)[number];
 
+export const TIME_SLOTS = ['MORNING', 'AFTERNOON', 'FULL_DAY'] as const;
+export type TimeSlot = (typeof TIME_SLOTS)[number];
+export const DOCUMENT_TYPES = ['ID', 'LICENCE', 'INSURANCE', 'REGISTRATION'] as const;
+export type DocumentType = (typeof DOCUMENT_TYPES)[number];
+export const MESSAGE_THREADS = ['MOVER_CLIENT', 'MOVER_SUPPORT', 'CLIENT_SUPPORT'] as const;
+export type MessageThread = (typeof MESSAGE_THREADS)[number];
+export type MoveStatus = 'DRAFT' | 'SUBMITTED' | 'QUOTING' | 'ASSIGNED' | 'EN_ROUTE' | 'IN_PROGRESS' | 'DELIVERED' | 'COMPLETED' | 'DISPUTED' | 'CANCELLED' | 'REFUNDED';
+export type ProgressStage = 'LOADING' | 'IN_TRANSIT';
+export type OfferStatus = 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'QUOTED' | 'EXPIRED' | 'WITHDRAWN';
+export type QuoteStatus = 'SENT' | 'ACCEPTED' | 'REJECTED' | 'EXPIRED';
+export type PhotoStage = 'REQUEST' | 'PICKUP' | 'LOAD' | 'DELIVERY' | 'CLAIM';
+export type NotificationType = 'OFFER_NEW' | 'OFFER_EXPIRED' | 'OFFER_WITHDRAWN' | 'QUOTE_ACCEPTED' | 'QUOTE_REJECTED' | 'JOB_ASSIGNED' | 'JOB_STATUS' | 'JOB_COMPLETED' | 'MESSAGE' | 'DOCUMENT_EXPIRING' | 'PAYOUT';
+export type VehicleType = 'VAN' | 'SMALL_TRUCK' | 'LARGE_TRUCK';
+export type EarningStatus = 'PENDING' | 'PAID';
+export const VEHICLE_TYPES = ['VAN', 'SMALL_TRUCK', 'LARGE_TRUCK'] as const;
+export const MOVE_STATUSES = ['DRAFT', 'SUBMITTED', 'QUOTING', 'ASSIGNED', 'EN_ROUTE', 'IN_PROGRESS', 'DELIVERED', 'COMPLETED', 'DISPUTED', 'CANCELLED', 'REFUNDED'] as const;
+export const PROGRESS_STAGES = ['LOADING', 'IN_TRANSIT'] as const;
+export const OFFER_STATUSES = ['PENDING', 'ACCEPTED', 'DECLINED', 'QUOTED', 'EXPIRED', 'WITHDRAWN'] as const;
+export const QUOTE_STATUSES = ['SENT', 'ACCEPTED', 'REJECTED', 'EXPIRED'] as const;
+export const PHOTO_STAGES = ['REQUEST', 'PICKUP', 'LOAD', 'DELIVERY', 'CLAIM'] as const;
+export const NOTIFICATION_TYPES = ['OFFER_NEW', 'OFFER_EXPIRED', 'OFFER_WITHDRAWN', 'QUOTE_ACCEPTED', 'QUOTE_REJECTED', 'JOB_ASSIGNED', 'JOB_STATUS', 'JOB_COMPLETED', 'MESSAGE', 'DOCUMENT_EXPIRING', 'PAYOUT'] as const;
+export const EARNING_STATUSES = ['PENDING', 'PAID'] as const;
+
 // Quality domain (claims / reviews) — single source of truth lives in lib/quality.
 export * from '../../../lib/quality/constants';
 

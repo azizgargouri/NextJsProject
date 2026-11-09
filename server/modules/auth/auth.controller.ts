@@ -128,7 +128,7 @@ class AuthController {
 
     response.cookies.set(REFRESH_COOKIE, session.refreshToken, {
       httpOnly: true,
-      secure: env().NODE_ENV === 'production',
+      secure: env().COOKIE_SECURE ?? env().NODE_ENV === 'production',
       sameSite: 'lax',
       path: '/',
       maxAge: env().REFRESH_TOKEN_TTL,

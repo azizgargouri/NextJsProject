@@ -1,0 +1,23 @@
+{
+  "id": "/mover",
+  "name": "MoveUp for movers",
+  "short_name": "MoveUp Mover",
+  "description": "Job offers, active jobs, proof photos and earnings for MoveUp movers.",
+  "start_url": "/mover",
+  "scope": "/mover",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f2f1ec",
+  "theme_color": "#101010",
+  "lang": "en",
+  "categories": ["business", "productivity"],
+  "icons": [
+    { "src": "/icons/mover-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/mover-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/mover-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Job offers", "url": "/mover/offers", "icons": [{ "src": "/icons/mover-192.png", "sizes": "192x192" }] },
+    { "name": "My jobs", "url": "/mover/jobs", "icons": [{ "src": "/icons/mover-192.png", "sizes": "192x192" }] }
+  ]
+}
