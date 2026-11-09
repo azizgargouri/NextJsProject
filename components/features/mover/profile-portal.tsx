@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
@@ -175,6 +175,135 @@ function CompanyPanel({ profile }: { profile: MoverProfileDto }) {
         </dd>
       </dl>
     </Panel>
+  );
+}
+
+const number = (max: number, message: string) =>
+  z
+    .string()
+    .trim()
+    .refine((value) => value !== '' && Number(value) >= 0 && Number(value) <= max, message);
+
+const CostsSchema = z.object({
+  fuelLitresPer100Km: number(100, 'Enter 0 to 100 litres'),
+  fuelPricePerLitre: number(20, 'Enter a price from 0 to 20 TND'),
+  helpers: number(20, 'Enter 0 to 20 helpers').refine(
+    (value) => Number.isInteger(Number(value)),
+    'Enter a whole number',
+  ),
+  helperHourlyRate: number(500, 'Enter a rate from 0 to 500 TND'),
+  costPerKm: number(20, 'Enter 0 to 20 TND'),
+  targetHourlyNet: number(1000, 'Enter 0 to 1000 TND'),
+});
+
+const COST_FIELDS: { name: keyof z.infer<typeof CostsSchema>; label: string; step: string }[] = [
+  { name: 'fuelLitresPer100Km', label: 'Fuel use (litres per 100 km)', step: '0.1' },
+  { name: 'fuelPricePerLitre', label: 'Fuel price (TND per litre)', step: '0.001' },
+  { name: 'helpers', label: 'Helpers on a usual job', step: '1' },
+  { name: 'helperHourlyRate', label: 'Pay per helper (TND per hour)', step: '0.5' },
+  { name: 'costPerKm', label: 'Wear and upkeep (TND per km)', step: '0.01' },
+  { name: 'targetHourlyNet', label: 'What you want to earn (TND per hour)', step: '1' },
+];
+
+function costsAsText(costs: MoverProfileDto['costs']) {
+  return Object.fromEntries(COST_FIELDS.map(({ name }) => [name, String(costs[name])])) as z.infer<
+    typeof CostsSchema
+  >;
+}
+
+/** Feeds the profitability estimate on every offer. */
+function CostsPanel({ profile }: { profile: MoverProfileDto }) {
+  const update = useUpdateMoverProfile();
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isDirty },
+    reset,
+  } = useForm({
+    resolver: zodResolver(CostsSchema),
+    defaultValues: costsAsText(profile.costs),
+  });
+
+  // Offers link here; the section only exists once the profile has loaded.
+  useEffect(() => {
+    if (window.location.hash === '#costs') {
+      document.getElementById('costs')?.scrollIntoView({ block: 'start' });
+    }
+  }, []);
+
+  const resetToDefaults = () =>
+    update.mutate(
+      { costs: null },
+      {
+        onSuccess: () => toast.success('Back to the default costs'),
+      },
+    );
+
+  return (
+    <div id="costs" className="scroll-mt-24">
+      <Panel title="My costs">
+        <p className="mb-4 text-sm text-ink-80">
+          {profile.costsAreDefaults
+            ? 'These are default values. Enter your own, so the estimate on each offer shows what the job really leaves you.'
+            : 'Used to work out what each offer leaves you after fuel, helpers and wear.'}
+        </p>
+        <form
+          className="grid gap-4 sm:grid-cols-2"
+          noValidate
+          onSubmit={handleSubmit((values) => {
+            const costs: MoverProfileDto['costs'] = {
+              fuelLitresPer100Km: Number(values.fuelLitresPer100Km),
+              fuelPricePerLitre: Number(values.fuelPricePerLitre),
+              helpers: Number(values.helpers),
+              helperHourlyRate: Number(values.helperHourlyRate),
+              costPerKm: Number(values.costPerKm),
+              targetHourlyNet: Number(values.targetHourlyNet),
+            };
+            update.mutate(
+              { costs },
+              {
+                onSuccess: () => {
+                  reset(values);
+                  toast.success('Costs saved');
+                },
+              },
+            );
+          })}
+        >
+          {COST_FIELDS.map((field) => (
+            <div key={field.name}>
+              <Label htmlFor={`cost-${field.name}`}>{field.label}</Label>
+              <TextInput
+                id={`cost-${field.name}`}
+                type="number"
+                inputMode="decimal"
+                min="0"
+                step={field.step}
+                aria-invalid={Boolean(errors[field.name])}
+                {...register(field.name)}
+              />
+              <FieldError message={errors[field.name]?.message} />
+            </div>
+          ))}
+          <div className="flex flex-wrap items-center gap-2 sm:col-span-2">
+            <SaveError message={update.isError ? apiErrorMessage(update.error) : null} />
+            <Button type="submit" disabled={update.isPending || !isDirty}>
+              {update.isPending ? 'Saving…' : 'Save'}
+            </Button>
+            {!profile.costsAreDefaults ? (
+              <Button
+                type="button"
+                variant="ghost"
+                disabled={update.isPending}
+                onClick={resetToDefaults}
+              >
+                Use the defaults
+              </Button>
+            ) : null}
+          </div>
+        </form>
+      </Panel>
+    </div>
   );
 }
 
@@ -616,6 +745,7 @@ export function ProfilePortal() {
         <DocumentsPanel documents={profile.data.documents} />
         <VehiclesPanel vehicles={profile.data.vehicles} />
         <TeamPanel team={profile.data.team} />
+        <CostsPanel key={JSON.stringify(profile.data.costs)} profile={profile.data} />
       </div>
     </>
   );

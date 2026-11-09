@@ -3,6 +3,7 @@
 import { useRef } from 'react';
 import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
+import { SERVICE_ZONES } from '@/server/modules/mover/mover.constants';
 
 /**
  * Auth telemetry panel — the "device console" side of the split screen.
@@ -44,13 +45,13 @@ export function AuthPanel() {
     { scope: rootRef },
   );
 
+  // Every line describes the real system: no invented counts.
   const ticks = [
     'CONSOLE / TUNIS-NORD',
     'REGISTRY SYNC OK',
-    'MOVER QUEUE: 237',
     'TOKEN: HS256 + 15M',
     'PAPER TRAIL: ON',
-    'ZONE GRID: 11 SECTORS',
+    `ZONE GRID: ${SERVICE_ZONES.length} SECTORS`,
   ];
 
   return (

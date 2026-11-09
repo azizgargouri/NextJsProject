@@ -20,6 +20,8 @@ const envSchema = z.object({
     .enum(['true', 'false'])
     .transform((value) => value === 'true')
     .optional(),
+  /** "off" makes the profitability estimate ignore the learned model and use the basic rules. */
+  PROFIT_MODEL: z.enum(['on', 'off']).default('on'),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -40,6 +42,7 @@ export function env(): Env {
     OFFER_TTL_MINUTES: process.env.OFFER_TTL_MINUTES || undefined,
     UPLOAD_DIR: process.env.UPLOAD_DIR || undefined,
     COOKIE_SECURE: process.env.COOKIE_SECURE || undefined,
+    PROFIT_MODEL: process.env.PROFIT_MODEL || undefined,
   });
 
   if (!parsed.success) {

@@ -1,4 +1,5 @@
 import mongoose, { Mongoose } from 'mongoose';
+import { env } from '../../config/env';
 
 /**
  * Mongoose connection singleton — dev hot-reload safe (global cache) and
@@ -14,8 +15,7 @@ export function connectMongo(): Promise<Mongoose> {
     return globalForMongoose.__moveUpMongoose;
   }
 
-  // Lazy-import the validated env config to keep this module standalone.
-  const { env } = require('../../config/env') as typeof import('../../config/env');
+  // Read on first connect, so tests and seeds can set the environment before then.
   const { MONGODB_URI: uri, MONGODB_DB_NAME: dbName } = env();
 
   // A failed attempt must not stay cached, or the server would keep failing

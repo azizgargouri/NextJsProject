@@ -9,6 +9,7 @@ import { Coverage } from '@/components/features/landing/coverage';
 import { BecomeMover } from '@/components/features/landing/become-mover';
 import { Footer } from '@/components/features/landing/footer';
 import { ContentService } from '@/server/modules/content/content.service';
+import { getPublicMetrics } from '@/server/modules/mover/mover.public';
 
 // Copy is managed in the admin Content module; always render from live data.
 export const dynamic = 'force-dynamic';
@@ -21,13 +22,15 @@ export const dynamic = 'force-dynamic';
  */
 export default async function HomePage() {
   const copy = await new ContentService().getLandingCopy('en');
+  // The page still renders without figures if the database is unreachable.
+  const metrics = await getPublicMetrics().catch(() => null);
 
   return (
     <main className="w-full max-w-full overflow-x-hidden">
       <Nav />
       <Hero copy={copy.hero} />
       <Marquee />
-      <Metrics />
+      <Metrics data={metrics} />
       <Services />
       <HowItWorks steps={copy.steps} />
       <Manifesto />

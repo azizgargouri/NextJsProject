@@ -5,7 +5,7 @@ import { errorResponse } from '../../shared/auth/guards';
 import { logEvent, EventType } from '../../shared/logger/audit';
 import { ValidationError } from '../../shared/database/errors';
 import { authService } from './auth.service';
-import { serializeAuthSession, type AuthSessionResponse } from './auth.serializer';
+import type { AuthSessionResponse } from './auth.serializer';
 import { RefreshTokenSchema, SignInSchema, SignUpSchema } from './auth.schema';
 
 const REFRESH_COOKIE = 'moveup_refresh';

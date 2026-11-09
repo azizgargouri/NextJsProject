@@ -5,6 +5,7 @@ import {
   TIME_SLOTS,
   VEHICLE_TYPES,
 } from '../../shared/database/enums';
+import { MAX_BOX_CODE_LENGTH } from '../../../lib/box-label';
 import { ZONE_CODES } from './mover.constants';
 
 const isoDay = z
@@ -42,11 +43,25 @@ export type AvailabilitySetInput = z.infer<typeof AvailabilitySetSchema>;
 
 export const AvailabilityRangeSchema = z.object({ from: isoDay, to: isoDay });
 
+const cost = (max: number) =>
+  z.coerce.number().min(0, 'Enter zero or more').max(max, 'This number is too high');
+
+export const MoverCostsSchema = z.object({
+  fuelLitresPer100Km: cost(100),
+  fuelPricePerLitre: cost(20),
+  helpers: z.coerce.number().int('Enter a whole number').min(0, 'Enter zero or more').max(20),
+  helperHourlyRate: cost(500),
+  costPerKm: cost(20),
+  targetHourlyNet: cost(1000),
+});
+
 export const MoverProfileUpdateSchema = z.object({
   companyName: z.string().trim().min(2, 'Enter your company name').max(120).optional(),
   taxId: z.string().trim().max(40).optional(),
   bio: z.string().trim().max(1000).optional(),
   zones: z.array(z.enum(ZONE_CODES)).max(ZONE_CODES.length).optional(),
+  /** Null goes back to the defaults. */
+  costs: MoverCostsSchema.nullable().optional(),
 });
 export type MoverProfileUpdateInput = z.infer<typeof MoverProfileUpdateSchema>;
 
@@ -88,18 +103,21 @@ const loadCount = z.coerce
   .min(0, 'Enter zero or more')
   .max(10_000, 'This number is too high');
 
-export const LoadCheckSchema = z
-  .object({
-    boxes: loadCount,
-    furniture: loadCount,
-    note: z.string().trim().max(500).optional(),
-    confirmed: z.literal(true, 'Confirm that you checked the photos and counts'),
-  })
-  .refine((value) => value.boxes + value.furniture > 0, {
-    path: ['boxes'],
-    message: 'Enter how many boxes or pieces of furniture you loaded',
-  });
+/** Boxes are not typed in: the count is the number of boxes scanned at pickup. */
+export const LoadCheckSchema = z.object({
+  furniture: loadCount,
+  note: z.string().trim().max(500).optional(),
+  confirmed: z.literal(true, 'Confirm that you checked the photos and counts'),
+});
 export type LoadCheckInput = z.infer<typeof LoadCheckSchema>;
+
+export const BoxScanSchema = z.object({
+  code: z
+    .string()
+    .trim()
+    .min(1, 'Scan a label or type its code')
+    .max(MAX_BOX_CODE_LENGTH, 'This is not a box label'),
+});
 
 export const NotificationsReadSchema = z.object({
   /** Omit to mark everything as read. */

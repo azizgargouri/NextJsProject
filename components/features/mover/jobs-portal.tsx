@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Camera, Check, Phone } from 'lucide-react';
+import { ArrowLeft, Camera, Check, Phone, Printer, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/field';
@@ -13,9 +13,13 @@ import {
   useJobPhotos,
   useMoverJob,
   useMoverJobs,
+  usePendingBoxScans,
+  useRemoveBoxScan,
+  useScanBox,
   useSendJobMessage,
   useUpdateJobStatus,
 } from '@/hooks/content/mover';
+import { parseBoxCode } from '@/lib/box-label';
 import { cn } from '@/lib/utils';
 import type {
   JobAction,
@@ -32,6 +36,7 @@ import {
   formatDateTime,
   formatDay,
   formatMoney,
+  formatTime,
   JobRow,
   jobStatusLabel,
   LoadingState,
@@ -42,6 +47,7 @@ import {
   Tag,
   TextInput,
 } from './mover-ui';
+import { BoxScanner } from './box-scanner';
 
 export function JobsPortal() {
   const jobs = useMoverJobs();
@@ -108,7 +114,7 @@ function proofBlocker(job: JobDetailDto): string | null {
 function LoadCountForm({ job, onDone }: { job: JobDetailDto; onDone: () => void }) {
   const confirm = useConfirmLoad(job.id);
   const { proof } = job;
-  const [boxes, setBoxes] = useState(proof.loadCheck ? String(proof.loadCheck.boxes) : '');
+  const scannedBoxes = proof.boxes.length;
   const [furniture, setFurniture] = useState(
     proof.loadCheck ? String(proof.loadCheck.furniture) : '',
   );
@@ -117,25 +123,22 @@ function LoadCountForm({ job, onDone }: { job: JobDetailDto; onDone: () => void 
   const [error, setError] = useState<string | null>(null);
   const photosReady = proof.loadPhotos >= proof.minLoadPhotos;
   const { expectedLoad: expected } = proof;
-  const counted = boxes !== '' && furniture !== '';
+  const counted = furniture !== '';
   const differs =
     expected !== null &&
     counted &&
-    (Number(boxes) !== expected.boxes || Number(furniture) !== expected.furniture);
+    (scannedBoxes !== expected.boxes || Number(furniture) !== expected.furniture);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    if (!counted)
-      return setError('Enter the number of boxes and furniture. Use 0 if there are none.');
+    if (!counted) return setError('Enter the number of furniture pieces. Use 0 if there are none.');
+    if (scannedBoxes + Number(furniture) === 0) {
+      return setError('Scan the boxes, or enter the furniture you loaded.');
+    }
     if (!checked) return setError('Tick the box to confirm the photos and counts.');
     setError(null);
     confirm.mutate(
-      {
-        boxes: Number(boxes),
-        furniture: Number(furniture),
-        note: note.trim() || undefined,
-        confirmed: true,
-      },
+      { furniture: Number(furniture), note: note.trim() || undefined, confirmed: true },
       { onSuccess: onDone, onError: (saveError) => setError(apiErrorMessage(saveError)) },
     );
   };
@@ -153,16 +156,13 @@ function LoadCountForm({ job, onDone }: { job: JobDetailDto; onDone: () => void 
       )}
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <Label htmlFor="load-boxes">Boxes</Label>
-          <TextInput
-            id="load-boxes"
-            type="number"
-            inputMode="numeric"
-            min="0"
-            step="1"
-            value={boxes}
-            onChange={(event) => setBoxes(event.target.value)}
-          />
+          <p className="mono block pb-2 text-[10px] leading-none text-ink-80">Boxes</p>
+          <p
+            aria-live="polite"
+            className="flex h-12 items-center border border-ink/40 px-3 text-sm font-bold"
+          >
+            {scannedBoxes} scanned
+          </p>
         </div>
         <div>
           <Label htmlFor="load-furniture">Furniture</Label>
@@ -199,7 +199,8 @@ function LoadCountForm({ job, onDone }: { job: JobDetailDto; onDone: () => void 
           checked={checked}
           onChange={(event) => setChecked(event.target.checked)}
         />
-        I checked the photos, and these counts match what is on the vehicle.
+        I checked the photos, and the scanned boxes and furniture count match what is on the
+        vehicle.
       </label>
       {error ? (
         <p role="alert" className="text-sm text-hazard-dark">
@@ -213,14 +214,131 @@ function LoadCountForm({ job, onDone }: { job: JobDetailDto; onDone: () => void 
   );
 }
 
-/** The space opened by "Start loading": photos from several angles, then the mover's count. */
+function buzz(pattern: number | number[]) {
+  if ('vibrate' in navigator) navigator.vibrate(pattern);
+}
+
+/** Item 7a: each box is scanned at the pickup address as it goes into the vehicle. */
+function BoxScanPanel({ job }: { job: JobDetailDto }) {
+  const scan = useScanBox(job.id);
+  const remove = useRemoveBoxScan(job.id);
+  const pending = usePendingBoxScans(job.id);
+  const [lastScan, setLastScan] = useState<{ text: string; refused: boolean } | null>(null);
+  const { boxes, expectedLoad: expected } = job.proof;
+  const known = new Set([...boxes.map((box) => box.code), ...pending.map((entry) => entry.code)]);
+  const total = boxes.length + pending.length;
+
+  const onCode = (raw: string) => {
+    const parsed = parseBoxCode(raw, job.reference);
+    if (!parsed.ok) {
+      buzz([80, 60, 80]);
+      setLastScan({ text: parsed.message, refused: true });
+      return;
+    }
+    if (known.has(parsed.code)) {
+      buzz([80, 60, 80]);
+      setLastScan({ text: `${parsed.label} is already scanned`, refused: true });
+      return;
+    }
+    buzz(60);
+    setLastScan({ text: `${parsed.label} added. ${boxCount(total + 1)} scanned.`, refused: false });
+    scan.mutate(parsed.code, {
+      onError: (error) =>
+        setLastScan({ text: `${parsed.label}: ${apiErrorMessage(error)}`, refused: true }),
+    });
+  };
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="font-bold">Scan the boxes</h3>
+        <Link
+          href={`/mover/jobs/${job.id}/labels`}
+          className="inline-flex items-center gap-1 text-sm underline-offset-2 hover:underline"
+        >
+          <Printer className="size-4" aria-hidden /> Print labels
+        </Link>
+      </div>
+      <p className="mt-1 text-sm text-ink-80">
+        Scan each box&apos;s QR label as it goes into the vehicle. {boxCount(total)} scanned
+        {expected ? `; the client listed ${expected.boxes}` : ''}.
+      </p>
+      <div className="mt-3">
+        <BoxScanner onCode={onCode} />
+      </div>
+      <p
+        aria-live="polite"
+        className={cn(
+          'mt-3 min-h-11 border px-3 py-2 text-sm font-bold',
+          !lastScan && 'border-transparent',
+          lastScan?.refused === false && 'border-ink bg-ink text-paper',
+          lastScan?.refused && 'border-hazard-dark text-hazard-dark',
+        )}
+      >
+        {lastScan?.text ?? ''}
+      </p>
+
+      {total > 0 ? (
+        <ul
+          aria-label="Scanned boxes"
+          className="mt-3 max-h-72 divide-y divide-ink/20 overflow-y-auto border border-ink"
+        >
+          {pending.map((entry, index) => {
+            const parsed = parseBoxCode(entry.code, job.reference);
+            return (
+              <li
+                key={`pending-${entry.code}-${index}`}
+                className="flex items-center justify-between gap-2 px-3 py-2 text-sm"
+              >
+                <span className="min-w-0 truncate">{parsed.ok ? parsed.label : entry.code}</span>
+                <span className="mono shrink-0 text-[10px] text-ink-80">
+                  {entry.waiting ? 'Waiting for connection' : 'Saving…'}
+                </span>
+              </li>
+            );
+          })}
+          {boxes.map((box) => (
+            <li
+              key={box.id}
+              className="flex items-center justify-between gap-2 py-1 pl-3 pr-1 text-sm"
+            >
+              <span className="min-w-0 truncate font-bold">{box.label}</span>
+              <span className="flex shrink-0 items-center gap-1">
+                <span className="text-xs text-ink-80">{formatTime(box.scannedAt)}</span>
+                <button
+                  type="button"
+                  aria-label={`Remove ${box.label}`}
+                  disabled={remove.isPending && remove.variables === box.id}
+                  onClick={() =>
+                    remove.mutate(box.id, {
+                      onError: (error) => toast.error(apiErrorMessage(error)),
+                    })
+                  }
+                  className="flex size-10 items-center justify-center hover:bg-ink/5 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-hazard disabled:opacity-40"
+                >
+                  <X className="size-4" aria-hidden />
+                </button>
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * The space opened by "Start loading" on arrival at pickup: boxes scanned as they
+ * go in, photos from several angles, then the mover's count.
+ */
 function LoadProof({ job }: { job: JobDetailDto }) {
   const { proof } = job;
   const [editing, setEditing] = useState(false);
 
   return (
     <div className="mt-4 flex flex-col gap-4 border-t border-ink pt-4">
-      <div>
+      <BoxScanPanel job={job} />
+      <div className="border-t border-ink pt-4">
         <PhotoStage job={job} stage="LOAD" title="Photos of the loaded vehicle" open />
         <p className="mt-2 text-sm text-ink-80">
           Take at least {proof.minLoadPhotos} from different angles, so all the boxes and furniture
@@ -235,8 +353,8 @@ function LoadProof({ job }: { job: JobDetailDto }) {
                 <Check className="size-4" aria-hidden /> Load confirmed
               </h3>
               <p className="text-sm">
-                {boxCount(proof.loadCheck.boxes)}, {plural(proof.loadCheck.furniture, 'piece')} of
-                furniture
+                {boxCount(proof.loadCheck.boxes)} scanned,{' '}
+                {plural(proof.loadCheck.furniture, 'piece')} of furniture
               </p>
               {proof.loadCheck.note ? (
                 <p className="text-sm text-ink-80">{proof.loadCheck.note}</p>
@@ -606,6 +724,46 @@ function JobPhotos({ job }: { job: JobDetailDto }) {
   );
 }
 
+/** After pickup, the record of what went into the vehicle, for the road and for claims. */
+function LoadedBoxes({ job }: { job: JobDetailDto }) {
+  const { boxes } = job.proof;
+  return (
+    <Panel title="Boxes loaded">
+      <p className="text-sm">{boxCount(boxes.length)} scanned into the vehicle at pickup.</p>
+      <details className="mt-2">
+        <summary className="cursor-pointer text-sm underline-offset-2 hover:underline">
+          Show the list
+        </summary>
+        <ul className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-3">
+          {[...boxes].reverse().map((box) => (
+            <li key={box.id} className="truncate">
+              {box.label}
+            </li>
+          ))}
+        </ul>
+      </details>
+    </Panel>
+  );
+}
+
+/** Labels go on the boxes before loading, so the sheet is offered from assignment on. */
+function BoxLabelsPanel({ job }: { job: JobDetailDto }) {
+  return (
+    <Panel title="Box labels">
+      <p className="text-sm text-ink-80">
+        At pickup, every box is scanned as it goes into the vehicle. Print QR labels for this move,
+        or use your own QR stickers.
+      </p>
+      <Link
+        href={`/mover/jobs/${job.id}/labels`}
+        className="mono mt-3 inline-flex h-11 items-center gap-2 border-2 border-ink px-4 text-[11px] hover:bg-ink hover:text-paper focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hazard"
+      >
+        <Printer className="size-4" aria-hidden /> Print box labels
+      </Link>
+    </Panel>
+  );
+}
+
 /** Item 7: the job page a mover works from on the road. */
 export function JobDetail({ id }: { id: string }) {
   const job = useMoverJob(id);
@@ -636,6 +794,7 @@ export function JobDetail({ id }: { id: string }) {
       <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_2fr]">
         <div className="flex flex-col gap-6">
           {!['CANCELLED', 'REFUNDED'].includes(data.status) ? <StatusStepper job={data} /> : null}
+          {['ASSIGNED', 'EN_ROUTE'].includes(data.status) ? <BoxLabelsPanel job={data} /> : null}
 
           <Panel title="Client">
             {data.client ? (
@@ -704,6 +863,9 @@ export function JobDetail({ id }: { id: string }) {
             ) : null}
           </Panel>
 
+          {!data.proof.canScanBoxes && data.proof.boxes.length > 0 ? (
+            <LoadedBoxes job={data} />
+          ) : null}
           <JobChat job={data} />
           <JobPhotos job={data} />
 

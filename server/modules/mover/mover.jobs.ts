@@ -1,4 +1,9 @@
-import { BadRequestError, DomainError, NotFoundError } from '../../shared/database/errors';
+import {
+  BadRequestError,
+  DomainError,
+  NotFoundError,
+  ValidationError,
+} from '../../shared/database/errors';
 import type { Role } from '../../shared/database/enums';
 import type { MoveRequestDoc } from '../../shared/database/models';
 import type {
@@ -22,11 +27,18 @@ import { completeMove } from './mover.completion';
 import { sweep } from './mover.dispatch';
 import { notify } from './mover.notifications';
 import { moverRepository as repo } from './mover.repository';
-import { expectedLoad, JOB_TRANSITIONS, nextJobAction, sniffFile } from './mover.rules';
+import {
+  boxScanOpen,
+  expectedLoad,
+  JOB_TRANSITIONS,
+  nextJobAction,
+  sniffFile,
+} from './mover.rules';
 import type { LoadCheckInput } from './mover.schema';
 import {
   serializeAddress,
   serializeArea,
+  serializeBoxScan,
   serializeItems,
   serializeJobSummary,
   serializeMessage,
@@ -34,6 +46,7 @@ import {
   serializeStatusEvent,
 } from './mover.serializer';
 import { moverStorage } from './mover.storage';
+import { maybeRetrainDurationModel } from './mover.duration-training';
 
 class ProofRequiredError extends DomainError {
   constructor(message: string) {
@@ -65,7 +78,7 @@ export async function listJobs(moverId: string): Promise<JobsListDto> {
 }
 
 /** Returning 404 for someone else's job also hides that the job exists. */
-async function ownedMove(moverId: string, moveId: string): Promise<MoveRequestDoc> {
+export async function ownedMove(moverId: string, moveId: string): Promise<MoveRequestDoc> {
   const move = await repo.findAssignedMove(moverId, moveId);
   if (!move) throw new NotFoundError('Job');
   return move;
@@ -76,13 +89,15 @@ export async function getJob(moverId: string, moveId: string): Promise<JobDetail
   const move = await ownedMove(moverId, moveId);
   const visible = contactVisible(move.status);
   const client = visible ? await repo.findUser(move.clientId) : null;
-  const [events, loadPhotos, deliveryPhotos, unreadClient, unreadSupport] = await Promise.all([
-    repo.listStatusEvents(moveId),
-    repo.countPhotos(moveId, 'LOAD'),
-    repo.countPhotos(moveId, 'DELIVERY'),
-    repo.countUnread(moveId, 'MOVER_CLIENT', moverId),
-    repo.countUnread(moveId, 'MOVER_SUPPORT', moverId),
-  ]);
+  const [events, loadPhotos, deliveryPhotos, boxes, unreadClient, unreadSupport] =
+    await Promise.all([
+      repo.listStatusEvents(moveId),
+      repo.countPhotos(moveId, 'LOAD'),
+      repo.countPhotos(moveId, 'DELIVERY'),
+      repo.listBoxScans(moveId),
+      repo.countUnread(moveId, 'MOVER_CLIENT', moverId),
+      repo.countUnread(moveId, 'MOVER_SUPPORT', moverId),
+    ]);
 
   return {
     ...serializeJobSummary(move),
@@ -111,6 +126,8 @@ export async function getJob(moverId: string, moveId: string): Promise<JobDetail
           }
         : null,
       expectedLoad: expectedLoad(move.items),
+      boxes: boxes.map(serializeBoxScan),
+      canScanBoxes: boxScanOpen(move),
     },
     timeline: events.map(serializeStatusEvent),
     canChat: (CHAT_OPEN_STATUSES as readonly string[]).includes(move.status),
@@ -135,7 +152,10 @@ async function assertProofFor(move: MoveRequestDoc, action: JobAction): Promise<
   }
 }
 
-/** The mover's count of what is on the vehicle. It can be corrected until they leave. */
+/**
+ * The mover's count of what is on the vehicle. Boxes are the ones scanned at
+ * pickup; furniture is typed. It can be corrected until they leave.
+ */
 export async function confirmLoad(
   moverId: string,
   moveId: string,
@@ -148,8 +168,12 @@ export async function confirmLoad(
   if ((await repo.countPhotos(moveId, 'LOAD')) < MIN_LOAD_PHOTOS) {
     throw new ProofRequiredError(`Add at least ${MIN_LOAD_PHOTOS} photos of the loaded vehicle`);
   }
+  const boxes = await repo.countBoxScans(moveId);
+  if (boxes + input.furniture === 0) {
+    throw new ValidationError('Scan the boxes, or enter the furniture you loaded');
+  }
   const saved = await repo.saveLoadCheck(moveId, moverId, {
-    boxes: input.boxes,
+    boxes,
     furniture: input.furniture,
     note: input.note ?? '',
     confirmedAt: new Date(),
@@ -159,12 +183,12 @@ export async function confirmLoad(
 
   const expected = expectedLoad(move.items);
   const differs =
-    expected !== null && (expected.boxes !== input.boxes || expected.furniture !== input.furniture);
+    expected !== null && (expected.boxes !== boxes || expected.furniture !== input.furniture);
   await repo.addStatusEvent({
     moveId,
     fromStatus: 'IN_PROGRESS',
     toStatus: 'IN_PROGRESS',
-    note: `Load confirmed: ${input.boxes} boxes, ${input.furniture} furniture${
+    note: `Load confirmed: ${boxes} boxes scanned, ${input.furniture} furniture${
       differs ? `. Client listed ${expected.boxes} boxes, ${expected.furniture} furniture` : ''
     }${input.note ? `. Note: ${input.note}` : ''}`,
     actorId: moverId,
@@ -212,6 +236,12 @@ export async function updateJobStatus(
         : 'Your mover updated the status of your move.',
     link: '/dashboard',
   });
+  // A delivered job is a new example of how long jobs take.
+  if (action === 'DELIVERED') {
+    await maybeRetrainDurationModel(now).catch((error: unknown) => {
+      console.error('Duration model training failed:', error);
+    });
+  }
   return getJob(moverId, moveId);
 }
 

@@ -1,11 +1,13 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useMutationState, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   confirmLoadAction,
   markNotificationsReadAction,
+  removeBoxScanAction,
   removeTeamMemberAction,
   removeVehicleAction,
   respondToOfferAction,
   saveTeamMemberAction,
+  scanBoxAction,
   saveVehicleAction,
   setAvailabilityAction,
   updateJobStatusAction,
@@ -15,6 +17,7 @@ import { callMoverAction } from '@/lib/actions/mover-action';
 import { api } from '@/lib/api';
 import type {
   JobAction,
+  JobDetailDto,
   LoadCheckPayload,
   MessageThread,
   MoverDocumentType,
@@ -116,6 +119,47 @@ export function useConfirmLoad(id: string) {
   return useMutation({
     mutationFn: (payload: LoadCheckPayload) => callMoverAction(confirmLoadAction(id, payload)),
     onSuccess: () => client.invalidateQueries({ queryKey: ['mover', 'jobs', id] }),
+  });
+}
+
+const boxScanKey = (id: string) => ['mover', 'boxes', id];
+
+/**
+ * Scans can arrive faster than the server answers, or wait for a connection.
+ * One queue per job sends them in order, so each answer is the latest list of
+ * boxes; a poll still in flight must not put an older list back.
+ */
+function useBoxMutation<T>(
+  id: string,
+  kind: 'scan' | 'remove',
+  mutationFn: (input: T) => Promise<JobDetailDto>,
+) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationKey: [...boxScanKey(id), kind],
+    scope: { id: boxScanKey(id).join(':') },
+    mutationFn,
+    onMutate: () => client.cancelQueries({ queryKey: ['mover', 'jobs', id], exact: true }),
+    onSuccess: (job) => client.setQueryData(['mover', 'jobs', id], job),
+  });
+}
+
+export const useScanBox = (id: string) =>
+  useBoxMutation(id, 'scan', (code: string) => callMoverAction(scanBoxAction(id, { code })));
+
+export const useRemoveBoxScan = (id: string) =>
+  useBoxMutation(id, 'remove', (scanId: string) =>
+    callMoverAction(removeBoxScanAction(id, scanId)),
+  );
+
+/** Scans not yet saved, including those waiting for a connection. */
+export function usePendingBoxScans(id: string): { code: string; waiting: boolean }[] {
+  return useMutationState({
+    filters: { mutationKey: [...boxScanKey(id), 'scan'], status: 'pending' },
+    select: (mutation) => ({
+      code: String(mutation.state.variables ?? ''),
+      waiting: mutation.state.isPaused,
+    }),
   });
 }
 

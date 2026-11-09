@@ -15,6 +15,7 @@ import type { EarningDoc, PayoutDoc } from '../../shared/database/models';
 import { MAX_UPLOAD_BYTES, SERVICE_ZONES } from './mover.constants';
 import { listJobs } from './mover.jobs';
 import { listOffers } from './mover.offers';
+import { moverCosts } from './mover.profit';
 import { moverRepository as repo } from './mover.repository';
 import { documentState, roundMoney, sniffFile, todayInTunis } from './mover.rules';
 import type {
@@ -101,6 +102,8 @@ export async function getProfile(moverId: string): Promise<MoverProfileDto> {
     team: team.map(serializeTeamMember),
     documents: documents.map((document) => serializeDocument(document)),
     availableZones: SERVICE_ZONES.map((zone) => ({ code: zone.code, label: zone.label })),
+    costs: moverCosts(profile),
+    costsAreDefaults: !profile.costs,
   };
 }
 

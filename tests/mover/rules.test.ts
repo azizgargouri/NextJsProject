@@ -2,6 +2,7 @@ import './helpers';
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
+  boxScanOpen,
   computeEarning,
   documentBlockers,
   documentState,
@@ -14,6 +15,7 @@ import {
   todayInTunis,
 } from '@/server/modules/mover/mover.rules';
 import { signFileUrl, verifyFileSignature } from '@/server/modules/mover/mover.storage';
+import { boxLabelCode, parseBoxCode } from '@/lib/box-label';
 
 const DAY = 24 * 60 * 60 * 1000;
 const NOW = new Date('2026-06-15T12:00:00.000Z');
@@ -177,5 +179,45 @@ describe('calendar day', () => {
   it('uses Tunisian time rather than UTC', () => {
     assert.equal(todayInTunis(new Date('2026-06-15T23:30:00.000Z')), '2026-06-16');
     assert.equal(todayInTunis(new Date('2026-06-15T22:30:00.000Z')), '2026-06-15');
+  });
+});
+
+describe('box labels', () => {
+  const REF = 'MV-2026-12345';
+
+  it('prints a code that reads back as the same move and box', () => {
+    const code = boxLabelCode(REF, 7);
+    assert.equal(code, 'MOVEUP:MV-2026-12345:007');
+    assert.deepEqual(parseBoxCode(code, REF), { ok: true, code, label: 'Box 7' });
+  });
+
+  it('refuses a printed label from another move', () => {
+    const result = parseBoxCode(boxLabelCode('MV-2026-99999', 1), REF);
+    assert.deepEqual(result, { ok: false, message: 'This label belongs to move MV-2026-99999' });
+  });
+
+  it('accepts any other QR code as it is, with a short name', () => {
+    assert.deepEqual(parseBoxCode(' ROLL-42 ', REF), {
+      ok: true,
+      code: 'ROLL-42',
+      label: 'ROLL-42',
+    });
+    const long = `https://example.com/${'a'.repeat(40)}`;
+    const parsed = parseBoxCode(long, REF);
+    assert.equal(parsed.ok && parsed.code, long);
+    assert.equal(parsed.ok && parsed.label.length, 24);
+  });
+
+  it('refuses empty, oversized or control-character codes', () => {
+    for (const raw of ['', '   ', 'x'.repeat(201), 'BOX\n1', 'BOX\u0000']) {
+      assert.equal(parseBoxCode(raw, REF).ok, false, JSON.stringify(raw));
+    }
+  });
+
+  it('opens scanning only while loading at pickup', () => {
+    assert.equal(boxScanOpen({ status: 'IN_PROGRESS', progressStage: 'LOADING' }), true);
+    assert.equal(boxScanOpen({ status: 'IN_PROGRESS', progressStage: 'IN_TRANSIT' }), false);
+    assert.equal(boxScanOpen({ status: 'EN_ROUTE', progressStage: null }), false);
+    assert.equal(boxScanOpen({ status: 'DELIVERED', progressStage: null }), false);
   });
 });
