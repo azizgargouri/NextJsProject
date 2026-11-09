@@ -19,14 +19,6 @@ const AddEmployeeSchema = z.object({
   fullName: z.string().trim().min(2, 'Name must be at least 2 characters'),
   email: z.string().email('Invalid email address'),
   role: z.enum(['employee', 'manager', 'hr']),
-  walletAddress: z
-    .string()
-    .trim()
-    .optional()
-    .refine(
-      (value) => !value || /^0x[a-fA-F0-9]{40}$/.test(value),
-      'Wallet must be 0x + 40 hex characters',
-    ),
 });
 
 type AddEmployeeValues = z.infer<typeof AddEmployeeSchema>;
@@ -49,7 +41,6 @@ export function AddEmployeeForm() {
       fullName: '',
       email: '',
       role: 'employee',
-      walletAddress: '',
     },
   });
 
@@ -77,6 +68,7 @@ export function AddEmployeeForm() {
         <h1 className="display text-4xl md:text-5xl">NEW STAFF.</h1>
         <p className="mt-3 text-sm text-ink-80">
           The record joins your organisation directory — attendance and leave open up immediately.
+          An app wallet is created automatically for contract signing.
         </p>
 
         <div className="mt-8 space-y-6">
@@ -124,19 +116,12 @@ export function AddEmployeeForm() {
             <FieldError message={errors.role?.message} />
           </FieldRow>
 
-          <FieldRow>
-            <Label htmlFor="walletAddress">METAMASK WALLET (OPTIONAL)</Label>
-            <Input
-              id="walletAddress"
-              placeholder="0x…"
-              autoComplete="off"
-              {...register('walletAddress')}
-            />
-            <FieldError message={errors.walletAddress?.message} />
-            <p className="mono mt-1 text-[9px] normal-case tracking-normal text-ink-40">
-              Required before an employment contract can be issued on-chain.
+          <div className="border border-ink/20 bg-paper-soft px-3 py-3">
+            <p className="mono text-[9px] normal-case tracking-normal text-ink-40">
+              The server generates a custodial app wallet for this employee. Its private key is
+              encrypted and never shown in the browser.
             </p>
-          </FieldRow>
+          </div>
 
           {serverError && (
             <p className="mono border border-hazard bg-hazard/5 px-3 py-2 text-[11px] normal-case tracking-normal text-hazard">

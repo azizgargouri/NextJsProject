@@ -4,6 +4,7 @@ import { AlreadyExistsError, NotFoundError } from '../../shared/database/errors'
 import { UserRepository, UserRow } from './users.repository';
 import { UserCreateInput, UserUpdateInput } from './users.schema';
 import { serializeUser, UserResponse } from './users.serializer';
+import { ensureWalletForEmail } from '../../shared/wallet/provisioning';
 
 /** Users business logic — orchestration only; no HTTP, no SQL. */
 export class UserService extends AbstractCrudService<UserRow> {
@@ -30,7 +31,16 @@ export class UserService extends AbstractCrudService<UserRow> {
     if (phoneTaken) throw new AlreadyExistsError('User', 'phone');
 
     const passwordHash = await hashPassword(input.password);
-    const user = await this.repository.create({ ...input, email, passwordHash });
+    // Every new account gets an app-managed custodial wallet. If HR already
+    // created an employee record for this email, reuse that wallet.
+    const wallet = await ensureWalletForEmail(email);
+    const user = await this.repository.create({
+      ...input,
+      email,
+      passwordHash,
+      walletAddress: wallet.address,
+      walletPrivateKeyEncrypted: wallet.encryptedPrivateKey,
+    });
     return serializeUser(user);
   }
 

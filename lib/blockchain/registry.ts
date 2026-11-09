@@ -1,6 +1,8 @@
 import {
   BrowserProvider,
   Contract,
+  JsonRpcProvider,
+  type ContractRunner,
   type ContractTransactionResponse,
   type Eip1193Provider as EthersEip1193Provider,
   type Signer,
@@ -106,7 +108,24 @@ export async function getSigner(): Promise<Signer> {
   return provider.getSigner();
 }
 
-function attachRegistry(runner: Signer | BrowserProvider): RegistryContract {
+let cachedReadProvider: { url: string; provider: JsonRpcProvider } | null = null;
+
+/** Read-only provider backed by the public RPC — no MetaMask required. */
+function getReadProvider(): JsonRpcProvider {
+  assertConfigured();
+  const url = web3Config.rpcUrl;
+  if (!url) {
+    throw new Error(
+      'RPC URL missing. Set NEXT_PUBLIC_RPC_URL in the app .env and restart Next.js.',
+    );
+  }
+  if (!cachedReadProvider || cachedReadProvider.url !== url) {
+    cachedReadProvider = { url, provider: new JsonRpcProvider(url) };
+  }
+  return cachedReadProvider.provider;
+}
+
+function attachRegistry(runner: ContractRunner): RegistryContract {
   assertConfigured();
   return new Contract(
     web3Config.contractAddress,
@@ -159,8 +178,7 @@ export async function signContractAsEmployee(
 export async function readContractOnChain(
   contractId: string,
 ): Promise<OnChainContractRecord> {
-  const provider = await getBrowserProvider();
-  const registry = attachRegistry(provider);
+  const registry = attachRegistry(getReadProvider());
   const record = await registry.getContract(contractId);
 
   return {
@@ -208,7 +226,7 @@ export async function signContractTermination(
   return { signature, signer: address };
 }
 
-/** Reads whether the connected wallet is registered as HR for the organisation. */
+/** Reads whether an app wallet is registered as HR for the organisation. */
 export async function isRegisteredHrAdmin(
   wallet: string,
   organizationHash: string,
@@ -216,8 +234,7 @@ export async function isRegisteredHrAdmin(
   if (!isContractConfigured) return false;
 
   try {
-    const provider = await getBrowserProvider();
-    const registry = attachRegistry(provider);
+    const registry = attachRegistry(getReadProvider());
     return Boolean(await registry.isHrAdminFor(wallet, organizationHash));
   } catch {
     return false;

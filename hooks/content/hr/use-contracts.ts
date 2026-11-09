@@ -27,6 +27,13 @@ export function useContractProposals() {
   });
 }
 
+/** Uploads the contract PDF and returns its id/hash/capability URL. */
+export function useUploadContractDocument() {
+  return useMutation({
+    mutationFn: (file: File) => api.contracts.uploadDocument(file),
+  });
+}
+
 /** Builds the canonical document + EIP-712 payload before HR signs. */
 export function usePrepareContract() {
   return useMutation({

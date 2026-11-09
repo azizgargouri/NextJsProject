@@ -7,6 +7,7 @@ import { EmployeeModel } from './shared/database/models/employee.model';
 import { AttendanceModel } from './shared/database/models/attendance.model';
 import { LeaveRequestModel } from './shared/database/models/leave-request.model';
 import { WorkScheduleModel } from './shared/database/models/work-schedule.model';
+import { ensureWalletForEmail } from './shared/wallet/provisioning';
 
 /**
  * Employee role → platform auth role. Only `users` rows can sign in, so every
@@ -113,6 +114,11 @@ async function seed() {
     },
     { upsert: true },
   );
+
+  // Sign-up accounts also receive app wallets; keep the demo users consistent.
+  for (const email of [adminEmail.toLowerCase(), 'client@moveup.tn', 'mover@moveup.tn']) {
+    await ensureWalletForEmail(email);
+  }
 
   console.log('Seed complete: admin, client, mover + moverProfile (demo accounts).');
 }
@@ -228,6 +234,13 @@ async function seedHr() {
     console.log(
       `  ${member.employeeRef}  ${member.email}  ${member.password}  → ${AUTH_ROLE_BY_EMPLOYEE_ROLE[member.role]}`,
     );
+  }
+
+  // Auto-create a custodial app wallet for every demo HR/employee account.
+  // The same wallet is written to both the User and Employee records.
+  for (const member of staff) {
+    const wallet = await ensureWalletForEmail(member.email);
+    console.log(`  ${member.employeeRef}  app wallet  ${wallet.address}`);
   }
 
   const employees = Object.values(ids);

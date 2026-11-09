@@ -10,6 +10,7 @@ import {
   useDashboardStats,
   useEmployees,
   useLeaveRequests,
+  useVoiceCheckins,
 } from '@/hooks/content/hr';
 import type { AttendanceDto, EmployeeDto } from '@/types';
 
@@ -37,6 +38,61 @@ function coversToday(start: string, end: string): boolean {
   const rangeEnd = new Date(end);
   rangeEnd.setHours(23, 59, 59, 999);
   return rangeStart < dayEnd && rangeEnd >= dayStart;
+}
+
+function isVoiceMismatch(label: string, decision: string, reasons: string[]): boolean {
+  return (
+    decision === 'reject' ||
+    label === 'different_voice' ||
+    reasons.some((reason) => reason.includes('voice') || reason.includes('different'))
+  );
+}
+
+function VoiceAlertsSection() {
+  const voice = useVoiceCheckins();
+
+  if (voice.isError) return null;
+
+  const rows = voice.data ?? [];
+  const mismatches = rows.filter((row) =>
+    isVoiceMismatch(row.voiceLabel, row.decision, row.reasons),
+  );
+
+  return (
+    <section className="mt-6 border border-ink bg-paper">
+      <div className="border-b border-ink px-5 py-3">
+        <h2 className="mono text-[11px] font-bold">VOICE CHECK-IN ALERTS</h2>
+        <p className="mono mt-1 text-[9px] text-ink-40">
+          {voice.isLoading ? 'LOADING…' : `${mismatches.length} MISMATCH${mismatches.length === 1 ? '' : 'ES'} · ${rows.length} ATTEMPT${rows.length === 1 ? '' : 'S'} TOTAL`}
+        </p>
+      </div>
+      {mismatches.length === 0 ? (
+        <p className="mono px-5 py-5 text-[10px] text-ink-40">
+          NO DIFFERENT-VOICE DETECTIONS. ATTEMPTS APPEAR HERE AS EMPLOYEES CHECK IN BY VOICE.
+        </p>
+      ) : (
+        <ul>
+          {mismatches.slice(0, 10).map((row) => (
+            <li
+              key={row.id}
+              className="flex flex-wrap items-center gap-3 border-b border-ink/15 px-5 py-3 last:border-0"
+            >
+              <span className="mono text-[10px] font-bold">⚠ {row.employeeRef}</span>
+              <span className="mono text-[10px] text-ink-40">
+                speaker {row.speakerScore.toFixed(2)} · {row.voiceLabel} · {row.decision}
+              </span>
+              <span className="mono text-[10px] text-ink-40">
+                {new Date(row.createdAt).toLocaleString([], { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+              </span>
+              <span className="mono ml-auto text-[9px] text-hazard">
+                {(row.reasons.join(', ') || 'DIFFERENT VOICE').toUpperCase()}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
 }
 
 /** HR control dashboard — stats, today's roster, schedule and the team map. */
@@ -337,6 +393,8 @@ export function DashboardView() {
           </div>
         )}
       </section>
+
+      <VoiceAlertsSection />
 
       <section className="mt-6">
         <p className="mono mb-3 text-[10px] text-ink-40">PLATFORM MODULES — PENDING</p>

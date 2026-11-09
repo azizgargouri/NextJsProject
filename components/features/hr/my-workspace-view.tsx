@@ -19,6 +19,7 @@ import {
   useLeaveRequests,
   useLocationTracking,
   useMyEmployee,
+  useVoiceCheckin,
 } from '@/hooks/content/hr';
 import { extractErrorMessage } from '@/lib/api/errors';
 import type { AttendanceDto, LeaveRequestDto } from '@/types';
@@ -62,6 +63,131 @@ function formatDate(value: string) {
     month: 'short',
     year: 'numeric',
   });
+}
+
+function recordVoiceClip(seconds = 4): Promise<File> {
+  return new Promise((resolve, reject) => {
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+      reject(new Error('Voice recording is not supported in this browser.'));
+      return;
+    }
+    navigator.mediaDevices
+      .getUserMedia({ audio: true })
+      .then((stream) => {
+        const recorder = new MediaRecorder(stream);
+        const chunks: Blob[] = [];
+        recorder.ondataavailable = (event) => {
+          if (event.data.size > 0) chunks.push(event.data);
+        };
+        recorder.onstop = () => {
+          stream.getTracks().forEach((track) => track.stop());
+          const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
+          resolve(new File([blob], 'voice.webm', { type: blob.type || 'audio/webm' }));
+        };
+        recorder.onerror = () => reject(new Error('Could not record your voice.'));
+        recorder.start();
+        window.setTimeout(() => {
+          if (recorder.state !== 'inactive') recorder.stop();
+        }, seconds * 1000);
+      })
+      .catch(() => reject(new Error('Microphone access was blocked. Allow it and try again.')));
+  });
+}
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '');
+    reader.onerror = () => reject(new Error('Could not read the recording.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+/** Voice check-in: record 4s → Kaggle verifier → accept/review/reject. */
+function VoiceCheckinSection() {
+  const voice = useVoiceCheckin();
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
+  const [transcript, setTranscript] = useState(
+    "I'm at the Ben Salah job in La Marsa, code Tunis, check me in",
+  );
+  const [jobId, setJobId] = useState('JOB-101');
+  const [challenge, setChallenge] = useState('Tunis');
+
+  const run = async () => {
+    setResult(null);
+    setBusy(true);
+    try {
+      const file = await recordVoiceClip(4);
+      const audio_b64 = await fileToBase64(file);
+      const response = await voice.mutateAsync({
+        audio_b64,
+        transcript,
+        job_id: jobId,
+        challenge,
+        lat: 36.8784,
+        lng: 10.3249,
+      });
+      setResult(
+        `${response.decision.toUpperCase()} · speaker ${response.speaker_score.toFixed(2)} (${response.voice_label}) · score ${response.threshold.toFixed(2)} · ${response.reasons.join(', ') || '—'}`,
+      );
+    } catch (error) {
+      setResult(extractErrorMessage(error, 'Voice check-in failed.'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="mt-8 border border-ink bg-paper p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="mono text-[11px] font-bold">VOICE CHECK-IN</h2>
+          <p className="mono mt-2 text-[9px] text-ink-40">
+            RECORD 4 SECONDS — SAY THE JOB + CODE. VERIFIED BY THE KAGGLE VOICE ENGINE.
+          </p>
+        </div>
+        <Button
+          variant="primary"
+          size="sm"
+          className="h-8 px-3 text-[9px]"
+          disabled={busy}
+          onClick={() => void run()}
+        >
+          {busy ? <Loader2 size={12} className="animate-spin" /> : null}
+          {busy ? 'RECORDING…' : 'Record & check in'}
+        </Button>
+      </div>
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <FieldRow>
+          <Label htmlFor="voice-transcript">WHAT YOU SAY</Label>
+          <Input
+            id="voice-transcript"
+            value={transcript}
+            onChange={(event) => setTranscript(event.target.value)}
+            placeholder="I'm at the Ben Salah job…, code Tunis"
+          />
+        </FieldRow>
+        <FieldRow>
+          <Label htmlFor="voice-job">JOB</Label>
+          <Input id="voice-job" value={jobId} onChange={(event) => setJobId(event.target.value)} />
+        </FieldRow>
+        <FieldRow>
+          <Label htmlFor="voice-challenge">CODE WORD</Label>
+          <Input
+            id="voice-challenge"
+            value={challenge}
+            onChange={(event) => setChallenge(event.target.value)}
+          />
+        </FieldRow>
+      </div>
+      {result && (
+        <p className="mono mt-3 border border-ink/20 bg-paper-soft px-3 py-2 text-[9px] normal-case tracking-normal text-ink-80">
+          {result}
+        </p>
+      )}
+    </section>
+  );
 }
 
 function getPosition(): Promise<GeolocationPosition> {
@@ -217,6 +343,8 @@ export function MyWorkspaceView() {
 
       {profile && (
         <>
+          <VoiceCheckinSection />
+
           <div className="mt-8 flex gap-1 border-b border-ink" role="tablist">
             {TABS.map((item) => {
               const active = tab === item.id;

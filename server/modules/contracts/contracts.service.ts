@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { ZeroHash, verifyTypedData } from 'ethers';
+import { ZeroHash } from 'ethers';
 import {
   AlreadyExistsError,
   BadRequestError,
@@ -9,7 +9,6 @@ import {
 import type { AccessTokenPayload } from '../../shared/auth/jwt';
 import {
   buildContractDocument,
-  contractDocumentUri,
   hashContractDocument,
   hashText,
   stableStringify,
@@ -31,12 +30,19 @@ import type {
 } from '../../../types';
 import { employeesService } from '../employees/employees.service';
 import {
+  ensureUserWalletById,
+  ensureEmployeeWalletById,
+} from '../../shared/wallet/provisioning';
+import { signTypedDataWithEncryptedKey } from '../../shared/wallet/custodial';
+import {
+  ensureHrAdminOnChain,
   getChainConfig,
   isHrAdminOnChain,
   sendCreateContractTransaction,
   sendTerminateContractTransaction,
   verifyCreateTransaction,
 } from './contracts.chain';
+import { contractDocumentsService } from './contracts-documents.service';
 import { ContractsRepository } from './contracts.repository';
 import { ContractProposalsRepository } from './contracts-proposals.repository';
 import { serializeContract, serializePreparedContract, serializeProposal } from './contracts.serializer';
@@ -137,14 +143,10 @@ export class ContractsService {
       throw new BadRequestError('Only active employees can receive a new contract.');
     }
 
-    if (
-      employee.walletAddress &&
-      employee.walletAddress.toLowerCase() !== input.employeeWallet.toLowerCase()
-    ) {
-      throw new BadRequestError(
-        `The directory wallet for ${employee.employeeRef} is ${employee.walletAddress}. Update the employee record first or use that wallet.`,
-      );
-    }
+    // Both wallets are app-managed: derive them from the authenticated HR
+    // account and the directory record. The client never supplies addresses.
+    const employerWallet = await ensureUserWalletById(user.sub);
+    const employeeWallet = await ensureEmployeeWalletById(employee.id);
 
     const current = await this.repository.findCurrentForEmployee(employee.id);
     if (current) {
@@ -159,6 +161,13 @@ export class ContractsService {
         `${employee.employeeRef} already has a proposal waiting for their signature (${openProposal.id}).`,
       );
     }
+
+    // The HR-uploaded PDF is required. Its hash and URL become part of the
+    // canonical document, so the on-chain signature commits to the exact file.
+    const attachment = await contractDocumentsService.findForOrganization(
+      input.documentId,
+      user.sub,
+    );
 
     const startDate = toDateOnly(input.startDate);
     const endDate = input.endDate ? toDateOnly(input.endDate) : null;
@@ -185,13 +194,21 @@ export class ContractsService {
       employeeRef: employee.employeeRef,
       employeeName: employee.fullName,
       employeeEmail: employee.email,
-      employeeWallet: input.employeeWallet,
+      employeeWallet: employeeWallet.address,
       organizationHash,
-      employerWallet: input.employerWallet,
+      employerWallet: employerWallet.address,
       jobTitle: input.jobTitle,
       salary,
       startDate,
       endDate,
+      attachment: {
+        kind: 'pdf',
+        fileName: attachment.fileName,
+        mimeType: attachment.mimeType,
+        size: attachment.size,
+        hash: attachment.hash,
+        uri: attachment.uri,
+      },
       issuedAt,
     });
 
@@ -199,7 +216,7 @@ export class ContractsService {
     // Namespaced with the private organisation id so the low-entropy EMP001
     // cannot be brute-forced from the public chain alone.
     const employeeRefHash = hashText(`moveup:employee:${user.sub}:${employee.employeeRef}`);
-    const documentUri = input.documentUri?.trim() || contractDocumentUri(documentHash);
+    const documentUri = attachment.uri;
     const nonce = `0x${randomBytes(32).toString('hex')}`;
     const deadline = Math.floor(Date.now() / 1000) + PROPOSAL_TTL_SECONDS;
 
@@ -210,8 +227,8 @@ export class ContractsService {
       employeeRef: employee.employeeRef,
       employeeName: employee.fullName,
       employeeEmail: employee.email,
-      employeeWallet: input.employeeWallet,
-      employerWallet: input.employerWallet,
+      employeeWallet: employeeWallet.address,
+      employerWallet: employerWallet.address,
       jobTitle: input.jobTitle,
       salary,
       startDate,
@@ -298,27 +315,28 @@ export class ContractsService {
       intent,
     );
 
-    let signer: string;
-    try {
-      signer = verifyTypedData(
-        typedData.domain,
-        typedData.types,
-        typedData.message,
-        input.signature,
-      );
-    } catch {
-      throw new BadRequestError('The HR EIP-712 signature is invalid.');
-    }
-
-    if (signer.toLowerCase() !== prepared.employerWallet.toLowerCase()) {
-      throw new BadRequestError('The signature was not produced by the connected HR wallet.');
-    }
-
-    if (!(await isHrAdminOnChain(prepared.employerWallet, prepared.organizationHash))) {
+    // Sign with the HR account's custodial wallet. The system wallet (registry
+    // owner) authorises that wallet for this organisation if needed.
+    const hrWallet = await ensureUserWalletById(user.sub);
+    if (hrWallet.address.toLowerCase() !== prepared.employerWallet.toLowerCase()) {
       throw new BadRequestError(
-        'This wallet is not authorized HR for the organisation on-chain. Run the grant script or switch wallets.',
+        'The HR app wallet changed while the contract was being prepared. Prepare it again.',
       );
     }
+
+    await ensureHrAdminOnChain(hrWallet.address, prepared.organizationHash);
+    if (!(await isHrAdminOnChain(hrWallet.address, prepared.organizationHash))) {
+      throw new BadRequestError(
+        'The HR app wallet could not be authorised on-chain. Make CONTRACT_ADMIN_PRIVATE_KEY the registry owner or grant it manually.',
+      );
+    }
+
+    const signature = await signTypedDataWithEncryptedKey(
+      hrWallet.encryptedPrivateKey,
+      typedData.domain,
+      typedData.types,
+      typedData.message,
+    );
 
     const created = await this.proposals.create({
       organization: user.sub,
@@ -344,7 +362,7 @@ export class ContractsService {
       nonce: prepared.nonce,
       deadline: prepared.deadline,
       status: 'awaiting_employee',
-      employerSignature: input.signature.toLowerCase(),
+      employerSignature: signature.toLowerCase(),
       contractId: null,
       createdTxHash: null,
       expiresAt: new Date(prepared.deadline * 1000),
@@ -409,24 +427,24 @@ export class ContractsService {
       intent,
     );
 
-    let signer: string;
-    try {
-      signer = verifyTypedData(
-        typedData.domain,
-        typedData.types,
-        typedData.message,
-        input.signature,
+    // The employee's app wallet signs on their behalf. The proposal is still
+    // off-chain; HR anchors the dual-signed intent afterwards.
+    const employeeWallet = await ensureEmployeeWalletById(proposal.employee);
+    if (employeeWallet.address.toLowerCase() !== proposal.employeeWallet.toLowerCase()) {
+      throw new BadRequestError(
+        'The employee app wallet changed while the proposal was pending. Ask HR to issue a new proposal.',
       );
-    } catch {
-      throw new BadRequestError('The employee EIP-712 signature is invalid.');
     }
 
-    if (signer.toLowerCase() !== proposal.employeeWallet.toLowerCase()) {
-      throw new BadRequestError('The signature was not produced by the employee wallet on file.');
-    }
+    const signature = await signTypedDataWithEncryptedKey(
+      employeeWallet.encryptedPrivateKey,
+      typedData.domain,
+      typedData.types,
+      typedData.message,
+    );
 
     const updated = await this.proposals.update(proposal.id, {
-      employeeSignature: input.signature.toLowerCase(),
+      employeeSignature: signature.toLowerCase(),
       employeeSignedAt: new Date(),
     });
 
@@ -682,42 +700,42 @@ export class ContractsService {
     const actorWallet = (isAdmin ? contract.employerWallet : contract.employeeWallet).toLowerCase();
     const reasonHash = terminationReasonHash(input.reason);
 
-    if (input.deadline * 1000 <= Date.now()) {
-      throw new BadRequestError('The termination signature expired. Sign again to retry.');
+    // Resolve the app wallet that must authorise this termination.
+    const actor = isAdmin
+      ? await ensureUserWalletById(user.sub)
+      : await ensureEmployeeWalletById(contract.employee);
+    if (actor.address.toLowerCase() !== actorWallet) {
+      throw new BadRequestError(
+        isAdmin
+          ? 'This contract was issued by a different HR app wallet. Only that wallet can terminate it.'
+          : 'This contract belongs to a different employee app wallet. Only that wallet can resign it.',
+      );
+    }
+
+    const deadline = input.deadline ?? Math.floor(Date.now() / 1000) + 15 * 60;
+    if (deadline * 1000 <= Date.now()) {
+      throw new BadRequestError('The termination signature expired. Try again.');
     }
 
     const { chainId, contractAddress } = getChainConfig();
     const typedData = contractTerminationTypedData(chainId, contractAddress, {
       contractId: contract.contractId,
       reasonHash,
-      deadline: input.deadline,
+      deadline,
     });
 
-    let signingWallet: string;
-    try {
-      signingWallet = verifyTypedData(
-        typedData.domain,
-        typedData.types,
-        typedData.message,
-        input.signature,
-      );
-    } catch {
-      throw new BadRequestError('The termination EIP-712 signature is invalid.');
-    }
-
-    if (signingWallet.toLowerCase() !== actorWallet) {
-      throw new BadRequestError(
-        isAdmin
-          ? 'The termination must be signed by the HR wallet that issued this contract.'
-          : 'The resignation must be signed by the employee wallet on file.',
-      );
-    }
+    const signature = await signTypedDataWithEncryptedKey(
+      actor.encryptedPrivateKey,
+      typedData.domain,
+      typedData.types,
+      typedData.message,
+    );
 
     const verified = await sendTerminateContractTransaction({
       contractId: contract.contractId,
       reasonHash,
-      deadline: input.deadline,
-      signature: input.signature,
+      deadline,
+      signature,
       expectedSigner: actorWallet,
     });
 

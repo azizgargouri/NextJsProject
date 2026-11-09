@@ -240,6 +240,50 @@ export async function isHrAdminOnChain(
   }
 }
 
+/**
+ * Ensures an HR app wallet is authorised for its organisation on-chain.
+ *
+ * New HR accounts get freshly generated wallets, so the registry owner must
+ * grant each one. The backend system wallet is expected to be the owner; if it
+ * is not, the transaction reverts and we surface a clear configuration error.
+ */
+export async function ensureHrAdminOnChain(
+  wallet: string,
+  organizationHash: string,
+): Promise<void> {
+  if (await isHrAdminOnChain(wallet, organizationHash)) return;
+
+  const { contractAddress } = getChainConfig();
+  const systemWallet = getContractAdminWallet();
+  await assertSystemWalletFunded(systemWallet.address);
+
+  const registry = new Contract(
+    contractAddress,
+    employmentContractRegistryAbi,
+    systemWallet,
+  ) as unknown as {
+    setHrAdmin(admin: string, organizationId: string): Promise<ContractTransactionResponse>;
+  };
+
+  try {
+    const tx = await registry.setHrAdmin(wallet, organizationHash);
+    const receipt = await tx.wait();
+    if (!receipt || receipt.status !== 1) {
+      throw new Error('setHrAdmin transaction reverted');
+    }
+  } catch {
+    throw new BadRequestError(
+      'The system wallet could not authorise the HR app wallet on-chain. Make CONTRACT_ADMIN_PRIVATE_KEY the registry owner (or grant this wallet with the blockchain script), then retry.',
+    );
+  }
+
+  if (!(await isHrAdminOnChain(wallet, organizationHash))) {
+    throw new BadRequestError(
+      'The HR app wallet is still not authorised on-chain after the grant transaction.',
+    );
+  }
+}
+
 export interface VerifyCreateInput {
   txHash: string;
   contractId: string;

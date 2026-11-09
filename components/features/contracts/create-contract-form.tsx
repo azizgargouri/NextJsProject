@@ -1,27 +1,26 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Loader2, ShieldAlert } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { FieldError, FieldRow, Label } from '@/components/ui/field';
-import { useEmployees, usePrepareContract, useProposeContract } from '@/hooks/content/hr';
-import { useWallet } from '@/components/features/web3/wallet-provider';
-import { isContractConfigured, web3Config } from '@/lib/blockchain/config';
-import { signContractIntent } from '@/lib/blockchain/registry';
-import { describeWalletError } from '@/lib/blockchain/errors';
+import {
+  useEmployees,
+  usePrepareContract,
+  useProposeContract,
+  useUploadContractDocument,
+} from '@/hooks/content/hr';
+import { isContractConfigured } from '@/lib/blockchain/config';
+import { extractErrorMessage } from '@/lib/api/errors';
 
 const FormSchema = z
   .object({
     employeeId: z.string().min(1, 'Select an employee'),
-    employeeWallet: z
-      .string()
-      .trim()
-      .regex(/^0x[a-fA-F0-9]{40}$/, 'Enter the employee MetaMask address (0x + 40 hex chars)'),
     jobTitle: z.string().trim().min(2, 'Job title is required'),
     salaryAmount: z
       .string()
@@ -34,7 +33,6 @@ const FormSchema = z
     salaryPeriod: z.enum(['month', 'year', 'hour']),
     startDate: z.string().min(1, 'Start date is required'),
     endDate: z.string().optional(),
-    documentUri: z.string().trim().max(500).optional(),
   })
   .refine((values) => !values.endDate || values.endDate > values.startDate, {
     path: ['endDate'],
@@ -43,67 +41,85 @@ const FormSchema = z
 
 type FormValues = z.infer<typeof FormSchema>;
 
-type Step = 'idle' | 'preparing' | 'signing' | 'proposing';
+type Step = 'idle' | 'uploading' | 'preparing' | 'proposing';
 
 const STEP_LABEL: Record<Step, string> = {
   idle: '',
-  preparing: 'Building + hashing the contract document…',
-  signing: 'Sign the contract intent in MetaMask…',
-  proposing: 'Storing the HR co-signature for the employee…',
+  uploading: 'Uploading + hashing the contract PDF…',
+  preparing: 'Building + hashing the canonical document…',
+  proposing: 'Signing with the HR app wallet + storing the proposal…',
 };
 
-/** Admin flow: select employee → canonical document → HR co-signature → proposal. */
+const MAX_PDF_BYTES = 8 * 1024 * 1024;
+
+/**
+ * Admin flow: select employee → canonical document → server signs with the
+ * HR app wallet → proposal waiting for the employee's app wallet.
+ */
 export function CreateContractForm() {
   const employeesQuery = useEmployees();
+  const upload = useUploadContractDocument();
   const prepare = usePrepareContract();
   const propose = useProposeContract();
-  const {
-    address,
-    isConnected,
-    isCorrectNetwork,
-    chainId,
-    connect,
-    switchNetwork,
-  } = useWallet();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [step, setStep] = useState<Step>('idle');
   const [serverError, setServerError] = useState<string | null>(null);
   const [success, setSuccess] = useState<{ proposalId: string } | null>(null);
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [pdfError, setPdfError] = useState<string | null>(null);
 
   const {
     register,
     handleSubmit,
     reset,
-    setValue,
     watch,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(FormSchema),
     defaultValues: {
       employeeId: '',
-      employeeWallet: '',
       jobTitle: '',
       salaryAmount: '',
       salaryCurrency: 'TND',
       salaryPeriod: 'month',
       startDate: '',
       endDate: '',
-      documentUri: '',
     },
   });
 
   const employees = useMemo(() => employeesQuery.data ?? [], [employeesQuery.data]);
   const selectedId = watch('employeeId');
+  const selectedEmployee = useMemo(
+    () => employees.find((item) => item.id === selectedId) ?? null,
+    [employees, selectedId],
+  );
 
-  useEffect(() => {
-    if (!selectedId) return;
-    const employee = employees.find((item) => item.id === selectedId);
-    if (employee) {
-      setValue('employeeWallet', employee.walletAddress ?? '', { shouldValidate: true });
+  const busy = step !== 'idle' || upload.isPending || prepare.isPending || propose.isPending;
+
+  const onPdfChange = (event: ChangeEvent<HTMLInputElement>) => {
+    setPdfError(null);
+    const file = event.target.files?.[0] ?? null;
+    if (!file) {
+      setPdfFile(null);
+      return;
     }
-  }, [selectedId, employees, setValue]);
 
-  const busy = step !== 'idle' || prepare.isPending || propose.isPending;
+    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+      setPdfFile(null);
+      setPdfError('Choose a PDF file.');
+      event.target.value = '';
+      return;
+    }
+    if (file.size > MAX_PDF_BYTES) {
+      setPdfFile(null);
+      setPdfError('The PDF must be 8 MB or smaller.');
+      event.target.value = '';
+      return;
+    }
+
+    setPdfFile(file);
+  };
 
   const onSubmit = async (values: FormValues) => {
     setServerError(null);
@@ -113,61 +129,47 @@ export function CreateContractForm() {
       setServerError('Contract address missing. Set NEXT_PUBLIC_CONTRACT_ADDRESS and restart.');
       return;
     }
-    if (!isConnected || !address) {
-      setServerError('Connect MetaMask before creating a contract.');
-      return;
-    }
-    if (!isCorrectNetwork) {
-      setServerError(`Switch MetaMask to ${web3Config.chainName} (chain ${web3Config.chainId}) first.`);
-      return;
-    }
-    if (chainId !== web3Config.chainId) {
-      setServerError('Wallet is on the wrong network.');
+    if (!pdfFile) {
+      setPdfError('Upload the contract as a PDF before issuing it.');
       return;
     }
 
     try {
+      setStep('uploading');
+      const uploaded = await upload.mutateAsync(pdfFile);
+
       setStep('preparing');
       const prepared = await prepare.mutateAsync({
         employeeId: values.employeeId,
-        employeeWallet: values.employeeWallet.toLowerCase(),
-        employerWallet: address.toLowerCase(),
         jobTitle: values.jobTitle,
         salaryAmount: values.salaryAmount ? Number(values.salaryAmount) : undefined,
         salaryCurrency: values.salaryCurrency.toUpperCase(),
         salaryPeriod: values.salaryPeriod,
         startDate: values.startDate,
         endDate: values.endDate || null,
-        documentUri: values.documentUri || undefined,
+        documentId: uploaded.id,
       });
-
-      if (prepared.employerWallet.toLowerCase() !== address.toLowerCase()) {
-        throw new Error('Switch MetaMask to the HR wallet that will co-sign this contract.');
-      }
-
-      setStep('signing');
-      const { signature } = await signContractIntent(prepared.typedData);
 
       setStep('proposing');
-      const proposal = await propose.mutateAsync({
-        token: prepared.token,
-        signature,
-      });
+      const proposal = await propose.mutateAsync({ token: prepared.token });
 
       setSuccess({ proposalId: proposal.id });
+      setPdfFile(null);
+      setPdfError(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
       reset({
         employeeId: '',
-        employeeWallet: '',
         jobTitle: '',
         salaryAmount: '',
         salaryCurrency: 'TND',
         salaryPeriod: 'month',
         startDate: '',
         endDate: '',
-        documentUri: '',
       });
     } catch (error) {
-      setServerError(describeWalletError(error));
+      setServerError(
+        extractErrorMessage(error, 'The contract could not be prepared. Check the server logs.'),
+      );
     } finally {
       setStep('idle');
     }
@@ -196,7 +198,8 @@ export function CreateContractForm() {
       <section className="mt-8 border border-ink bg-paper px-4 py-6">
         <p className="display text-2xl">NO EMPLOYEES YET.</p>
         <p className="mt-2 text-sm text-ink-80">
-          Add an employee to the directory, assign their MetaMask wallet, then issue a contract.
+          Add an employee to the directory — their app wallet is created automatically — then issue
+          a contract.
         </p>
       </section>
     );
@@ -206,7 +209,7 @@ export function CreateContractForm() {
     <section className="mt-8 border border-ink bg-paper">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-ink px-4 py-3">
         <h2 className="mono text-[10px]">ISSUE A NEW EMPLOYMENT CONTRACT</h2>
-        <span className="mono text-[9px] text-ink-40">EMPLOYEE SIGNS FREE · HR ANCHORS ON-CHAIN</span>
+        <span className="mono text-[9px] text-ink-40">APP WALLETS SIGN · SERVER PAYS GAS</span>
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4 px-4 py-4 md:grid-cols-2" noValidate>
@@ -221,20 +224,10 @@ export function CreateContractForm() {
             ))}
           </Select>
           <FieldError message={errors.employeeId?.message} />
-        </FieldRow>
-
-        <FieldRow className="md:col-span-2">
-          <Label htmlFor="contract-wallet">EMPLOYEE METAMASK WALLET</Label>
-          <Input
-            id="contract-wallet"
-            placeholder="0x…"
-            autoComplete="off"
-            {...register('employeeWallet')}
-            disabled={busy}
-          />
-          <FieldError message={errors.employeeWallet?.message} />
           <p className="mono mt-1 text-[9px] normal-case tracking-normal text-ink-40">
-            Prefilled from the employee directory. This wallet must co-sign the same document.
+            {selectedEmployee
+              ? `APP WALLET ${selectedEmployee.walletAddress ?? 'will be created on first use'}`
+              : 'Every employee has an app-managed wallet created automatically.'}
           </p>
         </FieldRow>
 
@@ -294,42 +287,23 @@ export function CreateContractForm() {
         </FieldRow>
 
         <FieldRow className="md:col-span-2">
-          <Label htmlFor="contract-uri">DOCUMENT URI (OPTIONAL)</Label>
+          <Label htmlFor="contract-pdf">CONTRACT DOCUMENT (PDF)</Label>
           <Input
-            id="contract-uri"
-            placeholder="ipfs://… or https://… — leave empty for a deterministic URN"
-            {...register('documentUri')}
+            id="contract-pdf"
+            ref={fileInputRef}
+            type="file"
+            accept="application/pdf,.pdf"
+            onChange={onPdfChange}
             disabled={busy}
+            className="h-auto cursor-pointer py-2 text-[11px] file:mr-3 file:cursor-pointer file:border-0 file:bg-ink file:px-3 file:py-1 file:text-[9px] file:uppercase file:text-paper hover:file:bg-hazard"
           />
-          <FieldError message={errors.documentUri?.message} />
+          <FieldError message={pdfError ?? undefined} />
           <p className="mono mt-1 text-[9px] normal-case tracking-normal text-ink-40">
-            The full canonical JSON is stored on-chain when the employee co-signs. It is PUBLIC on
-            a public network.
+            {pdfFile
+              ? `${pdfFile.name} · ${(pdfFile.size / 1024).toFixed(0)} KB · will be hashed into the on-chain document.`
+              : 'PDF only, max 8 MB. The PDF is stored off-chain and its keccak256 hash is committed on-chain.'}
           </p>
         </FieldRow>
-
-        {!isConnected && (
-          <div className="md:col-span-2 flex flex-wrap items-center gap-3 border border-hazard bg-hazard/5 px-3 py-3">
-            <ShieldAlert size={15} className="text-hazard" />
-            <p className="mono text-[9px] normal-case tracking-normal text-hazard">
-              Connect MetaMask as the employer/HR wallet before issuing a contract.
-            </p>
-            <Button type="button" variant="hazard" size="sm" onClick={() => void connect()}>
-              Connect
-            </Button>
-          </div>
-        )}
-
-        {isConnected && !isCorrectNetwork && (
-          <div className="md:col-span-2 flex flex-wrap items-center gap-3 border border-hazard bg-hazard/5 px-3 py-3">
-            <p className="mono text-[9px] normal-case tracking-normal text-hazard">
-              Wallet network does not match {web3Config.chainName}.
-            </p>
-            <Button type="button" variant="hazard" size="sm" onClick={() => void switchNetwork()}>
-              Switch network
-            </Button>
-          </div>
-        )}
 
         {step !== 'idle' && (
           <p className="mono md:col-span-2 flex items-center gap-2 text-[10px] text-ink-80">
@@ -346,7 +320,7 @@ export function CreateContractForm() {
         {success && (
           <p className="mono md:col-span-2 border border-ink bg-paper-soft px-3 py-2 text-[10px] normal-case tracking-normal">
             HR SIGNATURE STORED · PROPOSAL {success.proposalId.slice(0, 10)}… IS NOW WAITING FOR
-            THE EMPLOYEE TO SIGN (FREE). YOU THEN ANCHOR IT ON-CHAIN AND PAY THE GAS.
+            THE EMPLOYEE TO SIGN. YOU THEN ANCHOR IT ON-CHAIN.
           </p>
         )}
 
@@ -356,9 +330,9 @@ export function CreateContractForm() {
             variant="primary"
             size="lg"
             className="w-full"
-            disabled={busy || !address || !isCorrectNetwork || !isContractConfigured}
+            disabled={busy || !isContractConfigured}
           >
-            {busy ? <Loader2 className="animate-spin" size={16} /> : 'CO-SIGN AS HR & SEND TO EMPLOYEE >>>'}
+            {busy ? <Loader2 className="animate-spin" size={16} /> : 'SIGN AS HR & SEND TO EMPLOYEE >>>'}
           </Button>
         </div>
       </form>

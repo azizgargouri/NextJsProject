@@ -14,6 +14,8 @@ export interface EmployeeRow {
   status: EmployeeStatus;
   hireDate: Date | null;
   walletAddress: string | null;
+  /** Encrypted private key; internal only, never serialized to clients. */
+  walletPrivateKeyEncrypted: string | null;
   organization: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -30,6 +32,7 @@ export function toEmployeeRow(doc: EmployeeDoc): EmployeeRow {
     status: doc.status,
     hireDate: doc.hireDate ?? null,
     walletAddress: doc.walletAddress ?? null,
+    walletPrivateKeyEncrypted: doc.walletPrivateKeyEncrypted ?? null,
     organization: doc.organization ? String(doc.organization) : null,
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt,

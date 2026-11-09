@@ -17,25 +17,33 @@ import type {
 
 export interface PrepareContractPayload {
   employeeId: string;
-  employeeWallet: string;
-  employerWallet: string;
   jobTitle: string;
   salaryAmount?: number;
   salaryCurrency?: string;
   salaryPeriod?: SalaryPeriod;
   startDate: string;
   endDate?: string | null;
-  documentUri?: string;
+  /** UUID returned by `uploadDocument`. */
+  documentId: string;
+}
+
+export interface ContractDocumentUploadDto {
+  id: string;
+  fileName: string;
+  mimeType: string;
+  size: number;
+  /** keccak256 of the raw PDF bytes. */
+  hash: string;
+  /** Capability URL serving the PDF. */
+  uri: string;
 }
 
 export interface ProposeContractPayload {
   token: string;
-  signature: string;
 }
 
 export interface SignContractProposalPayload {
   proposalId: string;
-  signature: string;
 }
 
 export interface AnchorContractProposalPayload {
@@ -50,9 +58,8 @@ export interface RecordContractPayload {
 
 export interface TerminateContractPayload {
   contractId: string;
-  /** Free EIP-712 signature from the HR wallet or the employee. */
-  signature: string;
-  deadline: number;
+  /** Optional signature deadline (unix seconds); the server defaults to +15 min. */
+  deadline?: number;
   reason?: string;
 }
 
@@ -73,6 +80,16 @@ export const contractsApi = {
       '/api/contracts/proposals',
     );
     return data.proposals;
+  },
+  uploadDocument: async (file: File): Promise<ContractDocumentUploadDto> => {
+    const form = new FormData();
+    form.append('file', file);
+    const { data } = await axiosClient.post<{ document: ContractDocumentUploadDto }>(
+      '/api/contracts/documents',
+      form,
+      { timeout: 60_000 },
+    );
+    return data.document;
   },
   prepare: async (payload: PrepareContractPayload): Promise<PreparedContractDto> =>
     unwrapActionResult(await prepareContractAction(actionAccessToken(), payload)),

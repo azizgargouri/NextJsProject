@@ -9,6 +9,8 @@ export interface AuthUser {
   phone: string;
   role: UserRole;
   locale: string;
+  /** Public address of the auto-created app wallet. */
+  walletAddress: string | null;
   createdAt: string;
 }
 

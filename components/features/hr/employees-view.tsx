@@ -17,7 +17,7 @@ import type { EmployeeDto, EmployeeRole } from '@/types';
 
 const ROLES: EmployeeRole[] = ['employee', 'manager', 'hr'];
 
-type Draft = { fullName: string; email: string; role: EmployeeRole; walletAddress: string };
+type Draft = { fullName: string; email: string; role: EmployeeRole };
 
 /** HR directory — table with inline edits and activate/deactivate toggles. */
 export function EmployeesView() {
@@ -29,7 +29,6 @@ export function EmployeesView() {
     fullName: '',
     email: '',
     role: 'employee',
-    walletAddress: '',
   });
   const [rowError, setRowError] = useState<string | null>(null);
 
@@ -43,7 +42,6 @@ export function EmployeesView() {
       fullName: employee.fullName,
       email: employee.email,
       role: employee.role,
-      walletAddress: employee.walletAddress ?? '',
     });
   }
 
@@ -137,7 +135,7 @@ export function EmployeesView() {
                 <th className="px-4 py-3 font-normal">REF</th>
                 <th className="px-4 py-3 font-normal">NAME</th>
                 <th className="px-4 py-3 font-normal">EMAIL</th>
-                <th className="px-4 py-3 font-normal">WALLET</th>
+                <th className="px-4 py-3 font-normal">APP WALLET</th>
                 <th className="px-4 py-3 font-normal">ROLE</th>
                 <th className="px-4 py-3 font-normal">STATUS</th>
                 <th className="px-4 py-3 text-right font-normal">ACTIONS</th>
@@ -197,7 +195,7 @@ export function EmployeesView() {
                               event.preventDefault();
                               saveEdit(employee);
                             }}
-                            className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5"
+                            className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
                           >
                             <div className="flex flex-col gap-2">
                               <Label htmlFor={`fullName-${employee.id}`}>FULL NAME</Label>
@@ -246,21 +244,6 @@ export function EmployeesView() {
                                   </option>
                                 ))}
                               </Select>
-                            </div>
-                            <div className="flex flex-col gap-2">
-                              <Label htmlFor={`wallet-${employee.id}`}>METAMASK WALLET</Label>
-                              <Input
-                                id={`wallet-${employee.id}`}
-                                className="h-9"
-                                placeholder="0x…"
-                                value={draft.walletAddress}
-                                onChange={(event) =>
-                                  setDraft((current) => ({
-                                    ...current,
-                                    walletAddress: event.target.value,
-                                  }))
-                                }
-                              />
                             </div>
                             <div className="flex items-end gap-2">
                               <Button

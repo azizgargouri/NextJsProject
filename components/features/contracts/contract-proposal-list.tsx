@@ -2,15 +2,12 @@
 
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Clock, FileJson, Loader2, PenLine, ShieldCheck } from 'lucide-react';
+import { Clock, ExternalLink, FileText, Loader2, PenLine, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { StatusLabel } from '@/components/ui/status-chip';
 import { useAnchorContractProposal, useSignContractProposal } from '@/hooks/content/hr';
-import { useWallet } from '@/components/features/web3/wallet-provider';
 import { useAuthStore } from '@/hooks/stores/auth-store';
-import { signContractAsEmployee } from '@/lib/blockchain/registry';
-import { describeWalletError } from '@/lib/blockchain/errors';
-import { shortAddress } from '@/lib/blockchain/config';
+import { extractErrorMessage } from '@/lib/api/errors';
 import { formatSalary, stableStringify } from '@/lib/contracts/document';
 import type { ContractProposalDto } from '@/types';
 
@@ -23,14 +20,13 @@ function formatDeadline(value: number): string {
   return new Date(value * 1000).toISOString().replace('T', ' ').slice(0, 16);
 }
 
-function downloadDocument(proposal: ContractProposalDto) {
-  const blob = new Blob([stableStringify(proposal.document)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = `proposal-${proposal.employee?.employeeRef ?? 'employee'}-v${proposal.version}.json`;
-  anchor.click();
-  URL.revokeObjectURL(url);
+/** Public PDF link for new proposals; falls back to legacy http/ipfs URIs. */
+function documentHref(proposal: ContractProposalDto): string | null {
+  if (proposal.document.attachment?.uri) return proposal.document.attachment.uri;
+  if (proposal.documentUri.startsWith('http') || proposal.documentUri.startsWith('ipfs')) {
+    return proposal.documentUri;
+  }
+  return null;
 }
 
 /**
@@ -45,7 +41,6 @@ export function ContractProposalList({
   proposals: ContractProposalDto[];
   isAdmin: boolean;
 }) {
-  const { address, isConnected, isCorrectNetwork } = useWallet();
   const { user } = useAuthStore();
   const publish = useAnchorContractProposal();
   const signProposal = useSignContractProposal();
@@ -54,34 +49,21 @@ export function ContractProposalList({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const ready = isConnected && isCorrectNetwork;
-
-  /** Employee step: free EIP-712 signature. No transaction, no gas. */
+  /** Employee step: the server signs with the employee's app wallet. */
   const sign = async (proposal: ContractProposalDto) => {
     setActionError(null);
 
-    if (!ready || !address) {
-      setActionError('Connect MetaMask on the correct network first.');
-      return;
-    }
     if (proposal.status !== 'awaiting_employee') {
       setActionError('This proposal has expired. Ask HR to issue a new one.');
-      return;
-    }
-    if (proposal.employee?.walletAddress.toLowerCase() !== address.toLowerCase()) {
-      setActionError(
-        `Switch MetaMask to ${shortAddress(proposal.employee?.walletAddress)} — the employee wallet that must sign.`,
-      );
       return;
     }
 
     setBusyId(proposal.id);
     try {
-      const { signature } = await signContractAsEmployee(proposal.typedData);
-      await signProposal.mutateAsync({ proposalId: proposal.id, signature });
+      await signProposal.mutateAsync({ proposalId: proposal.id });
       await queryClient.invalidateQueries({ queryKey: ['contracts', 'proposals'] });
     } catch (error) {
-      setActionError(describeWalletError(error));
+      setActionError(extractErrorMessage(error, 'The proposal could not be signed.'));
     } finally {
       setBusyId(null);
     }
@@ -110,9 +92,7 @@ export function ContractProposalList({
       await queryClient.invalidateQueries({ queryKey: ['contracts', 'proposals'] });
       await queryClient.invalidateQueries({ queryKey: ['contracts'] });
     } catch (error) {
-      setActionError(
-        error instanceof Error ? error.message : 'Could not publish the contract on-chain.',
-      );
+      setActionError(extractErrorMessage(error, 'Could not publish the contract on-chain.'));
     } finally {
       setBusyId(null);
     }
@@ -234,14 +214,18 @@ export function ContractProposalList({
               </details>
 
               <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-ink/20 bg-paper-soft px-4 py-3">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 px-3 text-[9px]"
-                  onClick={() => downloadDocument(proposal)}
-                >
-                  <FileJson size={12} /> Download JSON
-                </Button>
+                <div className="flex flex-wrap items-center gap-2">
+                  {documentHref(proposal) && (
+                    <a
+                      href={documentHref(proposal) ?? undefined}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mono inline-flex h-8 items-center gap-1 border-2 border-ink px-3 text-[9px] uppercase transition-colors hover:bg-ink hover:text-paper"
+                    >
+                      <FileText size={12} /> View PDF <ExternalLink size={10} />
+                    </a>
+                  )}
+                </div>
 
                 {canSign ? (
                   <Button
@@ -252,7 +236,7 @@ export function ContractProposalList({
                     onClick={() => void sign(proposal)}
                   >
                     {isBusy ? <Loader2 size={12} className="animate-spin" /> : <PenLine size={12} />}
-                    Sign with wallet · no gas
+                    Sign with app wallet · no gas
                   </Button>
                 ) : canAnchor ? (
                   <Button
@@ -280,7 +264,7 @@ export function ContractProposalList({
                         : isMine
                           ? proposal.employeeSignature
                             ? 'SIGNED · WAITING FOR THE ADMIN TO PUBLISH IT'
-                            : 'CONNECT THE EMPLOYEE WALLET TO SIGN'
+                            : 'YOUR APP WALLET WILL SIGN AUTOMATICALLY'
                           : 'WAITING FOR THE EMPLOYEE TO SIGN'}
                   </span>
                 )}

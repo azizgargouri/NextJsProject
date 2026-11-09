@@ -42,6 +42,21 @@ const envSchema = z.object({
       .regex(/^0x[a-fA-F0-9]{64}$/, 'CONTRACT_ADMIN_PRIVATE_KEY must be a 32-byte hex private key')
       .optional(),
   ),
+  // Master key used to encrypt every custodial wallet private key at rest.
+  // Generate one with:
+  //   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+  // Optional at boot so existing installations keep working; wallet endpoints
+  // return a clear configuration error until it is set.
+  WALLET_ENCRYPTION_KEY: z.preprocess(
+    emptyToUndefined,
+    z
+      .string()
+      .regex(
+        /^(0x)?[a-fA-F0-9]{64}$/,
+        'WALLET_ENCRYPTION_KEY must be a 32-byte hex key (64 hex chars, optional 0x prefix)',
+      )
+      .optional(),
+  ),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -62,6 +77,7 @@ export function env(): Env {
     NEXT_PUBLIC_RPC_URL: process.env.NEXT_PUBLIC_RPC_URL,
     NEXT_PUBLIC_CONTRACT_ADDRESS: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS,
     CONTRACT_ADMIN_PRIVATE_KEY: process.env.CONTRACT_ADMIN_PRIVATE_KEY,
+    WALLET_ENCRYPTION_KEY: process.env.WALLET_ENCRYPTION_KEY,
   });
 
   if (!parsed.success) {

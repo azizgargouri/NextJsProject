@@ -22,6 +22,7 @@ export interface AuthSessionResponse {
     phone: string;
     role: Role;
     locale: string;
+    walletAddress: string | null;
     createdAt: string;
   };
   accessToken: string;
@@ -39,6 +40,7 @@ export function serializeAuthSession(response: AuthenticatedUserResponse): AuthS
       phone: response.phone,
       role: response.role,
       locale: response.locale,
+      walletAddress: response.walletAddress,
       createdAt: response.createdAt,
     },
     accessToken: response.tokens.accessToken,

@@ -13,11 +13,13 @@ const HR_NAV = [
   { href: '/attendance', label: 'Attendance' },
   { href: '/leave', label: 'Leave' },
   { href: '/contracts', label: 'Contracts' },
+  { href: '/profile', label: 'Profile' },
 ];
 
 const SELF_NAV = [
   { href: '/me', label: 'My workspace' },
   { href: '/contracts', label: 'My contracts' },
+  { href: '/profile', label: 'Profile' },
 ];
 
 /**

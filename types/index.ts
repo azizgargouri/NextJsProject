@@ -15,6 +15,8 @@ export interface ResponseUserDto extends DatabaseEntity {
   role: UserRole;
   locale: string;
   status: UserStatus;
+  /** Public address of the auto-created app wallet. */
+  walletAddress: string | null;
 }
 
 export interface ApiUserResponse {
@@ -151,6 +153,18 @@ export interface ContractSalaryDto {
   period: SalaryPeriod;
 }
 
+/** Off-chain PDF committed to by the canonical document hash. */
+export interface ContractDocumentAttachmentDto {
+  kind: 'pdf';
+  fileName: string;
+  mimeType: string;
+  size: number;
+  /** keccak256 of the raw PDF bytes. */
+  hash: string;
+  /** Capability URL serving the PDF. */
+  uri: string;
+}
+
 /** Canonical document stored on-chain; its keccak256 hash is signed by both parties. */
 export interface ContractDocumentDto {
   schema: 'moveup.employment-contract.v1';
@@ -170,6 +184,8 @@ export interface ContractDocumentDto {
     startDate: string;
     endDate: string | null;
   };
+  /** Optional for contracts issued before PDF uploads were introduced. */
+  attachment?: ContractDocumentAttachmentDto | null;
   issuedAt: string;
 }
 

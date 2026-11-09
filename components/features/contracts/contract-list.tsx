@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import {
   ExternalLink,
-  FileJson,
+  FileText,
   Loader2,
   ShieldCheck,
   TriangleAlert,
@@ -13,23 +13,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/field';
 import { StatusLabel } from '@/components/ui/status-chip';
 import { useTerminateContract } from '@/hooks/content/hr';
-import { useWallet } from '@/components/features/web3/wallet-provider';
 import { useAuthStore } from '@/hooks/stores/auth-store';
-import {
-  isRegisteredHrAdmin,
-  readContractOnChain,
-  signContractTermination,
-  type OnChainContractRecord,
-} from '@/lib/blockchain/registry';
-import { describeWalletError } from '@/lib/blockchain/errors';
-import { explorerTxUrl, isContractConfigured, shortAddress } from '@/lib/blockchain/config';
-import { contractTerminationTypedData } from '@/lib/contracts/eip712';
-import {
-  formatSalary,
-  hashText,
-  stableStringify,
-  terminationReasonHash,
-} from '@/lib/contracts/document';
+import { readContractOnChain, type OnChainContractRecord } from '@/lib/blockchain/registry';
+import { extractErrorMessage } from '@/lib/api/errors';
+import { explorerTxUrl, isContractConfigured } from '@/lib/blockchain/config';
+import { formatSalary, hashText } from '@/lib/contracts/document';
 import type { EmployeeContractDto } from '@/types';
 
 function formatDate(value: string | null): string {
@@ -37,16 +25,13 @@ function formatDate(value: string | null): string {
   return new Date(value).toISOString().slice(0, 10);
 }
 
-function downloadDocument(contract: EmployeeContractDto) {
-  const blob = new Blob([stableStringify(contract.document)], {
-    type: 'application/json',
-  });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = `contract-${contract.employee?.employeeRef ?? 'employee'}-v${contract.version}.json`;
-  anchor.click();
-  URL.revokeObjectURL(url);
+/** Public PDF link for new contracts; falls back to legacy http/ipfs URIs. */
+function documentHref(contract: EmployeeContractDto): string | null {
+  if (contract.document.attachment?.uri) return contract.document.attachment.uri;
+  if (contract.documentUri.startsWith('http') || contract.documentUri.startsWith('ipfs')) {
+    return contract.documentUri;
+  }
+  return null;
 }
 
 /** List + actions for both the admin directory and the employee's own view. */
@@ -57,7 +42,6 @@ export function ContractList({
   contracts: EmployeeContractDto[];
   isAdmin: boolean;
 }) {
-  const { address, isConnected, isCorrectNetwork } = useWallet();
   const { user } = useAuthStore();
   const terminateMutation = useTerminateContract();
 
@@ -68,15 +52,18 @@ export function ContractList({
   const [chainRecord, setChainRecord] = useState<OnChainContractRecord | null>(null);
   const [chainLoadingId, setChainLoadingId] = useState<string | null>(null);
 
-  const ready = isConnected && isCorrectNetwork && isContractConfigured;
-
   const showOnChainCopy = async (contract: EmployeeContractDto) => {
     setActionError(null);
+    if (!isContractConfigured) {
+      setActionError('Blockchain is not configured. Set the contract address and RPC URL.');
+      return;
+    }
+
     setChainLoadingId(contract.id);
     try {
       setChainRecord(await readContractOnChain(contract.contractId));
     } catch (error) {
-      setActionError(describeWalletError(error));
+      setActionError(extractErrorMessage(error, 'Could not read the contract from the chain.'));
     } finally {
       setChainLoadingId(null);
     }
@@ -84,50 +71,19 @@ export function ContractList({
 
   const terminate = async (contract: EmployeeContractDto) => {
     setActionError(null);
-    if (!ready || !address) {
-      setActionError('Connect MetaMask on the correct network first.');
-      return;
-    }
-
-    const allowedWallet = isAdmin ? null : contract.employee?.walletAddress;
-    if (isAdmin) {
-      const authorized = await isRegisteredHrAdmin(address, contract.organizationHash);
-      if (!authorized) {
-        setActionError(
-          'This wallet is not registered as an on-chain HR admin for the organisation. Switch to the registered HR wallet.',
-        );
-        return;
-      }
-    } else if (allowedWallet?.toLowerCase() !== address.toLowerCase()) {
-      setActionError(
-        `Switch MetaMask to ${shortAddress(allowedWallet)} — the wallet allowed to terminate this contract.`,
-      );
-      return;
-    }
 
     setBusyId(contract.id);
     try {
-      // Free EIP-712 signature; the server relays it from the system wallet.
-      const reasonHash = terminationReasonHash(reason);
-      const deadline = Math.floor(Date.now() / 1000) + 15 * 60;
-      const { signature } = await signContractTermination(
-        contractTerminationTypedData(contract.chainId, contract.contractAddress, {
-          contractId: contract.contractId,
-          reasonHash,
-          deadline,
-        }),
-      );
-
+      // The server signs with the HR/employee app wallet and relays the
+      // transaction from the system wallet.
       await terminateMutation.mutateAsync({
         contractId: contract.contractId,
-        signature,
-        deadline,
         reason,
       });
       setTerminatingId(null);
       setReason('');
     } catch (error) {
-      setActionError(describeWalletError(error));
+      setActionError(extractErrorMessage(error, 'The contract could not be terminated.'));
     } finally {
       setBusyId(null);
     }
@@ -251,14 +207,16 @@ export function ContractList({
 
             <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-ink/20 bg-paper-soft px-4 py-3">
               <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 px-3 text-[9px]"
-                  onClick={() => downloadDocument(contract)}
-                >
-                  <FileJson size={12} /> Download JSON
-                </Button>
+                {documentHref(contract) && (
+                  <a
+                    href={documentHref(contract) ?? undefined}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mono inline-flex h-8 items-center gap-1 border-2 border-ink px-3 text-[9px] uppercase transition-colors hover:bg-ink hover:text-paper"
+                  >
+                    <FileText size={12} /> View PDF <ExternalLink size={10} />
+                  </a>
+                )}
                 <Button
                   variant="ghost"
                   size="sm"
@@ -273,17 +231,6 @@ export function ContractList({
                   )}
                   On-chain copy
                 </Button>
-                {contract.documentUri.startsWith('http') ||
-                contract.documentUri.startsWith('ipfs') ? (
-                  <a
-                    href={contract.documentUri}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="mono inline-flex items-center gap-1 text-[9px] underline underline-offset-2 hover:text-hazard"
-                  >
-                    DOCUMENT URI <ExternalLink size={10} />
-                  </a>
-                ) : null}
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
@@ -342,8 +289,8 @@ export function ContractList({
                     placeholder="End of mission, mutual agreement…"
                   />
                   <p className="mono mt-1 text-[9px] normal-case tracking-normal text-ink-40">
-                    Only keccak256(reason) is stored on-chain. Signing is free — the system
-                    wallet pays the gas.
+                    Only keccak256(reason) is stored on-chain. Your app wallet signs server-side
+                    and the system wallet pays the gas.
                   </p>
                 </div>
                 <Button
@@ -354,7 +301,7 @@ export function ContractList({
                   onClick={() => void terminate(contract)}
                 >
                   {isBusy ? <Loader2 size={12} className="animate-spin" /> : null}
-                  Sign {isAdmin ? 'termination' : 'resignation'} · no gas
+                  Sign {isAdmin ? 'termination' : 'resignation'} · app wallet
                 </Button>
                 <Button
                   variant="ghost"

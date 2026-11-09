@@ -3,7 +3,7 @@
   "chainId": 31337,
   "network": "localhost",
   "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-  "deployedAt": "2026-11-05T09:16:17.052Z",
+  "deployedAt": "2026-11-08T21:05:22.754Z",
   "blockNumber": 1,
-  "transactionHash": "0xbb707283a34848e0b55c0ad4cb9286f99c521fe4bd6977737b97230e64cbe7e5"
+  "transactionHash": "0xad173882eefbf75e9422ac70e3e64a2b05fb515b8d6df348360c5aabf6e8b49a"
 }

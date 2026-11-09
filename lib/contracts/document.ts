@@ -1,5 +1,10 @@
 import { ZeroHash, keccak256, toUtf8Bytes } from 'ethers';
-import type { ContractDocumentDto, ContractSalaryDto, SalaryPeriod } from '@/types';
+import type {
+  ContractDocumentAttachmentDto,
+  ContractDocumentDto,
+  ContractSalaryDto,
+  SalaryPeriod,
+} from '@/types';
 
 /**
  * Deterministic JSON serialisation used on both the server and the client.
@@ -54,6 +59,7 @@ export interface ContractDocumentInput {
   salary: ContractSalaryDto | null;
   startDate: string;
   endDate: string | null;
+  attachment: ContractDocumentAttachmentDto | null;
   issuedAt: string;
 }
 
@@ -76,6 +82,7 @@ export function buildContractDocument(input: ContractDocumentInput): ContractDoc
       startDate: input.startDate,
       endDate: input.endDate,
     },
+    attachment: input.attachment,
     issuedAt: input.issuedAt,
   };
 }

@@ -3,7 +3,6 @@
 import { useAuthStore } from '@/hooks/stores/auth-store';
 import { useContractProposals, useContracts } from '@/hooks/content/hr';
 import { LoadingBlock } from '@/components/features/hr/loading-block';
-import { WalletPanel } from './wallet-panel';
 import { CreateContractForm } from './create-contract-form';
 import { ContractProposalList } from './contract-proposal-list';
 import { ContractList } from './contract-list';
@@ -30,8 +29,8 @@ export function ContractsView() {
           <h1 className="display text-4xl md:text-6xl">CONTRACTS.</h1>
           <p className="mono mt-3 text-[10px] text-ink-40">
             {isAdmin
-              ? 'DUAL-SIGNED AGREEMENTS · FULL DOCUMENT STORED ON-CHAIN · META_MASK'
-              : 'YOUR AGREEMENTS · SIGN WITH YOUR WALLET · IT NEVER COSTS YOU GAS'}
+              ? 'DUAL-SIGNED AGREEMENTS · FULL DOCUMENT STORED ON-CHAIN · APP WALLETS'
+              : 'YOUR AGREEMENTS · SIGNED BY YOUR APP WALLET · IT NEVER COSTS YOU GAS'}
           </p>
         </div>
         <div className="mono text-right text-[9px] text-ink-40">
@@ -39,8 +38,6 @@ export function ContractsView() {
           <p>HR SIGNATURE + EMPLOYEE SIGNATURE REQUIRED</p>
         </div>
       </header>
-
-      <WalletPanel />
 
       {isAdmin && <CreateContractForm />}
 
@@ -103,12 +100,12 @@ export function ContractsView() {
 
       <section className="mt-10 border border-ink/30 bg-paper-soft px-4 py-3">
         <p className="mono text-[9px] leading-relaxed text-ink-40">
-          BOTH THE HR WALLET AND THE EMPLOYEE WALLET SIGN THE SAME EIP-712 INTENT. THE CONTRACT IS
-          ONLY WRITTEN TO A BLOCK WHEN BOTH SIGNATURES ARE VALID. THE FULL CANONICAL JSON IS PART OF
-          THE TRANSACTION AND IS STORED IN CONTRACT STORAGE, SO IT CAN BE RECOVERED FROM THE CHAIN
-          EVEN IF MONGODB IS LOST. SIGNING COSTS NOTHING FOR THE EMPLOYEE: HR SUBMITS THE ANCHOR
-          TRANSACTION AND PAYS THE GAS. THE TRADE-OFF: NAMES, EMAILS AND SALARY ARE PUBLIC ON A
-          PUBLIC NETWORK.
+          BOTH THE HR AND THE EMPLOYEE SIGN THE SAME EIP-712 INTENT WITH THEIR APP-MANAGED WALLETS.
+          THE CONTRACT IS ONLY WRITTEN TO A BLOCK WHEN BOTH SIGNATURES ARE VALID. THE FULL CANONICAL
+          JSON IS PART OF THE TRANSACTION AND IS STORED IN CONTRACT STORAGE, SO IT CAN BE RECOVERED
+          FROM THE CHAIN EVEN IF MONGODB IS LOST. SIGNING COSTS NOTHING FOR THE EMPLOYEE: THE SERVER
+          SUBMITS THE ANCHOR TRANSACTION AND PAYS THE GAS. THE TRADE-OFF: NAMES, EMAILS AND SALARY
+          ARE PUBLIC ON A PUBLIC NETWORK.
         </p>
       </section>
     </main>
