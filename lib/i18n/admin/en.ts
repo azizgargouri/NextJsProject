@@ -642,7 +642,8 @@ export const en = {
 
   storage: {
     title: 'Storage',
-    description: 'Files kept in the S3-compatible bucket (RustFS) and the records using them.',
+    description:
+      'Files kept in the S3-compatible bucket (RustFS locally, Cloudflare R2 in production) and the records using them.',
     refresh: 'Refresh',
     pageFooter: (page: number, count: number) =>
       `Page ${page} · ${count} ${plural(count, 'object', 'objects')} on this page`,
@@ -661,7 +662,7 @@ export const en = {
       usage: 'Usage',
     },
     listFailed: 'Objects could not be listed.',
-    listFailedBody: 'Check that RustFS is running (`docker compose up -d`).',
+    listFailedBody: 'Check the S3_* settings (locally: start RustFS with `docker compose up -d`).',
     empty: 'No files here',
     emptyBody: 'Files appear once someone uploads a profile photo.',
     noOwner: 'No owner',
@@ -676,11 +677,12 @@ export const en = {
     deleteFile: 'Delete file',
     notConfigured: 'Storage is not configured',
     notConfiguredBody:
-      'Set the S3_* variables in .env and start RustFS with `docker compose up -d`.',
+      'Set S3_ENDPOINT, S3_REGION, S3_BUCKET, S3_ACCESS_KEY and S3_SECRET_KEY (locally in .env, in production in the hosting settings).',
     bucket: 'Bucket',
     reachable: 'Reachable',
     unreachable: 'Unreachable',
-    unreachableBody: 'The endpoint did not answer. Start RustFS with `docker compose up -d`.',
+    unreachableBody:
+      'The bucket did not answer. Check S3_ENDPOINT (without the bucket name), S3_BUCKET and the keys; locally, start RustFS with `docker compose up -d`.',
     stored: (count: number) => `${count} ${plural(count, 'object', 'objects')} stored`,
     files: (count: number, size: string) => `${count} ${plural(count, 'file', 'files')} · ${size}`,
   },

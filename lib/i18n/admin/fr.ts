@@ -667,7 +667,7 @@ export const fr: AdminMessages = {
   storage: {
     title: 'Stockage',
     description:
-      'Fichiers conservés dans le bucket compatible S3 (RustFS) et les données qui les utilisent.',
+      'Fichiers conservés dans le bucket compatible S3 (RustFS en local, Cloudflare R2 en production) et les données qui les utilisent.',
     refresh: 'Actualiser',
     pageFooter: (page, count) =>
       `Page ${page} · ${count} ${plural(count, 'objet', 'objets')} sur cette page`,
@@ -686,7 +686,8 @@ export const fr: AdminMessages = {
       usage: 'Utilisation',
     },
     listFailed: "Les objets n'ont pas pu être listés.",
-    listFailedBody: 'Vérifiez que RustFS est démarré (`docker compose up -d`).',
+    listFailedBody:
+      'Vérifiez les variables S3_* (en local : démarrez RustFS avec `docker compose up -d`).',
     empty: 'Aucun fichier ici',
     emptyBody: "Les fichiers apparaissent dès qu'une photo de profil est envoyée.",
     noOwner: 'Sans propriétaire',
@@ -701,12 +702,12 @@ export const fr: AdminMessages = {
     deleteFile: 'Supprimer le fichier',
     notConfigured: "Le stockage n'est pas configuré",
     notConfiguredBody:
-      'Définissez les variables S3_* dans .env et démarrez RustFS avec `docker compose up -d`.',
+      'Définissez S3_ENDPOINT, S3_REGION, S3_BUCKET, S3_ACCESS_KEY et S3_SECRET_KEY (en local dans .env, en production dans les réglages de l’hébergeur).',
     bucket: 'Bucket',
     reachable: 'Joignable',
     unreachable: 'Injoignable',
     unreachableBody:
-      "Le point d'accès n'a pas répondu. Démarrez RustFS avec `docker compose up -d`.",
+      "Le bucket n'a pas répondu. Vérifiez S3_ENDPOINT (sans le nom du bucket), S3_BUCKET et les clés ; en local, démarrez RustFS avec `docker compose up -d`.",
     stored: (count) => `${count} ${plural(count, 'objet stocké', 'objets stockés')}`,
     files: (count, size) => `${count} ${plural(count, 'fichier', 'fichiers')} · ${size}`,
   },

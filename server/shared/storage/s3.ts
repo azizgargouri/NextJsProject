@@ -42,7 +42,16 @@ export function storageEnv(): StorageEnv {
       `Object storage is not configured: ${parsed.error.issues.map((issue) => issue.message).join(', ')}`,
     );
   }
-  cachedEnv = parsed.data;
+  // A common slip: pasting the bucket URL (…/moveup) as the endpoint. The SDK adds
+  // the bucket itself, so a trailing "/<bucket>" would double it; drop it.
+  const endpoint = parsed.data.S3_ENDPOINT.replace(/\/+$/, '');
+  const bucketSuffix = `/${parsed.data.S3_BUCKET}`;
+  cachedEnv = {
+    ...parsed.data,
+    S3_ENDPOINT: endpoint.endsWith(bucketSuffix)
+      ? endpoint.slice(0, -bucketSuffix.length)
+      : endpoint,
+  };
   return cachedEnv;
 }
 
