@@ -1,502 +1,243 @@
-# MoveUp HR — Custodial Wallets, PDF Contracts & Voice Check-In
+# AI Merge Prompt — Port the RH & Employee Module into `dev`
 
-**Status:** implemented, tested, pushed to `rh-and-employee-tracking`
-**Last updated:** 9 November 2026
-**Audience:** developers picking up the HR module, reviewers, and anyone running the demo.
+You are a senior full-stack engineer working in the MoveUp Next.js repository. Your task is to merge the complete RH & employee module from `rh-and-employee-tracking` into `dev` **as a whole**, preserve the newer work already on `dev`, resolve every conflict deliberately, and leave the repo building and verifiable.
 
----
-
-## Table of contents
-
-1. [What changed and why](#1-what-changed-and-why)
-2. [System architecture](#2-system-architecture)
-3. [Custodial app wallets](#3-custodial-app-wallets)
-4. [Employment contracts with PDF documents](#4-employment-contracts-with-pdf-documents)
-5. [Profile page](#5-profile-page)
-6. [Voice check-in](#6-voice-check-in)
-7. [API reference](#7-api-reference)
-8. [Data model](#8-data-model)
-9. [Environment variables](#9-environment-variables)
-10. [Running the project locally](#10-running-the-project-locally)
-11. [Verification performed](#11-verification-performed)
-12. [Troubleshooting](#12-troubleshooting)
-13. [Security notes](#13-security-notes)
-14. [Git history](#14-git-history)
-15. [Known limitations and next steps](#15-known-limitations-and-next-steps)
+Do not rewrite the module from scratch. Port the existing branch.
 
 ---
 
-## 1. What changed and why
+## 1. Repository facts
 
-The HR module originally assumed every user had MetaMask: HR and employees
-connected a browser wallet, signed EIP-712 intents themselves, and a system
-wallet paid the gas. That is a poor fit for an HR product where staff should not
-need a crypto wallet at all.
+- Remote: `https://github.com/mAmineSouissi/NextJsProject.git`
+- Source branch: `rh-and-employee-tracking` @ `b0aeff4`
+- Target branch: `dev` @ `3f7a725` (fetch first; it may be newer)
+- Merge base: `5aafdd4` (`main`)
+- Source commits, in order:
+  1. `66e4d67` — HR/employee tracking module (employees, attendance, leave, reports)
+  2. `4aafd0e` — on-chain contracts, crews, location tracking, notebooks
+  3. `aec8ea6` — custodial wallets, PDF contracts, profile page, voice check-in
+  4. `e5149d0` — server-generated voice challenge + wrong-word RH alerts
+  5. `4fc8c78` — listen-before-send voice UI + RH audio playback
+  6. `d1807ad` — BSON `Binary` → `Buffer` fix for audio playback
+  7. `97020dd` — WebM → 16 kHz mono WAV conversion for the verifier
+  8. `b0aeff4` — documentation (this file)
+- Net diff vs base: **192 files, +29,857 / −54**
+- Expected merge conflicts: **19 files** (listed in §5)
 
-This work replaces that with:
+Authoritative file list:
 
-| Area | Before | Now |
-| --- | --- | --- |
-| Wallets | MetaMask per user | Server-generated **custodial wallets** per HR/employee account |
-| Contract creation | HR typed/connected wallet addresses | Addresses come from the database only |
-| Contract document | JSON URI / "Download JSON" | **PDF upload**, stored in MongoDB, opened via capability URL |
-| Wallet address in UI | Contracts page + explanation panel | **Profile page** (below email, above phone) |
-| Attendance | GPS "check in" card | **Voice check-in** (hold to record, listen back, send) |
-| Spoken challenge | Client-generated random words | **Server-generated** 3-word sentence + code word |
-| Faulty attempts | Not visible to HR | **RH voice alerts** with the recorded clip playable |
-| Voice verification | Local mock | Kaggle notebook (speaker model + Whisper) exposed via stable ngrok URL |
-
-No private key ever reaches the browser. The API exposes only public addresses.
+```powershell
+git diff --name-status 5aafdd4..HEAD
+git diff --stat 5aafdd4..HEAD
+```
 
 ---
 
-## 2. System architecture
+## 2. What must be ported
 
-```
-┌──────────────────────────── Browser ────────────────────────────┐
-│  /dashboard (HR)   /me (employee)   /contracts   /profile       │
-│  Next.js App Router + Zustand auth store + TanStack Query       │
-└───────────────┬─────────────────────────────────────────────────┘
-                │ HTTPS (Bearer access token)
-┌───────────────▼─────────────────────────────────────────────────┐
-│                     Next.js API routes (server)                  │
-│  /api/contracts/*        /api/voice/*        /api/auth/*         │
-│  custodial signing       proxy + persistence                    │
-└───────┬──────────────────────┬──────────────────────┬───────────┘
-        │                      │                      │
-┌───────▼────────┐   ┌─────────▼─────────┐   ┌────────▼──────────┐
-│    MongoDB     │   │  Polygon Amoy     │   │  Kaggle + ngrok   │
-│ users, staff,  │   │ EmploymentContract│   │ Flask voice API   │
-│ contracts,     │   │ Registry (EVM)    │   │ speaker + Whisper │
-│ PDFs, voice    │   │ dual signatures   │   │ /health           │
-│ attempts       │   │ + document hash   │   │ /api/voice/checkin│
-└────────────────┘   └───────────────────┘   └───────────────────┘
-```
+Port the entire module, not a subset:
 
-**Key principle:** MongoDB is a fast query mirror. For contracts, the chain is
-the source of truth — the server re-reads the receipt and the on-chain record
-before writing Mongo.
-
----
-
-## 3. Custodial app wallets
-
-### 3.1 Design
-
-- Every `User`/`Employee` gets an Ethereum wallet generated **on the server**.
-- The private key is encrypted at rest with **AES-256-GCM** using
-  `WALLET_ENCRYPTION_KEY`.
-- Stored payload format: `v1:<iv-base64>:<authTag-base64>:<ciphertext-base64>`.
-- The API returns only the public address (`walletAddress`).
-- When a contract needs a signature, the server decrypts the key in memory,
-  signs the EIP-712 intent, and discards it. Nothing is sent to the client.
-
-Implementation: `server/shared/wallet/custodial.ts`
-
-```ts
-generateCustodialWallet()            // address + encryptedPrivateKey
-encryptPrivateKey(privateKey)        // AES-256-GCM
-decryptPrivateKey(encrypted)         // server-only
-signTypedDataWithEncryptedKey(...)   // EIP-712 signing
-```
-
-### 3.2 Provisioning
-
-Wallets are created lazily and idempotently by:
-
-- `ensureWalletForEmail(email)` — HR/admin accounts
-- `ensureEmployeeWalletById(employeeId)` — employee records
-- the seed script, for demo accounts
-
-Both `User` and `Employee` documents store `walletAddress` and
-`encryptedPrivateKey`. Re-running provisioning never rotates an existing key.
-
-### 3.3 Who signs what
-
-| Step | Signer | Where the key lives |
-| --- | --- | --- |
-| HR creates a proposal | Employer (HR custodial wallet) | Server, encrypted |
-| Employee accepts | Employee custodial wallet | Server, encrypted |
-| Anchor on-chain | System wallet (`CONTRACT_ADMIN_PRIVATE_KEY`) | Server env, pays gas |
-
-The HR and employee signatures are **gasless**. Only the system wallet spends
-POL.
-
-### 3.4 HR admin authorization on-chain
-
-The registry only accepts contracts from wallets authorised as HR admins for an
-organisation. The server calls `ensureHrAdminOnChain(hrWallet, orgHash)` before
-anchoring, so the first contract for a new HR account self-authorises when
-`CONTRACT_ADMIN_PRIVATE_KEY` is the registry owner.
-
----
-
-## 4. Employment contracts with PDF documents
-
-### 4.1 Flow
-
-```
-HR                         Server                          Chain
- │  upload PDF               │                               │
- │ ─────────────────────────▶│ store bytes + keccak256       │
- │                           │                               │
- │  prepare (employee id,    │ build canonical document,     │
- │  PDF documentId, terms)   │ hash, nonce, deadline         │
- │ ─────────────────────────▶│ sign as employer              │
- │                           │                               │
- │  create proposal          │ proposal = awaiting_employee  │
- │ ─────────────────────────▶│                               │
- │                           │                               │
- │                  Employee │ signs with custodial wallet   │
- │                           │ (server-side, gasless)        │
- │                           │                               │
- │  anchor                   │ system wallet sends           │
- │ ─────────────────────────▶│ createContract(intent, doc,   │
- │                           │   employerSig, employeeSig)   │
- │                           │ ─────────────────────────────▶│ verifies BOTH
- │                           │                               │ stores doc+hash
- │                           │ re-reads receipt + on-chain   │
- │                           │ record, then writes Mongo     │
-```
-
-### 4.2 EIP-712 intent
-
-Both parties sign the same typed data (`ContractIntent`):
-
-| Field | Meaning |
+| Area | What ships |
 | --- | --- |
-| `organizationId` | keccak256 of the organisation id |
-| `employer` | HR custodial wallet address |
-| `employee` | employee custodial wallet address |
-| `employeeRefHash` | keccak256 of `EMP00x` |
-| `documentHash` | keccak256 of the canonical document bytes (includes the PDF hash) |
-| `startDate`, `endDate` | unix seconds |
-| `previousContractId` | renewal chain |
-| `version` | incremented per renewal |
-| `nonce` | replay protection |
-| `deadline` | signature expiry (7 days) |
+| HR workspace | stats, headcount, today's attendance, pending leave, contract counts, voice alerts |
+| Employees | directory, add/edit employee, auto-created wallet address |
+| Attendance | clock-in/out, statuses, history, geofence |
+| Leave | employee requests, HR approve/reject |
+| Crews & tracking | crews, members, live pings, session stop, history/map |
+| Contracts | PDF upload, prepare, propose, employee sign, anchor on-chain, view PDF, terminate |
+| Custodial wallets | server-generated wallets, AES-256-GCM at rest, server-side EIP-712 signing |
+| Profile | name, email, wallet address, phone |
+| Voice check-in | server challenge, hold-to-record, playback, send, verdict, RH alerts + audio playback |
+| Notebooks | speaker verification / voice check-in, geo-fraud analysis |
+| Blockchain | `EmploymentContractRegistry.sol`, Hardhat config, deploy/grant/dump scripts, ABI |
 
-Domain: registry name/version, `chainId`, `verifyingContract`.
-Type definitions: `types/index.ts` (`ContractIntentTypedData`).
-
-### 4.3 PDF storage
-
-- `POST /api/contracts/documents` (HR only, `multipart/form-data`, field `file`)
-- Only PDFs are accepted; the service validates the magic bytes and size.
-- Bytes are stored in MongoDB collection **`contract-document-files`**.
-- The response returns a document id + metadata; the canonical contract embeds
-  `attachment: { documentId, fileName, byteLength, sha256, url }`.
-- `keccak256(pdfBytes)` is part of the canonical document, so the on-chain
-  `documentHash` covers the PDF.
-- `GET /api/contracts/documents/[id]` serves the PDF inline. The id is an
-  unguessable UUID acting as a **capability URL**, so a plain link can open the
-  PDF without putting a Bearer token in the URL.
-
-### 4.4 UI changes
-
-- `components/features/contracts/create-contract-form.tsx`
-  - PDF file picker replaces the URI/JSON input.
-  - No wallet address fields: both addresses come from the DB.
-  - Uploads the PDF first, then calls `prepare` with `documentId`.
-- Contract cards show **View PDF** (opens the capability URL) instead of
-  "Download JSON".
-
-### 4.5 Deployment
-
-- Registry: `blockchain/contracts/EmploymentContractRegistry.sol`
-- Polygon Amoy address: `0xBEBf6067E65Cd53aF37B0033bA9099D0Ed71559f`
-- Registry owner / system wallet: `0xF95093Db7d2C58ddb5380645B2E463dCe1a61E2d`
-- `NEXT_PUBLIC_CHAIN_ID=80002`
+Key entry points: `/dashboard`, `/employees`, `/attendance`, `/leave`, `/contracts`, `/me`, `/profile`, `/api/contracts/*`, `/api/voice/*`, `/api/employees/*`, `/api/attendance/*`, `/api/leave-requests/*`, `/api/crews/*`, `/api/tracking/*`.
 
 ---
 
-## 5. Profile page
+## 3. Non-negotiable rules
 
-Route: `/profile` (`app/(dashboard)/profile/page.tsx`)
-
-- Shows **NAME**, **EMAIL**, **WALLET ADDRESS**, **PHONE**.
-- Wallet address sits between email and phone.
-- Copy-to-clipboard + PolygonScan link (`NEXT_PUBLIC_BLOCK_EXPLORER_URL`).
-- Role is not displayed.
-- The old wallet explanation panel (`wallet-panel.tsx`) was deleted.
-- Nav includes Profile for both HR and employees.
+1. **Merge the branch; do not reimplement.** Use `git merge --no-ff`. Cherry-pick only if merging is impossible (see §4.2).
+2. **Preserve `dev`'s newer work**: admin back-office, account/profile/password/session APIs, avatar/storage (S3/RustFS), pricing rules, landing content, audit persistence, auth role checks.
+3. **Keep `dev`'s `server/shared/auth/guards.ts`.** It is a superset: DB-backed `requireAuth`, `requireRole`, `requireAdmin`. Our routes already call `requireAdmin`/`requireAuth`, so they must compile against `dev`'s implementation.
+4. **Union the user model fields**, do not replace them:
+   - `dev`: `avatarKey`, `notificationsSeenAt`
+   - ours: `walletAddress`, `walletPrivateKeyEncrypted`
+5. **Never commit secrets** (`CONTRACT_ADMIN_PRIVATE_KEY`, `WALLET_ENCRYPTION_KEY`, real ngrok token, `.env`). Do not commit `.next`, `node_modules`, `dev-server.log`, or local Mongo test data.
+6. **Do not resolve conflicts wholesale** with `git checkout --ours/--theirs` except where explicitly stated (guards, audit, lockfile). Inspect each conflict.
+7. **Do not leave `typescript.ignoreBuildErrors: true`** in the merged `next.config.ts`. Remove it and fix type errors; if you must keep it temporarily, say so and run `tsc --noEmit` separately.
+8. **Do not silently delete `dev`'s client workspace.** `/dashboard` is a collision; resolve it explicitly (§6).
+9. Keep the HR navigation (`HR_NAV` / `SELF_NAV`) and the `adminOnly` guard.
+10. Match the existing code style, file layout, and naming. Keep changes scoped to the merge.
 
 ---
 
-## 6. Voice check-in
+## 4. Merge procedure
 
-### 6.1 End-to-end flow
+### 4.1 Same repository (recommended)
 
-```
-Employee /me                     Next.js API                    Kaggle (ngrok)
-     │                                │                              │
-     │ GET /api/voice/challenge       │                              │
-     │ ──────────────────────────────▶│ picks challenge + 2 words    │
-     │ ◀──────────── { challenge, sentence } ────────────────────────│
-     │                                │                              │
-     │ hold button, speak sentence    │                              │
-     │ release → local playback       │                              │
-     │ choose Record again / Send     │                              │
-     │                                │                              │
-     │ POST /api/voice/checkin        │                              │
-     │  { audio_b64(WAV), transcript, │                              │
-     │    job_id, challenge, lat,lng }│                              │
-     │ ──────────────────────────────▶│ forward JSON                 │
-     │                                │ ────────────────────────────▶│ decode WAV
-     │                                │                              │ speaker score
-     │                                │                              │ challenge/job
-     │                                │ ◀──────── verdict JSON ──────│
-     │                                │ persist attempt + audio      │
-     │ ◀──────── verdict ─────────────│                              │
-     │                                │                              │
-     │ HR /dashboard                  │                              │
-     │ GET /api/voice/checkins        │                              │
-     │ ──────────────────────────────▶│ mismatches + LISTEN REC      │
+```powershell
+git fetch origin --prune
+git checkout rh-and-employee-tracking
+git pull --ff-only
+git checkout dev
+git pull --ff-only
+git tag pre-rh-merge
+git merge --no-ff rh-and-employee-tracking -m "merge: RH & employee module (wallets, PDF contracts, voice check-in)"
 ```
 
-### 6.2 Server-generated challenge
+Expect 19 conflicts. Resolve them per §5–§6, then:
 
-`GET /api/voice/challenge` (authenticated):
+```powershell
+git add -A
+git commit
+```
 
-- Picks one challenge word from
-  `Tunis, Sfax, Bizerte, Sousse, Nabeul, Kairouan`.
-- Picks two other words from a fixed vocabulary (`mover`, `job`, `checkin`, …).
-- Shuffles the three words → `sentence`.
-- Returns `{ challenge, sentence }`.
+### 4.2 If `dev` is a separate repository
 
-The employee reads the sentence. The code word is displayed read-only; it cannot
-be edited in the UI. The sentence field remains editable (per product decision)
-so a wrong spoken/typed word can be verified and reported.
+If the repos share history, add this repo as a remote and merge:
 
-### 6.3 Recording UX (`components/features/hr/my-workspace-view.tsx`)
+```powershell
+git remote add rh-module https://github.com/mAmineSouissi/NextJsProject.git
+git fetch rh-module
+git merge --no-ff rh-module/rh-and-employee-tracking
+```
 
-1. **HOLD TO RECORD** — `pointerdown` starts `MediaRecorder`.
-2. **RELEASE TO LISTEN** — `pointerup` stops; the take is **not** sent yet.
-3. Playback card appears with:
-   - an `<audio controls>` preview of the take,
-   - **Record again** (discards),
-   - **Send for verification**.
-4. Only **Send** converts the audio and calls the verifier.
-5. While waiting: **VERIFYING…**; the verdict is shown as
-   `ACCEPT/REVIEW/REJECT · speaker score · label · threshold · reasons`.
+If histories are unrelated, use a patch series in commit order:
 
-The old GPS "TODAY'S ATTENDANCE / CHECK IN" card was removed; the voice section
-is the attendance card.
+```powershell
+git format-patch 5aafdd4..rh-and-employee-tracking -o ..\rh-patches
+git am -3 ..\rh-patches\*.patch
+```
 
-### 6.4 Audio format: WebM → 16 kHz mono WAV
+Do not reorder commits. `aec8ea6` depends on `66e4d67` + `4aafd0e`; `4fc8c78` depends on `e5149d0`; `97020dd` depends on `4fc8c78`.
 
-**Why:** `MediaRecorder` produces WebM/Opus. The Kaggle endpoint decodes with
-Python `soundfile` (`libsndfile`), which cannot read WebM — it throws
-`Format not recognised`. Without conversion, every real check-in would 500 and
-RH would receive nothing.
+### 4.3 Before merging
 
-**Fix:** `lib/audio/wav.ts`
-
-- `convertToWav16k(blob)`:
-  1. `AudioContext.decodeAudioData` decodes the take.
-  2. `OfflineAudioContext(1, frames, 16000)` renders mono 16 kHz.
-  3. `encodeWavPcm16` writes a 44-byte RIFF header + 16-bit PCM samples.
-- The browser sends `audio/wav`; the proxy sniffs the magic bytes
-  (`RIFF....WAVE`) and stores the correct MIME type.
-- The stored clip is therefore also directly playable by HR.
-
-Verified: a 3 s MediaRecorder WebM (16,480 bytes, 48 kHz) becomes a 96,044-byte
-WAV that `soundfile` reads as `16000 Hz, 3.00 s, float32`.
-
-### 6.5 Proxy and persistence
-
-`POST /api/voice/checkin`:
-
-1. `requireAuth` (Bearer token).
-2. Forwards the JSON body to `${VOICE_API_BASE_URL}/api/voice/checkin`.
-3. Persists **every attempt** in `voicecheckins`:
-   - `employeeRef`, `decision`, `speakerScore`, `voiceLabel`,
-     `challengeOk`, `jobOk`, `distanceM`, `reasons`
-   - `audio` (Buffer) + `mimeType`
-4. Persistence is best-effort: a DB failure never fails the check-in.
-5. If the verifier returns a non-JSON/HTML response, the row is still stored
-   with `decision: 'unknown'` (useful for diagnosing a broken tunnel).
-
-`GET /api/voice/checkin` is a health probe that forwards to the Kaggle `/health`.
-
-### 6.6 RH alerts and playback
-
-`GET /api/voice/checkins` (admin only) returns the last 50 attempts.
-
-The dashboard section **VOICE CHECK-IN ALERTS**
-(`components/features/hr/dashboard-view.tsx`) filters rows where:
-
-- `decision === 'reject'`, or
-- `voiceLabel === 'different_voice'`, or
-- any reason mentions `voice`, `different`, or `challenge`.
-
-Each mismatch shows employee ref, score, label, decision, timestamp and reasons,
-plus **LISTEN REC**. The button fetches
-`GET /api/voice/checkins/[id]/audio` with the Bearer token (an `<audio src>` cannot
-send headers), turns the response into an object URL, and plays it inline.
-
-The audio route is **admin-only**; employees and anonymous requests get
-`403`/`401`.
-
-### 6.7 Kaggle voice service
-
-Notebook: `notebooks/voice_checkin_speaker_verification.ipynb` (31 cells)
-
-- Speaker model: `speechbrain/spkrec-ecapa-voxceleb` (falls back to MFCC).
-- ASR: `openai/whisper-tiny` (used in the notebook analysis).
-- Flask app on port **8001**:
-  - `GET /health` → `{ ok, engine, threshold }`
-  - `POST /api/voice/checkin` → decodes WAV with `soundfile`, computes the
-    speaker score, parses the transcript, applies geofence/challenge rules and
-    returns `accept | review | reject` + reasons.
-- Exposed with the stable ngrok domain
-  `https://paloma-cranelike-kathrin.ngrok-free.dev`.
-- The notebook currently contains the placeholder `<NGROK_AUTHTOKEN>`; replace it
-  with a real token (or load it from a Kaggle secret) before running.
-
-> The tunnel only exists while the Kaggle session is running. Restarting Kaggle
-> kills it; rerunning the last cell reconnects the same stable domain.
-
-### 6.8 Trust model (important)
-
-The Flask endpoint currently trusts the `transcript` field sent by the client.
-It does **not** transcribe the uploaded audio inside `/api/voice/checkin`
-(Whisper is loaded in the notebook but only used for the analysis cells).
-
-Consequences:
-
-- A faulty **voice** is detected from the audio embedding (real).
-- A wrong **word** is only detected if the transcript text differs; a client
-  could send the correct word while saying something else.
-- The 3-word server sentence does not contain a check-in intent or a job name,
-  so `parse_command` adds `no_check_in_intent` / `job_not_recognised` and the
-  verdict is `reject` even for a correct voice.
-
-For a stricter design, run ASR on the uploaded audio inside the endpoint and
-derive the challenge check from the ASR text (see
-[Known limitations](#15-known-limitations-and-next-steps)).
+- Clean working tree; tag/backup `dev`.
+- Back up MongoDB (`mongodump`) if the database matters.
+- Confirm Node 20+, `yarn`, MongoDB, and the env values in §7.
+- Stop `next dev` before building.
 
 ---
 
-## 7. API reference
+## 5. Expected conflicts and how to resolve them
 
-| Method | Route | Auth | Purpose |
+| # | File | What each side changed | Resolution |
 | --- | --- | --- | --- |
-| `POST` | `/api/auth/sign-in` | public | Email/password → access token + refresh cookie |
-| `POST` | `/api/auth/refresh-token` | cookie | Rotate the access token |
-| `GET` | `/api/auth/me` | user | Current session |
-| `POST` | `/api/contracts/documents` | admin | Upload contract PDF (`multipart`, field `file`) |
-| `GET` | `/api/contracts/documents/[id]` | capability URL | Serve the PDF inline |
-| `POST` | `/api/contracts/prepare` | admin | Build + hash canonical contract, employer signature |
-| `POST` | `/api/contracts/proposals` | admin | Create proposal (`awaiting_employee`) |
-| `POST` | `/api/contracts/proposals/[id]/sign` | employee | Custodial employee signature |
-| `POST` | `/api/contracts/proposals/[id]/anchor` | admin | System wallet writes to chain |
-| `GET` | `/api/contracts` | user | List contracts (HR: org, employee: own) |
-| `GET` | `/api/voice/challenge` | user | Server-generated sentence + code word |
-| `GET` | `/api/voice/checkin` | user | Proxy Kaggle `/health` |
-| `POST` | `/api/voice/checkin` | user | Verify a recording, persist the attempt |
-| `GET` | `/api/voice/checkins` | admin | Last 50 attempts for RH alerts |
-| `GET` | `/api/voice/checkins/[id]/audio` | admin | Play back a stored recording |
+| 1 | `.env.example` | `dev`: Ollama vars. Ours: Web3, wallet, voice vars. | Keep both blocks. Remove the stray trailing `# NEXT_PUBLIC_BLOCK_EXPLORER_URL=` line. |
+| 2 | `app/providers.tsx` | `dev`: `ThemeProvider` + `Toaster`. Ours: `WalletProvider`. | Keep `dev`'s providers. **Drop `WalletProvider`** — no component consumes it anymore; contracts use the public RPC. |
+| 3 | `components/features/dashboard/dashboard-shell.tsx` | `dev`: hydration fix + `ADMIN → /admin` redirect. Ours: `HR_NAV`/`SELF_NAV` + `adminOnly`. | Keep `dev`'s hydration logic and our nav/adminOnly. Resolve the ADMIN redirect per §6. |
+| 4 | `hooks/stores/auth-store.ts` | `dev`: `avatarUrl`. Ours: `walletAddress`. | Keep both fields. |
+| 5 | `lib/api/index.ts` | `dev`: `adminApi`, `accountApi`. Ours: HR APIs. | Keep both; export `auth`, `admin`, `account`, `employees`, `contracts`, `attendance`, `leaveRequests`, `reports`, `crews`, `tracking`, `voice`. |
+| 6 | `next.config.ts` | `dev`: `devIndicators: false`. Ours: `typescript.ignoreBuildErrors: true`. | Keep `devIndicators`; **remove `ignoreBuildErrors`** and fix type errors. |
+| 7 | `package.json` | `dev`: AWS SDK, Radix, `lenis`, `next-themes`, `sonner`. Ours: `ethers@6.13.4`, `leaflet`, `@types/leaflet`. | Union dependencies. |
+| 8 | `server/modules/auth/auth.serializer.ts` | `dev`: `avatarUrl`. Ours: `walletAddress`. | Keep both fields in the DTO and serializer. |
+| 9 | `server/modules/users/users.repository.ts` | `dev`: admin filters, `findAnyByEmail/Phone`, `findByAvatarKey`, pagination, `returnDocument: 'after'`. Ours: wallet fields, email trim. | Keep `dev`'s methods and our `walletAddress`/`walletPrivateKeyEncrypted` in `UserRow` + `toUserRow`; keep email trim. |
+| 10 | `server/modules/users/users.serializer.ts` | `dev`: `avatarUrl`/`avatarUrlFor`. Ours: `walletAddress`. | Keep both. |
+| 11 | `server/modules/users/users.service.ts` | `dev`: managed users, status, profile flows. Ours: wallet provisioning in `createUser`. | Keep `dev`'s methods; add `ensureWalletForEmail` in `createUser` and, preferably, `createManagedUser`. |
+| 12 | `server/seed.ts` | `dev`: pricing rule + content entries. Ours: `seedHr()` + wallet provisioning. | Keep both; run `seedHr()` after the admin upsert and provision wallets for demo accounts. |
+| 13 | `server/shared/auth/guards.ts` | `dev`: DB-backed `requireAuth`, `requireRole`, `requireAdmin`. Ours: `requireAdmin` only. | **Take `dev`'s file wholesale.** Verify our routes still compile. |
+| 14 | `server/shared/database/enums.ts` | `dev`: `PRICING_STATUSES`. Ours: employee/attendance/leave/crew/tracking/contract enums. | Union both sets. |
+| 15 | `server/shared/database/models/index.ts` | `dev`: `AuditEvent`, `PricingRule`, `ContentEntry`. Ours: HR/contract/tracking models. | Union all exports. |
+| 16 | `server/shared/database/models/user.model.ts` | `dev`: `avatarKey`, `notificationsSeenAt`. Ours: wallet fields. | Union all four fields. |
+| 17 | `server/shared/logger/audit.ts` | `dev`: persists to `auditevents`. Ours: new `EventType` values, in-memory sink. | **Take `dev`'s persistent implementation** and add our enum values. |
+| 18 | `types/index.ts` | `dev`: admin/account/storage/pricing/content types. Ours: HR/contract/voice types. | Union. No duplicate export names were found, but verify. |
+| 19 | `yarn.lock` | Both sides updated it. | Take `dev`'s lockfile, then run `yarn install` and commit the regenerated lock. |
+
+Also review auto-merged files for semantic conflicts:
+`app/(auth)/sign-in/page.tsx`, `app/(auth)/sign-up/page.tsx`, `components/features/auth/sign-in-form.tsx`, `server/modules/auth/auth.controller.ts`, `server/modules/auth/auth.schema.ts`, `styles/globals.css`.
 
 ---
 
-## 8. Data model
+## 6. Critical decisions you must resolve explicitly
 
-### 8.1 `VoiceCheckin` (`voicecheckins`)
+### 6.1 ADMIN role collision
 
-| Field | Type | Notes |
-| --- | --- | --- |
-| `userId` | ObjectId | Auth user who attempted |
-| `employeeId` | ObjectId \| null | Employee profile |
-| `employeeRef` | string | e.g. `EMP001` |
-| `decision` | string | `accept`, `review`, `reject`, `unknown` |
-| `speakerScore` | number | Cosine similarity |
-| `voiceLabel` | string | `same_voice`, `review`, `different_voice`, `unknown` |
-| `challengeOk` | boolean | Challenge word matched |
-| `jobOk` | boolean | Job recognised |
-| `distanceM` | number | Geofence distance |
-| `reasons` | string[] | Machine-readable reasons |
-| `audio` | Buffer | Raw recording (WAV now, older rows WebM) |
-| `mimeType` | string | `audio/wav` or `audio/webm` |
-| `createdAt` | Date | Timestamp |
+`dev` treats `ADMIN` as the back-office admin and redirects `ADMIN` to `/admin`. The HR module also uses `ADMIN` for HR. If you keep the blanket redirect, HR can never open `/dashboard`.
 
-### 8.2 Contract document (`contract-document-files`)
+Pick one and document it:
 
-| Field | Type | Notes |
-| --- | --- | --- |
-| `_id` | UUID/string | Capability URL id |
-| `organization` | ObjectId | Owning HR org |
-| `uploadedBy` | ObjectId | HR user |
-| `fileName` | string | Original name |
-| `mimeType` | string | `application/pdf` |
-| `byteLength` | number | Size |
-| `sha256` | string | Hash of the bytes |
-| `data` | Buffer | PDF bytes |
-| `createdAt` | Date | Upload time |
+- **Option A (fastest):** keep a single `ADMIN` role. Remove the blanket `ADMIN → /admin` redirect. Keep `adminOnly` on HR pages and add an `/admin` nav link for admins.
+- **Option B (least privilege):** add an `isHrAdmin`/department flag (or a dedicated `HR` role) and guard HR routes with it. This touches the role enum, tokens, guards, and seed; only do it if the product needs separation.
+- **Recommended for the port:** Option A, then tighten later.
 
-### 8.3 Wallet fields
+### 6.2 `/dashboard` collision
 
-`User` and `Employee` both carry:
+Our branch replaces `dev`'s client workspace (`app/(dashboard)/dashboard/page.tsx`) with the HR dashboard. Do not silently lose the client workspace. Choose:
 
-| Field | Notes |
-| --- | --- |
-| `walletAddress` | Lower-case public address |
-| `encryptedPrivateKey` | `v1:iv:tag:ciphertext` (AES-256-GCM) |
+- **Option A (recommended):** role-based rendering — `ADMIN` sees the HR dashboard, `CLIENT`/`MOVER` see `dev`'s workspace.
+- **Option B:** keep `dev`'s `/dashboard` and mount the HR dashboard at `/hr`; update `HR_NAV`.
+- **Option C:** accept the replacement only if the client workspace is confirmed dead.
+
+State which option you chose in the final report.
+
+### 6.3 Legacy MetaMask layer
+
+`components/features/web3/wallet-provider.tsx`, `lib/blockchain/metamask.ts`, `lib/blockchain/ethereum.ts`, and the MetaMask sign functions in `lib/blockchain/registry.ts` are no longer used by the contract UI. Contracts read through the public RPC and sign on the server. You may remove the provider and dead sign helpers, but keep `readContractOnChain` and the public-RPC path working.
+
+### 6.4 `typescript.ignoreBuildErrors`
+
+Remove it. If the merge surfaces many unrelated `dev` type errors, fix the ones caused by the merge and report the rest; do not hide them permanently.
 
 ---
 
-## 9. Environment variables
+## 7. Environment and external services
 
-Copy `.env.example` → `.env` and fill the secrets.
+Add/verify these variables (never commit real values):
 
 | Variable | Purpose |
 | --- | --- |
-| `MONGODB_URI` | MongoDB connection string |
-| `JWT_SECRET` | Access-token signing key |
-| `ACCESS_TOKEN_TTL`, `REFRESH_TOKEN_TTL` | Token lifetimes (seconds) |
-| `NEXT_PUBLIC_CHAIN_ID` | `80002` for Polygon Amoy |
-| `NEXT_PUBLIC_RPC_URL` | Amoy RPC endpoint |
-| `NEXT_PUBLIC_CONTRACT_ADDRESS` | Deployed registry address |
-| `NEXT_PUBLIC_BLOCK_EXPLORER_URL` | PolygonScan base URL |
-| `CONTRACT_ADMIN_PRIVATE_KEY` | System wallet: pays gas, registry owner |
-| `WALLET_ENCRYPTION_KEY` | 32-byte hex key for AES-256-GCM |
-| `VOICE_API_BASE_URL` | Stable ngrok URL of the Kaggle Flask app |
+| `WALLET_ENCRYPTION_KEY` | 32-byte hex key for AES-256-GCM. **Must stay stable**; losing it makes stored wallet keys unrecoverable. |
+| `CONTRACT_ADMIN_PRIVATE_KEY` | Funded system wallet that pays gas and should own the registry. |
+| `NEXT_PUBLIC_CHAIN_ID` | `80002` for Polygon Amoy. |
+| `NEXT_PUBLIC_CHAIN_NAME` | `Polygon Amoy`. |
+| `NEXT_PUBLIC_RPC_URL` | `https://rpc-amoy.polygon.technology`. |
+| `NEXT_PUBLIC_CONTRACT_ADDRESS` | Deployed registry address. Current Amoy: `0xBEBf6067E65Cd53aF37B0033bA9099D0Ed71559f`. |
+| `NEXT_PUBLIC_BLOCK_EXPLORER_URL` | `https://amoy.polygonscan.com`. |
+| `VOICE_API_BASE_URL` | Stable ngrok URL of the Kaggle Flask app. |
+| `MONGODB_URI`, `JWT_SECRET`, TTLs, seed vars | Existing app config. |
+| `OLLAMA_*` | Keep `dev`'s local AI vars. |
 
-> **`WALLET_ENCRYPTION_KEY` is critical.** Losing it makes every stored wallet
-> key unrecoverable. Generate it with
-> `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
-> and keep it out of git.
+Current registry owner / system wallet (public): `0xF95093Db7d2C58ddb5380645B2E463dCe1a61E2d`.
+
+- If the target environment has no registry, deploy it:
+  ```powershell
+  cd blockchain
+  npm install
+  npm run test
+  npm run deploy:amoy
+  ```
+  Then set `NEXT_PUBLIC_CONTRACT_ADDRESS` and fund the system wallet with Amoy POL.
+- `ensureHrAdminOnChain` only auto-grants HR wallets if `CONTRACT_ADMIN_PRIVATE_KEY` is the registry owner. Otherwise run `npm run grant:amoy` for each HR wallet/org hash.
+- Voice service: open `notebooks/voice_checkin_speaker_verification.ipynb`, replace `<NGROK_AUTHTOKEN>`, Run All, confirm Flask is listening on `:8001`, and set `VOICE_API_BASE_URL`. The tunnel only exists while Kaggle runs.
+- `NEXT_PUBLIC_*` values are inlined at build time; restart/rebuild after changing them.
 
 ---
 
-## 10. Running the project locally
-
-### Prerequisites
-
-- Node.js 20+
-- MongoDB running on `localhost:27017`
-- A Kaggle session running the notebook (for real voice verification)
-- Polygon Amoy RPC (or local Hardhat)
-
-### Steps
+## 8. Post-merge setup
 
 ```powershell
-# 1. Install
-npm install
+# 1. Resolve package.json first, then regenerate the lockfile.
+#    You are on `dev` merging the source branch, so `--ours` = dev's lockfile.
+git checkout --ours yarn.lock
+yarn install
 
-# 2. Configure
-Copy-Item .env.example .env
-# fill JWT_SECRET, WALLET_ENCRYPTION_KEY, CONTRACT_ADMIN_PRIVATE_KEY,
-# NEXT_PUBLIC_CONTRACT_ADDRESS, VOICE_API_BASE_URL
+# 2. Real type check (next build ignores TS if the flag is left in)
+.\node_modules\.bin\tsc.cmd --noEmit
 
-# 3. Seed demo data (idempotent)
-npm run seed
+# 3. Stop next dev, clear the build cache, then build
+Remove-Item -Recurse -Force .next -ErrorAction SilentlyContinue
+yarn build
 
-# 4. Run
-npm run dev
+# 4. Seed demo data
+yarn db:seed
+
+# 5. Run
+yarn dev
 ```
 
-Demo accounts (from `server/seed.ts`):
+Demo accounts:
 
 | Role | Email | Password |
 | --- | --- | --- |
@@ -504,156 +245,81 @@ Demo accounts (from `server/seed.ts`):
 | Employee | `alice@moveup.tn` | `Demo#2026!` |
 | Employee | `bob@moveup.tn` | `Demo#2026!` |
 | Employee | `carol@moveup.tn` | `Demo#2026!` |
+| Employee | `dave@moveup.tn` | `Demo#2026!` |
+| Employee | `eve@moveup.tn` | `Demo#2026!` |
 
-### Voice service
-
-1. Open the notebook in Kaggle and Run All.
-2. Set the ngrok token (the notebook has `<NGROK_AUTHTOKEN>` placeholder):
-   - hardcode it temporarily, or
-   - use a Kaggle secret:
-     ```python
-     from kaggle_secrets import UserSecretsClient
-     NGROK_TOKEN = UserSecretsClient().get_secret("NGROK_AUTHTOKEN")
-     ```
-3. Confirm the last cell prints:
-   - `Local server on http://0.0.0.0:8001`
-   - `Stable URL: https://paloma-cranelike-kathrin.ngrok-free.dev`
-4. Verify from the host:
-   ```powershell
-   curl.exe -H "ngrok-skip-browser-warning: true" https://paloma-cranelike-kathrin.ngrok-free.dev/health
-   ```
-   Expected: `{"ok": true, ...}`.
-
-### Blockchain (optional, local)
-
-```powershell
-cd blockchain
-npm run node          # terminal A
-npm run deploy:local  # terminal B
-```
-
-Then point `NEXT_PUBLIC_CHAIN_ID=31337`, `NEXT_PUBLIC_RPC_URL=http://127.0.0.1:8545`
-and `NEXT_PUBLIC_CONTRACT_ADDRESS` at the local deployment.
+Seed mapping: `hr → ADMIN`, `manager → MOVER`, `employee → CLIENT`.
 
 ---
 
-## 11. Verification performed
+## 9. Verification checklist
 
-### 11.1 Contracts (Polygon Amoy)
+Do not declare success until all applicable checks pass.
 
-- `ensureHrAdminOnChain` verified on-chain: HR wallet went `false → true`.
-- Full E2E: HR `hr@moveup.tn` → Carol `carol@moveup.tn` (`EMP003`).
-  - Contract id: `0x6807c2c0a4647b8a031f914b0e60f64ff72f142393b2f455303e542bea31b79a`
-  - Create tx: `0xbca8918551f697045eb043309d697bc674ca33196e109e8beb88e9d38f8306cd`
-  - Status: `active`
-- Earlier local Hardhat E2E for Alice (`EMP001`):
-  - Contract: `0x7b8e66d1ec42007eedd9cbdd46f11522fe85a19a38c438925f4661c881a90e6d`
+### Build and type
+- [ ] `tsc --noEmit` passes (or every remaining error is documented as pre-existing).
+- [ ] `yarn build` passes with `next dev` stopped.
+- [ ] `yarn db:seed` completes and prints the HR/employee wallets.
 
-### 11.2 PDF upload
+### HR / employee
+- [ ] `hr@moveup.tn` signs in and reaches the HR workspace.
+- [ ] `/employees` lists the seeded staff with wallet addresses.
+- [ ] Creating an employee provisions a wallet.
+- [ ] `/profile` shows NAME, EMAIL, WALLET ADDRESS, PHONE; copy and explorer link work.
+- [ ] Attendance, leave request, and approve/reject flows work.
+- [ ] Crews/tracking endpoints respond and the map renders.
 
-- Upload → store → `prepare` with `documentId` → canonical document contains
-  `attachment` → PDF opens from the contract card via the capability URL.
+### Contracts / PDF
+- [ ] Upload a PDF via `POST /api/contracts/documents`.
+- [ ] Prepare/propose a contract; the canonical document contains the PDF attachment.
+- [ ] Employee sign and HR anchor complete; status becomes `active`.
+- [ ] `View PDF` opens the capability URL.
+- [ ] The contract is visible on Amoy PolygonScan.
 
-### 11.3 Voice check-in
+### Voice
+- [ ] `GET /api/voice/challenge` returns a server-generated sentence + code word.
+- [ ] Hold-to-record → release → playback → Record again/Send works.
+- [ ] Send converts to 16 kHz mono WAV and stores a `voicecheckins` row.
+- [ ] A faulty/different-voice attempt appears in `VOICE CHECK-IN ALERTS`.
+- [ ] `LISTEN REC` plays the stored clip.
+- [ ] Employee token on `/api/voice/checkins` → `403`; anonymous → `401`.
 
-Tested with a real MediaRecorder WebM and the browser-converted WAV:
-
-| Check | Result |
-| --- | --- |
-| Employee sign-in | OK (`alice@moveup.tn`) |
-| `POST /api/voice/checkin` (faulty WAV) | `200` → `reject · different_voice · wrong_challenge` |
-| HR feed shows the faulty row | OK |
-| `GET .../[id]/audio` (HR) | `200 · audio/wav · 96,044 bytes` |
-| Stored bytes vs sent bytes | SHA-256 identical |
-| Employee token on audio | `403` |
-| Anonymous on feed | `401` |
-| Browser playback | 3.0 s clip, `readyState 4`, no decode error |
-| RH dashboard | shows mismatch count and `LISTEN REC` |
-
-The Kaggle backend itself was simulated during the last test with a local Flask
-stand-in that decodes the payload using **`soundfile`** exactly like the
-notebook. It reported:
-
-```
-decoded 96044 bytes -> 16000 Hz, 3.00s
-```
-
-This proves the browser payload is readable by the real verifier. A live Kaggle
-run is still required to validate the model verdict itself.
+### `dev` regression
+- [ ] `CLIENT`/`MOVER` sign-in still works.
+- [ ] The client workspace is still reachable (per §6.2).
+- [ ] `/admin` back-office, account/profile, pricing, content, and storage routes still work.
+- [ ] Existing admin user list/create/status flows still work.
 
 ---
 
-## 12. Troubleshooting
+## 10. Rollback
 
-| Symptom | Cause | Fix |
-| --- | --- | --- |
-| `ERR_NGROK_6024` on the ngrok URL | Agent not connected | Start the notebook's ngrok cell; set a valid token |
-| `502 failed to dial backend: Connection timed out` | Tunnel is up but Flask is not listening on `:8001` | Restart the Kaggle kernel and Run All; check the last cell for `Address already in use` or a traceback |
-| Voice row saved with `decision: unknown` | Verifier returned non-JSON/HTML (tunnel page, 500) | Fix the backend; the row is kept for diagnosis |
-| `soundfile` / `Format not recognised` | WebM sent instead of WAV | Use the browser WAV conversion (`lib/audio/wav.ts`) |
-| Audio playback `500` | Mongoose `.lean()` returns a BSON `Binary`; `.length` is a function → invalid `Content-Length` | Fixed by `toBuffer()` in the audio route |
-| `Cannot read properties of undefined (reading '/_app')` | `next build` ran while `next dev` was using the same `.next` | Stop dev, delete `.next`, restart dev |
-| `npx.ps1 cannot be loaded` (PowerShell) | Execution policy | Use `.\node_modules\.bin\<tool>.cmd` |
-| `EADDRINUSE :::3000` | Another dev server is running | Kill the process on port 3000 or use `--port 3001` |
-| Contract anchor fails `NotHrAdmin` | HR wallet not authorised | Make `CONTRACT_ADMIN_PRIVATE_KEY` the registry owner, or run the grant script |
+- During conflicts: `git merge --abort`.
+- Before pushing: `git reset --hard pre-rh-merge`.
+- After pushing: `git revert -m 1 <merge-commit>`.
+- Database: restore the pre-merge dump, or drop the new collections. Do **not** rotate `WALLET_ENCRYPTION_KEY` if existing wallets must remain readable.
 
 ---
 
-## 13. Security notes
+## 11. Do not merge / clean up
 
-- **Private keys never leave the server.** Only public addresses are serialised.
-- **AES-256-GCM** with a 32-byte key; payloads are versioned (`v1:`).
-- **Capability URLs** for PDFs are unguessable UUIDs; they do not embed tokens.
-- **Voice audio is biometric data.** The demo stores the clip so HR can audit a
-  faulty check-in. For production, obtain consent, define retention, and
-  restrict access (the endpoint is already admin-only).
-- **The ngrok token was scrubbed** from the notebook before pushing; it is now a
-  placeholder. Never commit real tokens or private keys.
-- **The system wallet key** (`CONTRACT_ADMIN_PRIVATE_KEY`) pays gas and owns the
-  registry. Treat it as a production secret; consider a KMS/HSM in production.
-- **Custodial wallets are a deliberate demo choice.** For production, prefer a
-  wallet-as-a-service or non-custodial embedded wallet with user recovery.
+- `.env`, real private keys, real ngrok token.
+- `.next`, `node_modules`, `dev-server.log`.
+- Local Mongo test rows (including the 6 voice attempts).
+- `blockchain/deployments/localhost.json` if the target has its own deployment; otherwise regenerate it.
+- `typescript.ignoreBuildErrors` (remove).
+- The legacy MetaMask provider/sign helpers if you confirm nothing uses them.
+- `blockchain/README.md` still describes the old MetaMask flow; update it or note that this prompt/implementation is authoritative.
 
 ---
 
-## 14. Git history
+## 12. Final response format
 
-Branch: `rh-and-employee-tracking`
+When done, report:
 
-| Commit | Description |
-| --- | --- |
-| `aec8ea6` | Custodial app wallets, PDF contracts, profile page, voice check-in |
-| `e5149d0` | Server-generated voice challenge with wrong-word alerts for RH |
-| `4fc8c78` | Listen-before-send voice check-in and RH audio playback for faulty attempts |
-| `d1807ad` | Serve stored voice recordings by converting BSON Binary to Buffer |
-| `97020dd` | Send 16 kHz mono WAV to the voice verifier (soundfile cannot read WebM) |
-
----
-
-## 15. Known limitations and next steps
-
-1. **Kaggle tunnel lifetime** — the URL is stable, but the service only exists
-   while the notebook runs. A production deployment should host the verifier on
-   a always-on service (FastAPI + container) rather than Kaggle + ngrok.
-2. **Transcript trust / ASR gap** — the endpoint verifies the client-supplied
-   transcript, not the spoken audio. Recommended fix: run Whisper on the
-   uploaded WAV inside `/api/voice/checkin` and derive `challenge_ok` from the
-   ASR text. This is the only way "wrong word" is truly verified.
-3. **Intent/job parsing vs. 3-word sentence** — `parse_command` expects a
-   check-in intent and a job name/area. The server sentence contains neither, so
-   a correct voice still rejects with `no_check_in_intent` and
-   `job_not_recognised`. Align the challenge sentence with the parser (e.g.
-   include `check in <area> code <word>`) or relax those checks for this flow.
-4. **Audio retention** — clips are stored indefinitely in MongoDB. Add a TTL or
-   an explicit retention policy before production.
-5. **Old WebM rows** — records created before the WAV change remain WebM. They
-   play in Chrome but may not decode in Safari; new rows are WAV.
-6. **Storage size** — WAV is ~6× larger than WebM (96 KB vs 16 KB for 3 s).
-   Fine for short clips; consider Opus-in-Ogg if the verifier is updated.
-7. **MetaMask documentation** — `blockchain/README.md` still describes the old
-   browser-wallet flow. The current implementation is custodial (this document
-   is authoritative).
-
----
-
-*End of document.*
+1. The merge commit hash and the branch it landed on.
+2. Every conflict you resolved and the decision you made (especially §6.1 and §6.2).
+3. Any files you intentionally did not port.
+4. Commands run and their results (`tsc`, `build`, `seed`, smoke tests).
+5. Remaining type errors or known limitations.
+6. Anything that needs the human's decision before pushing.
