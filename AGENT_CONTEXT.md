@@ -27,7 +27,7 @@ yarn lint         # has 3 pre-existing <img> warnings on landing files — basel
 yarn db:seed      # idempotent seed (users, pricing rule, content entries)
 yarn db:reset     # drop moveup DB + seed again
 npx tsc --noEmit  # typecheck
-docker compose up -d   # RustFS: S3 API :9000, console :9001; `rustfs-init` (rustfs/rc) creates the bucket
+docker compose up -d   # RustFS: S3 API :9000 (403 in a browser is normal), console http://localhost:9001/rustfs/console/ (moveupadmin / moveupsecret); `rustfs-init` (rustfs/rc) creates the bucket
 ```
 
 Prettier: use `npx prettier --write <file>` per file — brace-expansion globs fail in the agent shell.
@@ -36,6 +36,7 @@ Prettier: use `npx prettier --write <file>` per file — brace-expansion globs f
 
 - Dev DB: local `mongod` (brew service `mongodb-community`), database `moveup`.
 - Object storage: `S3_ENDPOINT`, `S3_REGION`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET` in `.env` (defaults match `docker-compose.yml`). Storage env is validated lazily (`server/shared/storage/s3.ts`): the app boots without it and storage calls answer 503.
+- Local AI: `OLLAMA_URL` (default `http://localhost:11434`), `OLLAMA_MODEL` (default `qwen2.5vl:7b`, vision-capable), optional `OLLAMA_TIMEOUT_MS` (120000). Start with `ollama serve`, install with `ollama pull qwen2.5vl:7b`. Validated lazily (`server/shared/ai/ollama.ts`): without Ollama the app boots and the assistant answers 503 with an honest "offline" message.
 - Never run `yarn add` while `yarn dev` is live — the dev server loses moved node_modules paths (ENOENT tslib); restart it with a fresh `.next`.
 - Dev server normally runs on port 3000 in the background during a session.
 - Env vars in `.env`; note that unquoted dotenv values are truncated at `#` — keep secrets quoted (`Admin#2026!`).
@@ -120,6 +121,7 @@ Mongoose v9 specifics: no `FilterQuery` export (use `Record<string, unknown>`), 
   - Estimator reads the live ACTIVE pricing rule (`PricingService.findActivePublic()`) and uses the shared pure `lib/pricing/estimate.ts` (reuse it for real quotes). No live rule → honest "pricing being updated" state.
   - Honesty rules: no invented metrics, registrations, dates or cities. Launch cities are Tunis, Sfax, Sousse only. Photos are openly licensed Wikimedia Commons files in `public/images/landing/` with credits in `components/features/landing/photos.ts` (rendered in the footer) — keep attribution when adding photos.
   - Type floor: mono labels ≥11px; small red text uses `text-hazard-ink` on paper and `text-hazard-glow` on ink; muted text uses `text-ink-60` (not `ink-40`).
+  - **AI inventory assistant** (inside the Estimator, `components/features/landing/inventory-assistant.tsx`): plain words + up to 3 photos (downscaled to 1280px in the browser) → `POST /api/estimate/inventory` (public, multipart, rate-limited 6 per 10 min per IP, bytes sniffed via `server/shared/files/sniff-image.ts`) → `server/modules/inventory` → Ollama with a JSON-schema `format`. The model only names and counts items against the reference catalogue `lib/inventory/catalogue.ts`; every m³ comes from that table (unknown items are `custom`, volume clamped and flagged EST.). Items inferred from home size are flagged ASSUMED; the server clears that flag for anything named in the description. The customer edits quantities, then applies the total to the volume slider (step 0.1, max grows past 60 when needed).
   - Mover CTAs link to `/sign-up?role=MOVER` (preselects the role).
 - Back office shell (light/dark/system theme, one blue accent, 4px rhythm) + overview module (real counters) + Users CRUD + real Audit log portal.
 - Pricing rules module: complete CRUD, activation exclusivity (one ACTIVE rule; activation auto-retires others), versioning, soft delete, effective-window validation, seed rule "MoveUp Standard 2026".

@@ -1,5 +1,6 @@
 # Local object storage for MoveUp (S3-compatible RustFS).
-#   docker compose up -d        -> S3 API on :9000, web console on :9001
+#   docker compose up -d        -> S3 API on :9000 (signed requests only),
+#                                  web console at http://localhost:9001/rustfs/console/
 #   rustfs-init (rustfs/rc) creates the bucket idempotently, then exits.
 services:
   rustfs:
