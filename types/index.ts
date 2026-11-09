@@ -272,3 +272,4 @@ export interface StorageObjectsQuery {
   cursor?: string;
   limit?: number;
 }
+export * from './mover';

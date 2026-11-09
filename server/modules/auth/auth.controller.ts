@@ -5,7 +5,7 @@ import { errorResponse } from '../../shared/auth/guards';
 import { logEvent, EventType } from '../../shared/logger/audit';
 import { ValidationError } from '../../shared/database/errors';
 import { authService } from './auth.service';
-import { serializeAuthSession, type AuthSessionResponse } from './auth.serializer';
+import type { AuthSessionResponse } from './auth.serializer';
 import { RefreshTokenSchema, SignInSchema, SignUpSchema } from './auth.schema';
 
 export const REFRESH_COOKIE = 'moveup_refresh';
@@ -131,7 +131,7 @@ class AuthController {
 
     response.cookies.set(REFRESH_COOKIE, session.refreshToken, {
       httpOnly: true,
-      secure: env().NODE_ENV === 'production',
+      secure: env().COOKIE_SECURE ?? env().NODE_ENV === 'production',
       sameSite: 'lax',
       path: '/',
       maxAge: env().REFRESH_TOKEN_TTL,

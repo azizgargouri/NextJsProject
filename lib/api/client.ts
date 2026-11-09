@@ -1,6 +1,13 @@
 import axios, { type AxiosError, type AxiosInstance } from 'axios';
 
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? 'http://localhost:3000';
+/**
+ * In the browser, requests go to the address the page was opened from, so the
+ * app works at localhost, a Wi-Fi address (a phone on the offline app) or a domain.
+ */
+const BASE_URL =
+  typeof window === 'undefined'
+    ? (process.env.NEXT_PUBLIC_BASE_URL ?? 'http://localhost:3000')
+    : '';
 
 export const REFRESH_COOKIE = 'moveup_refresh';
 

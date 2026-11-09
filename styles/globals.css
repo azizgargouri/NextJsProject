@@ -299,6 +299,13 @@ body:has(.admin-surface).grain::before {
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
+/* Printed pages (box labels) stay clean: the grain would print over the QR codes. */
+@media print {
+  .grain::before {
+    display: none;
+  }
+}
+
 /* Hairline rules used across the system */
 .hairline-x {
   background-image: repeating-linear-gradient(
@@ -314,6 +321,11 @@ body:has(.admin-surface).grain::before {
 .dotgrid {
   background-image: radial-gradient(circle, #10101022 1px, transparent 1px);
   background-size: 22px 22px;
+}
+
+/* Diagonal print hatching: marks an uncertain or secondary span in a bar */
+.hatch {
+  background-image: repeating-linear-gradient(-45deg, var(--color-ink) 0 1px, transparent 1px 6px);
 }
 
 /* blueprint crosshairs at rule intersections */

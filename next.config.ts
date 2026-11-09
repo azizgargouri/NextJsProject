@@ -4,12 +4,8 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   outputFileTracingRoot: __dirname,
   devIndicators: false,
-  images: {
-    remotePatterns: [
-      { protocol: 'https', hostname: 'picsum.photos' },
-      { protocol: 'https', hostname: 'fastly.picsum.photos' },
-    ],
-  },
+  // The offline build keeps its own folder, so it and `next dev` never overwrite each other.
+  distDir: process.env.NEXT_DIST_DIR || '.next',
 };
 
 export default nextConfig;

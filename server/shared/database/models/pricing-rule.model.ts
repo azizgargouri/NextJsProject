@@ -16,6 +16,8 @@ export interface PricingRuleDoc {
   /** Express service surcharge in percent of the computed total (0–100). */
   expressSurcharge: number;
   minQuote: number;
+  /** Share of a completed move kept by the society, as a fraction (0–1). */
+  commissionRate: number;
   effectiveFrom: Date;
   effectiveTo: Date | null;
   /** Bumped on every mutation for a visible change history trail. */
@@ -37,6 +39,7 @@ const PricingRuleSchema = new Schema<PricingRuleDoc>(
     perM3: { type: Number, required: true, min: 0 },
     expressSurcharge: { type: Number, required: true, min: 0, max: 100 },
     minQuote: { type: Number, required: true, min: 0 },
+    commissionRate: { type: Number, default: 0.15, min: 0, max: 1 },
     effectiveFrom: { type: Date, required: true },
     effectiveTo: { type: Date, default: null },
     version: { type: Number, default: 1 },

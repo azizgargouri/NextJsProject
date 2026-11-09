@@ -75,7 +75,16 @@ export function SignUpForm({ initialRole = 'CLIENT' }: { initialRole?: 'CLIENT' 
   );
 
   const onSubmit = (values: SignUpFormValues) => {
-    mutate({ ...values, locale: 'en' }, { onSuccess: () => router.push('/dashboard') });
+    mutate(
+      { ...values, locale: 'en' },
+      {
+        // A real page load: the mover service worker can only control a page created under /mover.
+        onSuccess: () => {
+          if (values.role === 'MOVER') window.location.assign('/mover');
+          else router.push('/dashboard');
+        },
+      },
+    );
   };
 
   return (

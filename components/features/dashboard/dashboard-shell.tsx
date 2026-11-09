@@ -38,9 +38,13 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       router.replace('/admin');
       return;
     }
+    if (user?.role === 'MOVER') {
+      router.replace('/mover');
+      return;
+    }
   }, [hydrated, isAuthenticated, router, user?.role]);
 
-  if (!hydrated || !isAuthenticated || user?.role === 'ADMIN') {
+  if (!hydrated || !isAuthenticated || user?.role !== 'CLIENT') {
     return (
       <div className="mono flex min-h-dvh items-center justify-center text-[11px] text-ink-80">
         LOADING WORKSPACE…
