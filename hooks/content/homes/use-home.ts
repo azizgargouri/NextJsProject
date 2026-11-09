@@ -7,6 +7,7 @@ export function useHome(id: string) {
   return useQuery({
     queryKey: homesKeys.detail(userId, id),
     queryFn: () => homesApi.get(id),
+    networkMode: 'offlineFirst',
     enabled: Boolean(id),
   });
 }

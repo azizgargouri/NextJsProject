@@ -9,6 +9,7 @@ export function useLayoutPlan(homeId: string, houseVersion: string) {
   return useQuery({
     queryKey: [...homesKeys.layout(userId, homeId), houseVersion],
     queryFn: () => homesApi.layout(homeId),
+    networkMode: 'offlineFirst',
     placeholderData: (previous) => previous,
   });
 }

@@ -342,6 +342,17 @@ get the warning) → **Delete plan**.
 
 ---
 
+### Installable app (PWA) + offline
+
+- On `unified-all-features` the app uses the **team's PWA** (`app/manifest.ts`, `public/sw.js`,
+  `components/pwa-register.tsx`). Its worker caches pages and static files but **never `/api/*`**
+  (private data), so the homes pages open offline without their house data.
+- The homes queries keep `networkMode: 'offlineFirst'`, so per-user `/api/homes*` caching can be
+  added to the team's `sw.js` later without touching the hooks. (`smart-room` keeps the original
+  homes-data cache in its own `sw.js`.)
+
+---
+
 ### Step 5 — Hardening & hand-off
 
 - Same input → saved plan returned (no new AI call); max 10 generations per house per day.
