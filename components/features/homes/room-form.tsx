@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { useFieldArray, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2, Plus, X } from 'lucide-react';
@@ -22,6 +23,7 @@ import {
   WALL_LABELS,
   type RoomFormValues,
 } from './home-schemas';
+import { openingSpot } from './layout-geometry';
 import { RoomOutline } from './room-outline';
 
 const EMPTY_ROOM: RoomFormValues = {
@@ -57,6 +59,8 @@ export function RoomForm({
     register,
     control,
     handleSubmit,
+    getValues,
+    setValue,
     formState: { errors },
   } = useForm<RoomFormValues>({ resolver: zodResolver(RoomFormSchema), defaultValues });
   const { fields, append, remove } = useFieldArray({ control, name: 'openings' });
@@ -64,6 +68,46 @@ export function RoomForm({
 
   const addOpening = (kind: OpeningKind) =>
     append({ kind, wall: 'N', offsetCm: 0, widthCm: kind === 'DOOR' ? 80 : 120 });
+
+  // Drag a door/window on the preview: it follows the nearest wall, the fields follow it.
+  const [draggedOpening, setDraggedOpening] = useState<number | null>(null);
+  const stopDrag = useRef<(() => void) | null>(null);
+  useEffect(() => () => stopDrag.current?.(), []);
+
+  const startOpeningDrag = (index: number, event: ReactPointerEvent<SVGLineElement>) => {
+    const svg = event.currentTarget.ownerSVGElement;
+    if (!svg) return;
+    event.preventDefault();
+    stopDrag.current?.();
+    setDraggedOpening(index);
+
+    const move = (pointer: PointerEvent) => {
+      const matrix = svg.getScreenCTM();
+      if (!matrix) return;
+      const point = new DOMPoint(pointer.clientX, pointer.clientY).matrixTransform(
+        matrix.inverse(),
+      );
+      const { widthCm, lengthCm, openings } = getValues();
+      const spot = openingSpot({ widthCm, lengthCm }, point, openings[index]?.widthCm ?? 0);
+      if (!spot) return;
+      setValue(`openings.${index}.wall`, spot.wall, { shouldDirty: true });
+      setValue(`openings.${index}.offsetCm`, spot.offsetCm, {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+    };
+    const stop = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', stop);
+      window.removeEventListener('pointercancel', stop);
+      stopDrag.current = null;
+      setDraggedOpening(null);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', stop);
+    window.addEventListener('pointercancel', stop);
+    stopDrag.current = stop;
+  };
 
   return (
     <form
@@ -144,6 +188,7 @@ export function RoomForm({
             </div>
           </div>
           <p className="text-xs text-ink-80">
+            Drag a door or window along the walls in the preview to place it, or type it below.
             Offset = distance from the wall&apos;s start corner: the west corner for north/south
             walls, the north corner for east/west walls.
           </p>
@@ -249,6 +294,8 @@ export function RoomForm({
                 Boolean(opening?.kind && opening.wall),
             )}
             label="Preview of the room outline"
+            onOpeningPointerDown={startOpeningDrag}
+            activeOpening={draggedOpening}
           />
         </div>
         <ul className="mono space-y-1 text-[10px] text-ink-80">
@@ -258,6 +305,7 @@ export function RoomForm({
           <li className="flex items-center gap-2">
             <span className="inline-block h-1.5 w-5 border-y border-ink" aria-hidden /> Window
           </li>
+          <li>Drag them along the walls to move them.</li>
         </ul>
       </aside>
 
