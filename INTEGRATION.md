@@ -76,6 +76,12 @@ Description: `SMART_ROOM_LAYOUT_PLAN.md` on the branch. Most of the branch had a
 
 Shared setting to know about: the smart room planner and the landing inventory assistant both read `OLLAMA_MODEL` (a text model). The planner falls back to Groq (`GROQ_API_KEY`) when Ollama is missing or slow; the inventory assistant says it is offline instead.
 
+### Mover routing restored — 2026-11-09
+
+The `main` sync brought the HR module's routing, which sent every `MOVER` to `/me` (the HR employee page) after sign-in, so movers never reached the mover workspace. Decision: **a `MOVER` lands on `/mover`** (sign-in, sign-up, the auth "Continue" link, `/dashboard`, and the redirect away from admin-only pages). The HR pages (`/me`, contracts, profile) stay reachable for movers who are also employees. Verified: sign-in lands on `/mover`, and the dashboard, application, offers, jobs, availability, earnings, notifications and profile pages all render the mover-side interface with no page errors.
+
+When another branch touches post-sign-in routing, keep this rule: `ADMIN` → `/admin`, `MOVER` → `/mover`, `CLIENT` → `/request` (unless a `redirect`/`next` parameter is given).
+
 ## Waiting to be integrated
 
 Measured against `dev` on 2026-11-09, after the `main` sync:
