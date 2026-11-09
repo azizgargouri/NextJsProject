@@ -10,7 +10,7 @@ import {
 } from './users.schema';
 import { serializeUser, UserResponse } from './users.serializer';
 import type { UserStatus } from '../../shared/database/enums';
-import { ensureWalletForEmail } from '../../shared/wallet/provisioning';
+import { walletForNewAccount } from '../../shared/wallet/provisioning';
 
 /** Users business logic — orchestration only; no HTTP, no SQL. */
 export class UserService extends AbstractCrudService<UserRow> {
@@ -38,13 +38,13 @@ export class UserService extends AbstractCrudService<UserRow> {
 
     const { password, ...account } = input;
     const passwordHash = await hashPassword(password);
-    const wallet = await ensureWalletForEmail(email);
+    const wallet = await walletForNewAccount(email);
     const user = await this.repository.create({
       ...account,
       email,
       passwordHash,
-      walletAddress: wallet.address,
-      walletPrivateKeyEncrypted: wallet.encryptedPrivateKey,
+      walletAddress: wallet?.address ?? null,
+      walletPrivateKeyEncrypted: wallet?.encryptedPrivateKey ?? null,
     });
     return serializeUser(user);
   }
@@ -58,14 +58,14 @@ export class UserService extends AbstractCrudService<UserRow> {
 
     const { password, ...account } = input;
     const passwordHash = await hashPassword(password);
-    const wallet = await ensureWalletForEmail(email);
+    const wallet = await walletForNewAccount(email);
     return serializeUser(
       await this.repository.create({
         ...account,
         email,
         passwordHash,
-        walletAddress: wallet.address,
-        walletPrivateKeyEncrypted: wallet.encryptedPrivateKey,
+        walletAddress: wallet?.address ?? null,
+        walletPrivateKeyEncrypted: wallet?.encryptedPrivateKey ?? null,
       }),
     );
   }
