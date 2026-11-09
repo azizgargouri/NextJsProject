@@ -65,15 +65,20 @@ export function DashboardLayout({
       router.replace('/sign-in');
       return;
     }
+    // Movers work in their own workspace (/mover); the HR pages (/me, contracts) stay reachable.
+    if (user?.role === 'MOVER' && pathname === '/dashboard') {
+      router.replace('/mover');
+      return;
+    }
     if (adminOnly && user?.role !== 'ADMIN') {
       if (user?.role === 'MOVER') {
-        router.replace('/me');
+        router.replace('/mover');
       } else {
         router.replace('/request');
       }
       return;
     }
-  }, [hydrated, isAuthenticated, adminOnly, user?.role, router]);
+  }, [hydrated, isAuthenticated, adminOnly, user?.role, router, pathname]);
 
   if (!hydrated || !isAuthenticated || (adminOnly && user?.role !== 'ADMIN')) {
     return (
