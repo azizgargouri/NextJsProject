@@ -16,7 +16,9 @@ import {
   moverBlockers,
   sweep,
 } from './mover.dispatch';
+import { durationRepository } from './mover.duration-repository';
 import { notify } from './mover.notifications';
+import { profitEstimator } from './mover.profitability';
 import { moverRepository as repo } from './mover.repository';
 import { matchesMove } from './mover.rules';
 import { serializeOffer } from './mover.serializer';
@@ -35,16 +37,37 @@ export async function moverEligibility(moverId: string): Promise<MoverEligibilit
   return { eligible: blockers.length === 0, blockers };
 }
 
-async function joinOffers(offers: JobOfferDoc[]): Promise<OfferDto[]> {
+async function joinOffers(moverId: string, offers: JobOfferDoc[]): Promise<OfferDto[]> {
+  if (offers.length === 0) return [];
   const moves = await repo.findMoves(offers.map((offer) => offer.moveId));
   const movesById = new Map(moves.map((move) => [String(move._id), move]));
   const quotes = await repo.quotesByOffers(offers.map((offer) => String(offer._id)));
   const quotesByOffer = new Map<string, QuoteDoc>(quotes.map((quote) => [quote.offerId, quote]));
+  const estimate = await profitEstimator(moverId);
 
   return offers.flatMap((offer) => {
     const move = movesById.get(offer.moveId);
-    return move ? [serializeOffer(offer, move, quotesByOffer.get(String(offer._id)) ?? null)] : [];
+    if (!move) return [];
+    const quote = quotesByOffer.get(String(offer._id)) ?? null;
+    const { profitability } = estimate(move, quote?.amount ?? move.estimatedPrice);
+    return [serializeOffer(offer, move, quote, profitability)];
   });
+}
+
+/** Keeps the estimate the mover decided on. It must never stop them taking the job. */
+async function recordEstimate(
+  moverId: string,
+  offerId: string,
+  move: MoveRequestDoc,
+  price: number | null,
+  now: Date,
+): Promise<void> {
+  try {
+    const { estimate } = (await profitEstimator(moverId, now))(move, price);
+    await durationRepository.recordOfferEstimate(offerId, estimate, now);
+  } catch (error) {
+    console.error('Could not record the offer estimate:', error);
+  }
 }
 
 /** M-04: open offers that still match the mover's zones and availability. */
@@ -54,7 +77,9 @@ export async function listOffers(moverId: string): Promise<OffersListDto> {
 
   const eligibility = await moverEligibility(moverId);
   const quotedOffers = await repo.listOffersByStatus(moverId, 'QUOTED');
-  const quoted = (await joinOffers(quotedOffers)).filter((offer) => offer.quote?.status === 'SENT');
+  const quoted = (await joinOffers(moverId, quotedOffers)).filter(
+    (offer) => offer.quote?.status === 'SENT',
+  );
   if (!eligibility.eligible) return { eligibility, offers: [], quoted };
 
   const profile = await repo.findProfile(moverId);
@@ -73,7 +98,10 @@ export async function listOffers(moverId: string): Promise<OffersListDto> {
       )
       .map((move) => String(move._id)),
   );
-  const offers = await joinOffers(pending.filter((offer) => matching.has(offer.moveId)));
+  const offers = await joinOffers(
+    moverId,
+    pending.filter((offer) => matching.has(offer.moveId)),
+  );
   return { eligibility, offers, quoted };
 }
 
@@ -81,7 +109,7 @@ export async function getOffer(moverId: string, offerId: string): Promise<OfferD
   await sweep();
   const offer = await repo.findOffer(moverId, offerId);
   if (!offer) throw new NotFoundError('Offer');
-  const [joined] = await joinOffers([offer]);
+  const [joined] = await joinOffers(moverId, [offer]);
   if (!joined) throw new NotFoundError('Offer');
   return joined;
 }
@@ -193,6 +221,7 @@ export async function respondToOffer(
       await repo.setOfferStatus(offerId, 'WITHDRAWN');
       throw new OfferClosedError('Another mover has already taken this job');
     }
+    await recordEstimate(moverId, offerId, move, move.estimatedPrice, now);
     await finishAssignment(assigned, moverId, null, moverId, 'Mover accepted the fixed price');
     return { status: 'ACCEPTED', jobId: offer.moveId };
   }
@@ -207,6 +236,7 @@ export async function respondToOffer(
     message: input.message ?? '',
     validUntil: new Date(now.getTime() + QUOTE_VALID_HOURS * 60 * 60 * 1000),
   });
+  await recordEstimate(moverId, offerId, move, input.amount, now);
   await notify(move.clientId, {
     type: 'JOB_STATUS',
     title: `New quote for ${move.reference}`,

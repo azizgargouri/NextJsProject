@@ -1,7 +1,7 @@
 import { NotFoundError } from '../../shared/database/errors';
 import type { AccessTokenPayload } from '../../shared/auth/jwt';
 import { employeesService } from '../employees/employees.service';
-import { LeaveRequestRepository, type LeaveRequestRow } from './leave-requests.repository';
+import { LeaveRequestRepository } from './leave-requests.repository';
 import type { LeaveCreateInput, LeaveQuery } from './leave-requests.schema';
 import { serializeLeaveRequest, type LeaveRequestResponse } from './leave-requests.serializer';
 

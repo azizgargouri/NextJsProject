@@ -20,6 +20,8 @@ import { GET as getJob } from '@/app/api/mover/jobs/[id]/route';
 import { POST as setStatus } from '@/app/api/mover/jobs/[id]/status/route';
 import { GET as listPhotos, POST as addPhoto } from '@/app/api/mover/jobs/[id]/photos/route';
 import { POST as loadCheck } from '@/app/api/mover/jobs/[id]/load-check/route';
+import { POST as scan } from '@/app/api/mover/jobs/[id]/boxes/route';
+import { DELETE as unscan } from '@/app/api/mover/jobs/[id]/boxes/[boxId]/route';
 import { GET as messages, POST as sendMessage } from '@/app/api/moves/[id]/messages/route';
 import { POST as confirm } from '@/app/api/moves/[id]/confirm-delivery/route';
 import { GET as earnings } from '@/app/api/mover/earnings/route';
@@ -34,6 +36,7 @@ import {
   StatusEventModel,
 } from '@/server/shared/database/models';
 import { sweep } from '@/server/modules/mover';
+import { boxLabelCode } from '@/lib/box-label';
 
 before(resetDatabase);
 after(closeDatabase);
@@ -67,6 +70,24 @@ const photo = (
 const checkLoad = (mover: Account, id: string, body: unknown) =>
   call(loadCheck, { token: mover.token, params: { id }, body });
 
+const scanBox = (mover: Account, id: string, code: unknown) =>
+  call(scan, { token: mover.token, params: { id }, body: { code } });
+
+const removeBox = (mover: Account, id: string, boxId: string) =>
+  call(unscan, { method: 'DELETE', token: mover.token, params: { id, boxId } });
+
+/** The printed label for box `boxNumber` of this move. */
+async function label(moveId: string, boxNumber: number): Promise<string> {
+  const move = await MoveRequestModel.findById(moveId).lean();
+  return boxLabelCode(move?.reference ?? '', boxNumber);
+}
+
+async function scanBoxes(mover: Account, id: string, count: number) {
+  for (let box = 1; box <= count; box += 1) {
+    assert.equal((await scanBox(mover, id, await label(id, box))).status, 201);
+  }
+}
+
 async function loadPhotos(mover: Account, id: string, count = 4) {
   for (let index = 0; index < count; index += 1) {
     assert.equal((await photo(mover, id, 'LOAD')).status, 201);
@@ -78,7 +99,7 @@ async function advance(mover: Account, id: string, actions: string[]) {
   for (const action of actions) {
     if (action === 'IN_TRANSIT') {
       await loadPhotos(mover, id);
-      const body = { boxes: 0, furniture: 1, confirmed: true };
+      const body = { furniture: 1, confirmed: true };
       assert.equal((await checkLoad(mover, id, body)).status, 200);
     }
     if (action === 'DELIVERED') assert.equal((await photo(mover, id, 'DELIVERY')).status, 201);
@@ -112,7 +133,7 @@ describe('item 7: active job page (M-06)', () => {
     for (const [action, status, stage, next] of expected) {
       if (action === 'IN_TRANSIT') {
         await loadPhotos(mover, moveId);
-        await checkLoad(mover, moveId, { boxes: 0, furniture: 1, confirmed: true });
+        await checkLoad(mover, moveId, { furniture: 1, confirmed: true });
       }
       if (action === 'DELIVERED') await photo(mover, moveId, 'DELIVERY');
       const { status: code, data } = await act(mover, moveId, action);
@@ -200,13 +221,116 @@ describe('item 7: active job page (M-06)', () => {
   }
 });
 
+describe('box scanning at pickup', () => {
+  const loading = async () => {
+    const job = await assignedJob();
+    await advance(job.mover, job.moveId, ['EN_ROUTE', 'LOADING']);
+    return job;
+  };
+  const jobOf = async (mover: Account, id: string) =>
+    (await call(getJob, { token: mover.token, params: { id } })).data.job;
+
+  it('records printed labels and any other QR code, newest first', async () => {
+    const { mover, moveId } = await loading();
+    assert.equal((await jobOf(mover, moveId)).proof.canScanBoxes, true);
+
+    const printed = await scanBox(mover, moveId, await label(moveId, 7));
+    assert.equal(printed.status, 201);
+    const sticker = await scanBox(mover, moveId, '  STICKER-ROLL-000123  ');
+    assert.equal(sticker.status, 201);
+
+    const { boxes } = sticker.data.job.proof;
+    assert.deepEqual(
+      boxes.map((box: { label: string; code: string }) => [box.label, box.code]),
+      [
+        ['STICKER-ROLL-000123', 'STICKER-ROLL-000123'],
+        ['Box 7', await label(moveId, 7)],
+      ],
+    );
+  });
+
+  it('counts a box once, even when two scans of it arrive together', async () => {
+    const { mover, moveId } = await loading();
+    const code = await label(moveId, 1);
+    const results = await Promise.all([scanBox(mover, moveId, code), scanBox(mover, moveId, code)]);
+    assert.deepEqual(results.map((result) => result.status).sort(), [201, 409]);
+
+    const again = await scanBox(mover, moveId, code);
+    assert.equal(again.status, 409);
+    assert.equal(again.data.code, 'BOX_ALREADY_SCANNED');
+    assert.match(again.data.message, /Box 1 is already scanned/);
+    assert.equal((await jobOf(mover, moveId)).proof.boxes.length, 1);
+  });
+
+  it("refuses another move's label and empty or unreadable codes", async () => {
+    const { mover, moveId } = await loading();
+    const foreign = await scanBox(mover, moveId, boxLabelCode('MV-2026-00000', 1));
+    assert.equal(foreign.status, 400);
+    assert.match(foreign.data.message, /belongs to move MV-2026-00000/);
+    for (const code of ['', '   ', 'x'.repeat(201), 42, null]) {
+      assert.equal((await scanBox(mover, moveId, code)).status, 422, String(code));
+    }
+    assert.equal((await scanBox(mover, moveId, 'BOX\u0007')).status, 400);
+    assert.equal((await jobOf(mover, moveId)).proof.boxes.length, 0);
+  });
+
+  it('only works at pickup, while loading', async () => {
+    const { mover, moveId } = await assignedJob();
+    const code = await label(moveId, 1);
+    assert.equal((await scanBox(mover, moveId, code)).status, 400);
+    await advance(mover, moveId, ['EN_ROUTE']);
+    assert.equal((await scanBox(mover, moveId, code)).status, 400);
+    assert.equal((await jobOf(mover, moveId)).proof.canScanBoxes, false);
+
+    await advance(mover, moveId, ['LOADING']);
+    const { data } = await scanBox(mover, moveId, code);
+    await advance(mover, moveId, ['IN_TRANSIT']);
+    assert.equal((await scanBox(mover, moveId, await label(moveId, 2))).status, 400);
+    assert.equal((await removeBox(mover, moveId, data.job.proof.boxes[0].id)).status, 400);
+    const job = await jobOf(mover, moveId);
+    assert.equal(job.proof.canScanBoxes, false);
+    assert.equal(job.proof.boxes.length, 1);
+    assert.equal(job.proof.loadCheck.boxes, 1);
+  });
+
+  it('a change to the scanned boxes asks for the count again', async () => {
+    const { mover, moveId } = await loading();
+    await loadPhotos(mover, moveId);
+    await scanBoxes(mover, moveId, 2);
+    assert.equal((await checkLoad(mover, moveId, { furniture: 1, confirmed: true })).status, 200);
+
+    const third = await scanBox(mover, moveId, await label(moveId, 3));
+    assert.equal(third.data.job.proof.loadCheck, null);
+    assert.equal((await act(mover, moveId, 'IN_TRANSIT')).status, 409);
+    const confirmed = await checkLoad(mover, moveId, { furniture: 1, confirmed: true });
+    assert.equal(confirmed.data.job.proof.loadCheck.boxes, 3);
+
+    const [newest] = confirmed.data.job.proof.boxes;
+    const removed = await removeBox(mover, moveId, newest.id);
+    assert.equal(removed.status, 200);
+    assert.equal(removed.data.job.proof.boxes.length, 2);
+    assert.equal(removed.data.job.proof.loadCheck, null);
+    assert.equal((await removeBox(mover, moveId, newest.id)).status, 404);
+    assert.equal((await removeBox(mover, moveId, 'not-an-id')).status, 404);
+  });
+
+  it("another mover cannot scan into, or remove from, someone else's job", async () => {
+    const { mover, moveId } = await loading();
+    const { data } = await scanBox(mover, moveId, await label(moveId, 1));
+    const other = await createMover({ zones: ['SFA'] });
+    assert.equal((await scanBox(other, moveId, await label(moveId, 2))).status, 404);
+    assert.equal((await removeBox(other, moveId, data.job.proof.boxes[0].id)).status, 404);
+    assert.equal((await jobOf(mover, moveId)).proof.boxes.length, 1);
+  });
+});
+
 describe('load and delivery proof', () => {
   const loading = async () => {
     const job = await assignedJob();
     await advance(job.mover, job.moveId, ['EN_ROUTE', 'LOADING']);
     return job;
   };
-  const GOOD = { boxes: 20, furniture: 2, confirmed: true };
+  const GOOD = { furniture: 2, confirmed: true };
 
   it('cannot leave without the photos and the confirmed count', async () => {
     const { mover, moveId } = await loading();
@@ -239,12 +363,13 @@ describe('load and delivery proof', () => {
     const { mover, moveId } = await loading();
     await loadPhotos(mover, moveId);
     const bad = [
-      { boxes: 20, furniture: 2 },
-      { boxes: 20, furniture: 2, confirmed: false },
-      { boxes: 0, furniture: 0, confirmed: true },
-      { boxes: -1, furniture: 2, confirmed: true },
-      { boxes: 1.5, furniture: 2, confirmed: true },
-      { boxes: 'many', furniture: 2, confirmed: true },
+      { furniture: 2 },
+      { furniture: 2, confirmed: false },
+      // No boxes scanned and no furniture: nothing was loaded.
+      { furniture: 0, confirmed: true },
+      { furniture: -1, confirmed: true },
+      { furniture: 1.5, confirmed: true },
+      { furniture: 'many', confirmed: true },
     ];
     for (const body of bad) {
       assert.equal((await checkLoad(mover, moveId, body)).status, 422, JSON.stringify(body));
@@ -255,8 +380,10 @@ describe('load and delivery proof', () => {
   it('compares with the client list, warns in the record, and does not block', async () => {
     const { mover, moveId } = await loading();
     await loadPhotos(mover, moveId);
+    await scanBoxes(mover, moveId, 5);
     const { status, data } = await checkLoad(mover, moveId, {
-      boxes: 5,
+      // A typed box count is ignored: the scans set it.
+      boxes: 99,
       furniture: 2,
       note: 'One box stayed behind',
       confirmed: true,
@@ -267,7 +394,7 @@ describe('load and delivery proof', () => {
     assert.equal(data.job.proof.loadCheck.boxes, 5);
     assert.equal(data.job.proof.loadCheck.note, 'One box stayed behind');
     const notes = data.job.timeline.map((event: { note: string }) => event.note).join(' | ');
-    assert.match(notes, /Load confirmed: 5 boxes, 2 furniture/);
+    assert.match(notes, /Load confirmed: 5 boxes scanned, 2 furniture/);
     assert.match(notes, /Client listed 0 boxes, 1 furniture/);
     assert.match(notes, /One box stayed behind/);
     assert.equal((await act(mover, moveId, 'IN_TRANSIT')).status, 200);
@@ -277,11 +404,11 @@ describe('load and delivery proof', () => {
     const { mover, moveId } = await loading();
     await loadPhotos(mover, moveId);
     await checkLoad(mover, moveId, GOOD);
-    await checkLoad(mover, moveId, { ...GOOD, boxes: 21 });
-    assert.equal((await MoveRequestModel.findById(moveId))?.loadCheck?.boxes, 21);
+    await checkLoad(mover, moveId, { ...GOOD, furniture: 3 });
+    assert.equal((await MoveRequestModel.findById(moveId))?.loadCheck?.furniture, 3);
     await act(mover, moveId, 'IN_TRANSIT');
-    assert.equal((await checkLoad(mover, moveId, { ...GOOD, boxes: 1 })).status, 409);
-    assert.equal((await MoveRequestModel.findById(moveId))?.loadCheck?.boxes, 21);
+    assert.equal((await checkLoad(mover, moveId, { ...GOOD, furniture: 1 })).status, 409);
+    assert.equal((await MoveRequestModel.findById(moveId))?.loadCheck?.furniture, 3);
   });
 
   it('load photos and the count only work during loading', async () => {
@@ -290,6 +417,7 @@ describe('load and delivery proof', () => {
     assert.equal((await checkLoad(mover, moveId, GOOD)).status, 409);
     await advance(mover, moveId, ['EN_ROUTE']);
     assert.equal((await photo(mover, moveId, 'LOAD')).status, 400);
+    assert.equal((await checkLoad(mover, moveId, GOOD)).status, 409);
     await advance(mover, moveId, ['LOADING', 'IN_TRANSIT']);
     assert.equal((await photo(mover, moveId, 'LOAD')).status, 400);
   });

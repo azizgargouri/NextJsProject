@@ -130,6 +130,7 @@ Mongoose v9 specifics: no `FilterQuery` export (use `Record<string, unknown>`), 
 - Account menu: Profile (`/admin/profile`, avatar in RustFS), Account settings (`/admin/settings`: password change with optional sign-out of other devices, signed-in device list from refresh tokens, theme), Notifications (`/admin/notifications` + header bell unread count). Notifications are derived from audit events (others' workspace changes for admins; own security events; changes to your account by others) with `notificationsSeenAt` on the user.
 - Back-office i18n (EN/FR): `lib/i18n/admin/{en,fr,index}.tsx` — typed dictionaries (`fr: AdminMessages` must match `en`), `AdminI18nProvider` inside `AdminShell`, `useAdminI18n()` → `{ m, fmt, locale, setLocale }`. Locale = the signed-in user's `locale` (`ar` falls back to `en`); the header EN/FR switch and Settings both PATCH `/api/account/profile`. Never hard-code admin UI strings — add keys to both dictionaries; use `fmt.*` for dates/money/bytes. Nav items carry a `key` (labels from `m.nav.items`). Server error messages are still English (password "current incorrect" is mapped client-side).
 - Storage portal (`/admin/storage`): bucket reachability/usage, cursor-paginated object list with owner + in-use flag, download, delete.
+- **Mover workspace** (`/mover`, from the `mover-side` branch, merged into `dev`): offers, jobs, calendar, earnings, profile, QR box scanning at pickup, profitability estimate with a trained duration model, offline build (`yarn offline`), 150 tests (`TEST_MONGODB_URI=mongodb://localhost:27017 yarn test:mover`). Code in `server/modules/mover`, `app/(mover)`, `components/features/mover`; details in `MOVER_SIDE.md` and `OFFLINE.md`. Offers only reach movers once client move creation and admin dispatch (`dispatchMove()`) exist.
 - Nav: every module routes; remaining unbuilt modules show a "Soon" badge and land on an honest "not connected" page: Move requests, Assignments, Disputes, Mover reviews, Customer reviews.
 
 ## Likely next features (not built yet — do not assume otherwise)
@@ -152,9 +153,10 @@ Mongoose v9 specifics: no `FilterQuery` export (use `Record<string, unknown>`), 
 
 ## Git workflow
 
-- Remote: HTTPS only — `https://github.com/azizgargouri/NextJsProject.git` (SSH fails on this machine; `gh` CLI not installed).
+- Remote: HTTPS only — `https://github.com/mAmineSouissi/NextJsProject.git` (SSH fails on this machine; `gh` CLI not installed).
+- Integrating team branches: follow `INTEGRATION.md` (merge, never rebase; conflict rules; verification; log of merged and waiting branches). Update it after every merge.
 - Branches: `main` is stable and demo-ready; `dev` (cut from `main`) is the integration branch. Do new work on `dev` or on feature branches (`feat/<name>`, `fix/<name>`) cut from `dev` and merged back into `dev`; merge `dev` into `main` only when it is verified.
-- Push pattern: `git push https://github.com/azizgargouri/NextJsProject.git <branch>` — then `git fetch origin` so status stops showing "ahead" (URL pushes do not update the origin ref).
+- Push pattern: `git push https://github.com/mAmineSouissi/NextJsProject.git <branch>` — then `git fetch origin` so status stops showing "ahead" (URL pushes do not update the origin ref).
 - Make short, atomic, conventional commits; keep `git status` clean (nothing untracked except ignored artifacts). commit splits so far: api/backend / admin UI / landing / db seed.
 
 ## UI verification protocols (quick reference)

@@ -31,7 +31,8 @@ type SignInFormValues = z.infer<typeof SignInFormSchema>;
 export function SignInForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTarget = searchParams.get('redirect') || searchParams.get('next') || searchParams.get('callbackUrl');
+  const redirectTarget =
+    searchParams.get('redirect') || searchParams.get('next') || searchParams.get('callbackUrl');
 
   const { mutate, isPending, error, isError } = useSignIn();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -67,7 +68,8 @@ export function SignInForm() {
         } else if (response.user.role === 'ADMIN') {
           router.push('/admin');
         } else if (response.user.role === 'MOVER') {
-          router.push('/me');
+          // A real page load: the mover service worker can only control a page created under /mover.
+          window.location.assign('/mover');
         } else {
           router.push('/request');
         }
@@ -104,8 +106,12 @@ export function SignInForm() {
         </h1>
 
         {redirectTarget ? (
-          <div data-form-reveal className="mt-4 border border-hazard bg-hazard/10 p-3 mono text-xs text-ink">
-            <span className="text-hazard font-bold">AUTHENTICATION REQUIRED:</span> Please log in to complete your move booking. Your draft items and LiDAR calculations are preserved.
+          <div
+            data-form-reveal
+            className="mt-4 border border-hazard bg-hazard/10 p-3 mono text-xs text-ink"
+          >
+            <span className="text-hazard font-bold">AUTHENTICATION REQUIRED:</span> Please log in to
+            complete your move booking. Your draft items and LiDAR calculations are preserved.
           </div>
         ) : (
           <p data-form-reveal className="mt-4 text-sm text-ink-80">
@@ -170,7 +176,11 @@ export function SignInForm() {
         </div>
         <div className="mt-6 text-center">
           <Link
-            href={redirectTarget ? `/sign-up?redirect=${encodeURIComponent(redirectTarget)}` : '/sign-up'}
+            href={
+              redirectTarget
+                ? `/sign-up?redirect=${encodeURIComponent(redirectTarget)}`
+                : '/sign-up'
+            }
             className="mono border-b-2 border-ink pb-0.5 text-[11px] hover:border-hazard hover:text-hazard"
           >
             CREATE AN ACCOUNT &gt;&gt;&gt;

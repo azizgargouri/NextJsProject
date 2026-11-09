@@ -9,13 +9,35 @@ export interface JobOfferDoc {
   expiresAt: Date;
   respondedAt: Date | null;
   declineReason: string;
+  /** The duration estimate the mover saw when they accepted or quoted, kept to measure accuracy. */
+  estimate: OfferEstimate | null;
   createdAt: Date;
   updatedAt: Date;
   _id: Types.ObjectId;
 }
 
+export interface OfferEstimate {
+  workHoursLikely: number;
+  workHoursWorst: number;
+  ruleHours: number;
+  modelVersion: number | null;
+  recordedAt: Date;
+}
+
+const OfferEstimateSchema = new Schema<OfferEstimate>(
+  {
+    workHoursLikely: { type: Number, required: true },
+    workHoursWorst: { type: Number, required: true },
+    ruleHours: { type: Number, required: true },
+    modelVersion: { type: Number, default: null },
+    recordedAt: { type: Date, required: true },
+  },
+  { _id: false },
+);
+
 const JobOfferSchema = new Schema<JobOfferDoc>(
   {
+    estimate: { type: OfferEstimateSchema, default: null },
     moveId: { type: String, required: true },
     moverId: { type: String, required: true },
     status: { type: String, enum: [...OFFER_STATUSES], default: 'PENDING' },

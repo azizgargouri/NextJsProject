@@ -2,6 +2,7 @@ export * from './mover.schema';
 export * from './mover.http';
 export * from './mover.offers';
 export * from './mover.jobs';
+export * from './mover.boxes';
 export * from './mover.profile';
 export { dispatchMove, sweep } from './mover.dispatch';
 export { listNotifications, markNotificationsRead } from './mover.notifications';

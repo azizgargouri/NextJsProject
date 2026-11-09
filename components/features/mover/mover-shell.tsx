@@ -67,7 +67,7 @@ function Header({ unlocked }: { unlocked: boolean }) {
   const pathname = usePathname();
 
   return (
-    <header className="sticky top-0 z-40 border-b border-ink bg-paper">
+    <header className="sticky top-0 z-40 border-b border-ink bg-paper print:hidden">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-4 py-2 md:px-6">
         <Link href="/mover" className="mono shrink-0 text-sm font-bold">
           <span className="mr-2 inline-block size-2.5 bg-hazard align-middle" aria-hidden />
@@ -131,7 +131,7 @@ function BottomNav() {
   return (
     <nav
       aria-label="Workspace"
-      className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-ink bg-paper pb-[env(safe-area-inset-bottom)] md:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-ink bg-paper pb-[env(safe-area-inset-bottom)] md:hidden print:hidden"
     >
       {NAV.map(({ href, label, icon: Icon }) => (
         <Link
@@ -183,7 +183,10 @@ function MoverGate({ pathname, children }: { pathname: string; children: ReactNo
       <Header unlocked={unlocked} />
       <OfflineBanner />
       <main
-        className={cn('mx-auto max-w-6xl px-4 py-6 md:px-6 md:py-10', unlocked && 'pb-24 md:pb-10')}
+        className={cn(
+          'mx-auto max-w-6xl px-4 py-6 md:px-6 md:py-10 print:max-w-none print:p-0',
+          unlocked && 'pb-24 md:pb-10',
+        )}
       >
         {application.isPending ? (
           <LoadingState label="Checking your application" />

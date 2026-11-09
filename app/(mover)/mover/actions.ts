@@ -3,6 +3,7 @@
 import { cookies } from 'next/headers';
 import {
   AvailabilitySetSchema,
+  BoxScanSchema,
   JobStatusSchema,
   LoadCheckSchema,
   MoverProfileUpdateSchema,
@@ -18,9 +19,11 @@ import {
   markNotificationsRead,
   listNotifications,
   parse,
+  removeBoxScan,
   removeTeamMember,
   removeVehicle,
   respondToOffer,
+  scanBox,
   setAvailability,
   updateJobStatus,
   updateProfile,
@@ -53,6 +56,14 @@ export async function updateJobStatusAction(jobId: string, payload: unknown) {
 
 export async function confirmLoadAction(jobId: string, payload: unknown) {
   return withMover((moverId) => confirmLoad(moverId, jobId, parse(LoadCheckSchema, payload)));
+}
+
+export async function scanBoxAction(jobId: string, payload: unknown) {
+  return withMover((moverId) => scanBox(moverId, jobId, parse(BoxScanSchema, payload).code));
+}
+
+export async function removeBoxScanAction(jobId: string, scanId: string) {
+  return withMover((moverId) => removeBoxScan(moverId, jobId, scanId));
 }
 
 export async function setAvailabilityAction(payload: unknown) {

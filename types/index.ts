@@ -625,15 +625,65 @@ export interface ContentResetPayload {
   keys: string[];
 }
 
-export interface ProfileUpdatePayload { name?: string; phone?: string; locale?: 'en' | 'fr' | 'ar' }
-export interface PasswordChangePayload { currentPassword: string; newPassword: string; confirmPassword: string; signOutOtherSessions: boolean }
-export interface AccountSessionDto { id: string; userAgent: string | null; startedAt: string; lastActiveAt: string; expiresAt: string; current: boolean }
-export interface AccountNotificationDto { id: string; event: AuditEventType; createdAt: string; unread: boolean; actor: { id: string; name: string; email: string } | null; logInfo: Record<string, string | undefined> }
-export interface AccountNotificationsPage { data: AccountNotificationDto[]; unreadCount: number; seenAt: string | null; nextBefore: string | null }
-export interface StorageStatusDto { reachable: boolean; bucket: string; endpoint: string; objectCount: number | null; totalBytes: number | null; prefixes: { prefix: string; objectCount: number; totalBytes: number }[] }
-export interface StorageObjectDto { key: string; size: number; lastModified: string | null; etag: string | null; owner: { id: string; name: string; email: string } | null; referenced: boolean }
-export interface StorageObjectsPage { data: StorageObjectDto[]; nextCursor: string | null }
-export interface StorageObjectsQuery { prefix?: string; cursor?: string; limit?: number }
+// ── Account (self-service) ─────────────────────────────────────────────
+export interface ProfileUpdatePayload {
+  name?: string;
+  phone?: string;
+  locale?: 'en' | 'fr' | 'ar';
+}
+export interface PasswordChangePayload {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+  signOutOtherSessions: boolean;
+}
+export interface AccountSessionDto {
+  id: string;
+  userAgent: string | null;
+  startedAt: string;
+  lastActiveAt: string;
+  expiresAt: string;
+  current: boolean;
+}
+export interface AccountNotificationDto {
+  id: string;
+  event: AuditEventType;
+  createdAt: string;
+  unread: boolean;
+  actor: { id: string; name: string; email: string } | null;
+  logInfo: Record<string, string | undefined>;
+}
+export interface AccountNotificationsPage {
+  data: AccountNotificationDto[];
+  unreadCount: number;
+  seenAt: string | null;
+  nextBefore: string | null;
+}
+export interface StorageStatusDto {
+  reachable: boolean;
+  bucket: string;
+  endpoint: string;
+  objectCount: number | null;
+  totalBytes: number | null;
+  prefixes: { prefix: string; objectCount: number; totalBytes: number }[];
+}
+export interface StorageObjectDto {
+  key: string;
+  size: number;
+  lastModified: string | null;
+  etag: string | null;
+  owner: { id: string; name: string; email: string } | null;
+  referenced: boolean;
+}
+export interface StorageObjectsPage {
+  data: StorageObjectDto[];
+  nextCursor: string | null;
+}
+export interface StorageObjectsQuery {
+  prefix?: string;
+  cursor?: string;
+  limit?: number;
+}
 
 export * from './homes';
 /* ------------------------------------------------------------------ */
@@ -792,4 +842,55 @@ export interface ChatHistoryDto {
   messages: { id: string; role: 'user' | 'assistant'; content: string; createdAt: string }[];
 }
 
-export type { AvailabilityDayDto, EarningsDto, JobDetailDto, JobsListDto, MessageDto, MoverApplicationDto, MoverDashboardDto, MoverDocumentDto, MoverProfileDto, NotificationDto, NotificationsDto, OfferDto, OffersListDto, PhotoDto, TimeSlot, MoveStatus, ProgressStage, OfferStatus, QuoteStatus, MessageThread, MoverPhotoStage, VehicleType, MoverDocumentType, MoveAreaDto, MoveAddressDto, OfferResponsePayload, VerificationStatus, JobAction, LoadCheckPayload, MoverProfilePayload, TeamMemberPayload, VehiclePayload, MoverActionResult, TeamMemberDto, VehicleDto } from './mover';
+export type {
+  AvailabilityDayDto,
+  BoxScanDto,
+  EarningDto,
+  EarningsDto,
+  EarningsSummaryDto,
+  JobAction,
+  JobDetailDto,
+  JobProofDto,
+  JobSummaryDto,
+  JobsListDto,
+  LoadCheckDto,
+  LoadCheckPayload,
+  LoadCountsDto,
+  MessageDto,
+  MessageThread,
+  MoveAddressDto,
+  MoveAreaDto,
+  MoveStatus,
+  MoverActionResult,
+  MoverApplicationDto,
+  MoverCostsDto,
+  MoverDashboardDto,
+  MoverDocumentDto,
+  MoverDocumentType,
+  MoverEligibilityDto,
+  MoverPhotoStage,
+  MoverProfileDto,
+  MoverProfilePayload,
+  NotificationDto,
+  NotificationsDto,
+  OfferDto,
+  OfferResponsePayload,
+  OfferStatus,
+  OffersListDto,
+  PayoutDto,
+  PhotoDto,
+  ProfitLineKind,
+  ProfitVerdict,
+  ProfitabilityDto,
+  ProgressStage,
+  QuoteDto,
+  QuoteStatus,
+  StatusEventDto,
+  TeamMemberDto,
+  TeamMemberPayload,
+  TimeSlot,
+  VehicleDto,
+  VehiclePayload,
+  VehicleType,
+  VerificationStatus,
+} from './mover';

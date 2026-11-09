@@ -1,5 +1,6 @@
 import mongoose, { Mongoose } from 'mongoose';
 import type { MongoMemoryServer } from 'mongodb-memory-server';
+import { env } from '../../config/env';
 
 /**
  * Mongoose connection singleton — dev hot-reload safe (global cache) and
@@ -15,7 +16,9 @@ function isConnectionRefusedError(error: unknown): boolean {
   if (typeof error !== 'object' || error === null) return false;
 
   const { code, message } = error as { code?: unknown; message?: unknown };
-  return code === 'ECONNREFUSED' || (typeof message === 'string' && message.includes('ECONNREFUSED'));
+  return (
+    code === 'ECONNREFUSED' || (typeof message === 'string' && message.includes('ECONNREFUSED'))
+  );
 }
 
 export async function connectMongo(): Promise<Mongoose> {
@@ -23,12 +26,9 @@ export async function connectMongo(): Promise<Mongoose> {
     return globalForMongoose.__moveUpMongoose;
   }
 
-  // Lazy-import the validated env config to keep this module standalone.
-  const { env } = require('../../config/env') as typeof import('../../config/env');
-  const connectOptions = {
-    serverSelectionTimeoutMS: 5_000,
-    dbName: 'moveup',
-  };
+  // Read on first connect, so tests and seeds can set the environment before then.
+  const { MONGODB_DB_NAME: dbName } = env();
+  const connectOptions = { serverSelectionTimeoutMS: 5_000, dbName };
 
   let uri = env().MONGODB_URI;
 
@@ -45,11 +45,11 @@ export async function connectMongo(): Promise<Mongoose> {
     const { MongoMemoryServer } = await import('mongodb-memory-server');
     const memoryServer = await MongoMemoryServer.create({
       binary: { version: '7.0.14' },
-      instance: { dbName: 'moveup' },
+      instance: { dbName },
     });
 
     globalForMongoose.__moveUpMongoMemoryServer = memoryServer;
-    uri = memoryServer.getUri('moveup');
+    uri = memoryServer.getUri(dbName);
     globalForMongoose.__moveUpMongoose = mongoose.connect(uri, connectOptions);
     return await globalForMongoose.__moveUpMongoose;
   }

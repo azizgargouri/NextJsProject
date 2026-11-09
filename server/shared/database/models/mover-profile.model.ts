@@ -16,11 +16,34 @@ export interface MoverProfileDoc {
   verificationStatus: VerificationStatus;
   ratingAvg: number;
   ratingCount: number;
+  /** Running costs for the profitability estimate; null until the mover enters them. */
+  costs: MoverCosts | null;
   createdAt: Date;
   updatedAt: Date;
 
   _id: Types.ObjectId;
 }
+
+export interface MoverCosts {
+  fuelLitresPer100Km: number;
+  fuelPricePerLitre: number;
+  helpers: number;
+  helperHourlyRate: number;
+  costPerKm: number;
+  targetHourlyNet: number;
+}
+
+const MoverCostsSchema = new Schema<MoverCosts>(
+  {
+    fuelLitresPer100Km: { type: Number, required: true, min: 0 },
+    fuelPricePerLitre: { type: Number, required: true, min: 0 },
+    helpers: { type: Number, required: true, min: 0 },
+    helperHourlyRate: { type: Number, required: true, min: 0 },
+    costPerKm: { type: Number, required: true, min: 0 },
+    targetHourlyNet: { type: Number, required: true, min: 0 },
+  },
+  { _id: false },
+);
 
 const MoverProfileSchema = new Schema<MoverProfileDoc>(
   {
@@ -36,6 +59,7 @@ const MoverProfileSchema = new Schema<MoverProfileDoc>(
     },
     ratingAvg: { type: Number, default: 0, min: 0, max: 5 },
     ratingCount: { type: Number, default: 0, min: 0 },
+    costs: { type: MoverCostsSchema, default: null },
   },
   { timestamps: true },
 );

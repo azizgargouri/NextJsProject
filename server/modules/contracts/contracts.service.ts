@@ -1,11 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { ZeroHash } from 'ethers';
-import {
-  AlreadyExistsError,
-  BadRequestError,
-  ForbiddenError,
-  NotFoundError,
-} from '../../shared/database/errors';
+import { BadRequestError, ForbiddenError, NotFoundError } from '../../shared/database/errors';
 import type { AccessTokenPayload } from '../../shared/auth/jwt';
 import {
   buildContractDocument,
@@ -29,10 +24,7 @@ import type {
   PreparedContractDto,
 } from '../../../types';
 import { employeesService } from '../employees/employees.service';
-import {
-  ensureUserWalletById,
-  ensureEmployeeWalletById,
-} from '../../shared/wallet/provisioning';
+import { ensureUserWalletById, ensureEmployeeWalletById } from '../../shared/wallet/provisioning';
 import { signTypedDataWithEncryptedKey } from '../../shared/wallet/custodial';
 import {
   ensureHrAdminOnChain,
@@ -45,7 +37,11 @@ import {
 import { contractDocumentsService } from './contracts-documents.service';
 import { ContractsRepository } from './contracts.repository';
 import { ContractProposalsRepository } from './contracts-proposals.repository';
-import { serializeContract, serializePreparedContract, serializeProposal } from './contracts.serializer';
+import {
+  serializeContract,
+  serializePreparedContract,
+  serializeProposal,
+} from './contracts.serializer';
 import type {
   ContractAnchorProposalInput,
   ContractPrepareInput,
@@ -279,7 +275,9 @@ export class ContractsService {
       employee.walletAddress &&
       employee.walletAddress.toLowerCase() !== prepared.employeeWallet.toLowerCase()
     ) {
-      throw new BadRequestError('The employee wallet changed while the contract was being prepared.');
+      throw new BadRequestError(
+        'The employee wallet changed while the contract was being prepared.',
+      );
     }
 
     const current = await this.repository.findCurrentForEmployee(employee.id);
@@ -309,11 +307,7 @@ export class ContractsService {
       nonce: prepared.nonce,
       deadline: prepared.deadline,
     });
-    const typedData = contractIntentTypedData(
-      prepared.chainId,
-      prepared.contractAddress,
-      intent,
-    );
+    const typedData = contractIntentTypedData(prepared.chainId, prepared.contractAddress, intent);
 
     // Sign with the HR account's custodial wallet. The system wallet (registry
     // owner) authorises that wallet for this organisation if needed.
@@ -421,11 +415,7 @@ export class ContractsService {
       nonce: proposal.nonce,
       deadline: proposal.deadline,
     });
-    const typedData = contractIntentTypedData(
-      proposal.chainId,
-      proposal.contractAddress,
-      intent,
-    );
+    const typedData = contractIntentTypedData(proposal.chainId, proposal.contractAddress, intent);
 
     // The employee's app wallet signs on their behalf. The proposal is still
     // off-chain; HR anchors the dual-signed intent afterwards.
@@ -533,10 +523,7 @@ export class ContractsService {
   }
 
   /** Verifies the anchor transaction receipt and mirrors the chain record in MongoDB. */
-  async record(
-    user: AccessTokenPayload,
-    input: ContractRecordInput,
-  ): Promise<EmployeeContractDto> {
+  async record(user: AccessTokenPayload, input: ContractRecordInput): Promise<EmployeeContractDto> {
     const proposal = await this.proposals.findOneById(input.proposalId);
     if (!proposal) throw new NotFoundError('Contract proposal');
 
@@ -550,7 +537,8 @@ export class ContractsService {
 
     if (proposal.status === 'completed') {
       const existing = await this.repository.findByContractId(input.contractId);
-      if (existing && existing.contractId === proposal.contractId) return serializeContract(existing);
+      if (existing && existing.contractId === proposal.contractId)
+        return serializeContract(existing);
       throw new BadRequestError('This proposal was already anchored with another contract.');
     }
     if (proposal.status !== 'awaiting_employee' && proposal.status !== 'expired') {
@@ -566,9 +554,7 @@ export class ContractsService {
     }
 
     const startTimestamp = Math.floor(proposal.startDate.getTime() / 1000);
-    const endTimestamp = proposal.endDate
-      ? Math.floor(proposal.endDate.getTime() / 1000)
-      : 0;
+    const endTimestamp = proposal.endDate ? Math.floor(proposal.endDate.getTime() / 1000) : 0;
 
     const intent = buildContractIntent({
       organizationHash: proposal.organizationHash,
@@ -689,7 +675,9 @@ export class ContractsService {
     const isEmployee = profile?.id === contract.employee;
 
     if (!isAdmin && !isEmployee) {
-      throw new ForbiddenError('Only the employer or the assigned employee can terminate this contract.');
+      throw new ForbiddenError(
+        'Only the employer or the assigned employee can terminate this contract.',
+      );
     }
 
     if (contract.status === 'terminated') return serializeContract(contract);

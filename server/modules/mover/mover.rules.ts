@@ -116,6 +116,11 @@ export function nextJobAction(position: JobPosition): JobAction | null {
   );
 }
 
+/** Boxes are scanned at the pickup address, as they go into the vehicle. */
+export function boxScanOpen(position: JobPosition): boolean {
+  return position.status === 'IN_PROGRESS' && position.progressStage === 'LOADING';
+}
+
 /** Boxes and furniture the client listed, to compare with what the mover counted. */
 export function expectedLoad(
   items: { name: string; quantity: number; category: string }[],

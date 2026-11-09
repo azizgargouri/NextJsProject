@@ -32,13 +32,14 @@ export function AuthLayout({ children }: { children: React.ReactNode }) {
                   ALREADY LOGGED IN
                 </p>
                 <p className="font-semibold text-ink text-xs truncate max-w-[200px] sm:max-w-none">
-                  {user.name} ({user.email}) · <span className="text-hazard font-bold">{user.role}</span>
+                  {user.name} ({user.email}) ·{' '}
+                  <span className="text-hazard font-bold">{user.role}</span>
                 </p>
               </div>
               <div className="flex items-center gap-3">
                 <Link
                   href={
-                    user.role === 'ADMIN' ? '/admin' : user.role === 'MOVER' ? '/me' : '/request'
+                    user.role === 'ADMIN' ? '/admin' : user.role === 'MOVER' ? '/mover' : '/request'
                   }
                   className="mono border border-ink bg-ink px-3 py-1 text-[10px] font-bold text-paper hover:bg-hazard hover:text-white transition"
                 >

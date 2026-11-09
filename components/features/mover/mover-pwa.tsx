@@ -201,7 +201,7 @@ export function OfflineBanner() {
   );
   if (online) return null;
   return (
-    <div role="status" className="border-b border-ink bg-ink text-paper">
+    <div role="status" className="border-b border-ink bg-ink text-paper print:hidden">
       <p className="mx-auto flex max-w-6xl items-center gap-2 px-4 py-2 text-sm md:px-6">
         <WifiOff className="size-4 shrink-0" aria-hidden />
         You are offline, showing your last saved data. Keep this page open: your updates are sent

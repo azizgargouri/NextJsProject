@@ -1,5 +1,6 @@
 import type {
   AvailabilityDoc,
+  BoxScanDoc,
   EarningDoc,
   JobOfferDoc,
   MessageDoc,
@@ -17,6 +18,7 @@ import type {
 } from '../../shared/database/models';
 import type {
   AvailabilityDayDto,
+  BoxScanDto,
   EarningDto,
   JobSummaryDto,
   MessageDto,
@@ -29,6 +31,7 @@ import type {
   OfferDto,
   PayoutDto,
   PhotoDto,
+  ProfitabilityDto,
   QuoteDto,
   StatusEventDto,
   TeamMemberDto,
@@ -84,7 +87,8 @@ export function serializeQuote(quote: QuoteDoc): QuoteDto {
 export function serializeOffer(
   offer: JobOfferDoc,
   move: MoveRequestDoc,
-  quote: QuoteDoc | null = null,
+  quote: QuoteDoc | null,
+  profitability: ProfitabilityDto,
 ): OfferDto {
   return {
     id: String(offer._id),
@@ -93,6 +97,7 @@ export function serializeOffer(
     createdAt: offer.createdAt.toISOString(),
     canAccept: move.estimatedPrice !== null,
     quote: quote ? serializeQuote(quote) : null,
+    profitability,
     move: {
       id: String(move._id),
       reference: move.reference,
@@ -152,6 +157,15 @@ export function serializePhoto(photo: PhotoDoc): PhotoDto {
     stage: photo.stage as MoverPhotoStage,
     url: signFileUrl(photo.storageKey),
     createdAt: photo.createdAt.toISOString(),
+  };
+}
+
+export function serializeBoxScan(scan: BoxScanDoc): BoxScanDto {
+  return {
+    id: String(scan._id),
+    code: scan.code,
+    label: scan.label,
+    scannedAt: scan.createdAt.toISOString(),
   };
 }
 

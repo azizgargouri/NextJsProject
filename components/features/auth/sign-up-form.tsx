@@ -45,7 +45,8 @@ const ROLE_OPTIONS = [
 export function SignUpForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTarget = searchParams.get('redirect') || searchParams.get('next') || searchParams.get('callbackUrl');
+  const redirectTarget =
+    searchParams.get('redirect') || searchParams.get('next') || searchParams.get('callbackUrl');
 
   const { mutate, isPending, isError, error } = useSignUp();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -86,7 +87,8 @@ export function SignUpForm() {
           } else if (response.user.role === 'ADMIN') {
             router.push('/dashboard');
           } else if (response.user.role === 'MOVER') {
-            router.push('/me');
+            // A real page load: the mover service worker can only control a page created under /mover.
+            window.location.assign('/mover');
           } else {
             router.push('/request');
           }
@@ -211,7 +213,11 @@ export function SignUpForm() {
         <p className="mono text-center text-[10px] text-ink-40">ALREADY REGISTERED?</p>
         <p className="mt-3 text-center">
           <Link
-            href={redirectTarget ? `/sign-in?redirect=${encodeURIComponent(redirectTarget)}` : '/sign-in'}
+            href={
+              redirectTarget
+                ? `/sign-in?redirect=${encodeURIComponent(redirectTarget)}`
+                : '/sign-in'
+            }
             className="mono border-b-2 border-ink pb-0.5 text-[11px] hover:border-hazard hover:text-hazard"
           >
             GO TO LOGIN &gt;&gt;&gt;

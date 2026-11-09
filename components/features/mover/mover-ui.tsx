@@ -9,6 +9,10 @@ import { Button } from '@/components/ui/button';
 import { MoverActionError } from '@/lib/actions/mover-action';
 import { Input, type InputProps } from '@/components/ui/input';
 import type { MoveStatus, OfferDto, ProgressStage, ServerErrorResponse, TimeSlot } from '@/types';
+import { formatMoney } from './format';
+import { ProfitStrip } from './profit-ui';
+
+export { formatDuration, formatMoney } from './format';
 
 /** Shared pieces for the mover workspace, in the public Swiss print language. */
 
@@ -33,11 +37,6 @@ export function apiErrorMessage(error: unknown, fallback = 'Something went wrong
   return fallback;
 }
 
-export function formatMoney(amount: number, currency = 'TND'): string {
-  const value = new Intl.NumberFormat('en-US', { maximumFractionDigits: 3 }).format(amount);
-  return `${value} ${currency}`;
-}
-
 /** Formats a YYYY-MM-DD day without letting the viewer's time zone shift it. */
 export function formatDay(day: string): string {
   return new Intl.DateTimeFormat('en-GB', {
@@ -53,6 +52,14 @@ export function formatDateTime(iso: string): string {
   return new Intl.DateTimeFormat('en-GB', {
     day: 'numeric',
     month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'Africa/Tunis',
+  }).format(new Date(iso));
+}
+
+export function formatTime(iso: string): string {
+  return new Intl.DateTimeFormat('en-GB', {
     hour: '2-digit',
     minute: '2-digit',
     timeZone: 'Africa/Tunis',
@@ -262,6 +269,7 @@ export function OfferCard({ offer, onExpire }: { offer: OfferDto; onExpire?: () 
           <span className="font-bold">Quote needed</span>
         )}
       </div>
+      {offer.status === 'PENDING' ? <ProfitStrip profitability={offer.profitability} /> : null}
     </Link>
   );
 }

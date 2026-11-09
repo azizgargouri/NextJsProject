@@ -6,12 +6,14 @@
  *   its data in .offline/db.
  * - Seeds the demo accounts only when the database has no users, because the
  *   seeds overwrite admin-edited content and reset the test accounts.
- * - Builds into .next-offline when the source changed, then serves that build.
+ * - Builds into .next-offline when the source or .env changed, then serves that
+ *   build on every network address, so phones on the same Wi-Fi can open it.
  */
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { connect } from 'node:net';
+import { networkInterfaces } from 'node:os';
 import path from 'node:path';
 import mongoose from 'mongoose';
 
@@ -32,11 +34,13 @@ const SOURCE_PATHS = [
   'package.json',
   'postcss.config.mjs',
   'tsconfig.json',
+  '.env',
 ];
 const MONGO_START_TIMEOUT_MS = 30_000;
 const MONGO_POLL_MS = 250;
 
 const children = new Set();
+let shuttingDown = false;
 
 class OfflineError extends Error {}
 
@@ -116,6 +120,12 @@ async function ensureMongo(uri) {
     throw new OfflineError('mongod did not start in time.');
   })();
   await Promise.race([ready, failed]);
+  mongod.once('exit', () => {
+    children.delete(mongod);
+    if (!shuttingDown) {
+      log('MongoDB stopped. The app cannot reach its data until you restart this command.');
+    }
+  });
 }
 
 async function seedIfEmpty(uri, dbName) {
@@ -127,11 +137,8 @@ async function seedIfEmpty(uri, dbName) {
     return;
   }
 
-  log('Empty database, adding the demo data.');
-  // The mover seed refuses to run in production, and this is local demo data.
-  const { NODE_ENV: _ignored, ...seedEnv } = process.env;
-  await run(bin('tsx'), ['server/seed.ts'], seedEnv);
-  await run(bin('tsx'), ['server/seed-mover.ts'], seedEnv);
+  log('Empty database, adding the demo accounts.');
+  await run(bin('tsx'), ['server/seed.ts']);
 }
 
 function newestChange(target) {
@@ -143,12 +150,32 @@ function newestChange(target) {
   );
 }
 
-function buildIsCurrent(baseUrl) {
+function buildIsCurrent() {
   if (!existsSync(BUILD_STAMP)) return false;
   const stamp = JSON.parse(readFileSync(BUILD_STAMP, 'utf8'));
-  if (stamp.baseUrl !== baseUrl) return false;
-  const newestSource = Math.max(...SOURCE_PATHS.map((entry) => newestChange(path.join(ROOT, entry))));
+  const newestSource = Math.max(
+    ...SOURCE_PATHS.map((entry) => newestChange(path.join(ROOT, entry))),
+  );
   return newestSource <= stamp.builtAt;
+}
+
+/**
+ * `next build` points next-env.d.ts at its own output folder. Pointing it back
+ * at .next keeps lint and the type checker working when .next-offline is gone.
+ */
+function pointTypesBackAtDevBuild() {
+  const file = path.join(ROOT, 'next-env.d.ts');
+  if (!existsSync(file)) return;
+  const content = readFileSync(file, 'utf8');
+  writeFileSync(file, content.replaceAll(`./${BUILD_DIR}/`, './.next/'));
+}
+
+/** Addresses a phone on the same network can use to reach this computer. */
+function wifiAddresses(port) {
+  return Object.values(networkInterfaces())
+    .flat()
+    .filter((address) => address && address.family === 'IPv4' && !address.internal)
+    .map((address) => `http://${address.address}:${port}`);
 }
 
 async function main() {
@@ -169,6 +196,8 @@ async function main() {
   await seedIfEmpty(uri, process.env.MONGODB_DB_NAME || 'moveup');
 
   const baseUrl = `http://localhost:${port}`;
+  // The browser calls the API on whatever address it opened, so this is only the
+  // server-side default.
   const appEnv = {
     ...process.env,
     COOKIE_SECURE: 'false',
@@ -177,20 +206,26 @@ async function main() {
     NEXT_TELEMETRY_DISABLED: '1',
   };
 
-  if (buildIsCurrent(baseUrl)) {
+  if (buildIsCurrent()) {
     log('Build is up to date.');
   } else {
     log('Building the app (about a minute).');
     const builtAt = Date.now();
-    await run(bin('next'), ['build'], appEnv);
-    writeFileSync(BUILD_STAMP, JSON.stringify({ baseUrl, builtAt }));
+    try {
+      await run(bin('next'), ['build'], appEnv);
+    } finally {
+      pointTypesBackAtDevBuild();
+    }
+    writeFileSync(BUILD_STAMP, JSON.stringify({ builtAt }));
   }
 
   log(`Open ${baseUrl}  (press Ctrl+C to stop)`);
+  for (const address of wifiAddresses(port)) log(`On a phone on the same Wi-Fi: ${address}`);
   await run(bin('next'), ['start', '-p', String(port)], appEnv);
 }
 
 function stopChildren() {
+  shuttingDown = true;
   for (const child of children) child.kill('SIGTERM');
 }
 

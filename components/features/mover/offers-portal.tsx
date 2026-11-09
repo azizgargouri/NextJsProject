@@ -25,15 +25,27 @@ import {
   Tag,
   TextInput,
 } from './mover-ui';
+import { ProfitPanel } from './profit-ui';
+
+type Sort = 'SOON' | 'PAY';
+
+/** Hourly net, or what the suggested quote would leave, so both kinds of offer compare. */
+function hourlyPay(offer: OfferDto): number {
+  const { netPerHour, suggestedQuote } = offer.profitability;
+  return netPerHour ?? suggestedQuote?.netPerHour ?? Number.NEGATIVE_INFINITY;
+}
 
 /** Item 5: offers matching the mover's zones and availability. */
 export function OffersPortal() {
   const offers = useMoverOffers();
+  const [sort, setSort] = useState<Sort>('SOON');
 
   if (offers.isPending) return <LoadingState label="Loading offers" />;
   if (offers.isError)
     return <ErrorState error={offers.error} onRetry={() => void offers.refetch()} />;
-  const { eligibility, offers: open, quoted } = offers.data;
+  const { eligibility, offers: unsorted, quoted } = offers.data;
+  const open =
+    sort === 'PAY' ? [...unsorted].sort((a, b) => hourlyPay(b) - hourlyPay(a)) : unsorted;
 
   return (
     <>
@@ -62,11 +74,35 @@ export function OffersPortal() {
           />
         </Panel>
       ) : (
-        <div className="grid gap-3 md:grid-cols-2">
-          {open.map((offer) => (
-            <OfferCard key={offer.id} offer={offer} onExpire={() => void offers.refetch()} />
-          ))}
-        </div>
+        <>
+          {open.length > 1 ? (
+            <div role="group" aria-label="Sort offers" className="mb-4 flex border border-ink">
+              {(
+                [
+                  ['SOON', 'Ending soon'],
+                  ['PAY', 'Best pay'],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={sort === value}
+                  onClick={() => setSort(value)}
+                  className={`mono flex-1 px-4 py-2 text-[11px] font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hazard ${
+                    sort === value ? 'bg-ink text-paper' : 'bg-paper text-ink hover:bg-paper-soft'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          ) : null}
+          <div className="grid gap-3 md:grid-cols-2">
+            {open.map((offer) => (
+              <OfferCard key={offer.id} offer={offer} onExpire={() => void offers.refetch()} />
+            ))}
+          </div>
+        </>
       )}
 
       {quoted.length > 0 ? (
@@ -111,8 +147,9 @@ type Mode = 'idle' | 'quote' | 'decline';
 function OfferActions({ offer, onExpired }: { offer: OfferDto; onExpired: () => void }) {
   const router = useRouter();
   const respond = useRespondToOffer(offer.id);
+  const suggested = offer.profitability.suggestedQuote;
   const [mode, setMode] = useState<Mode>('idle');
-  const [amount, setAmount] = useState('');
+  const [amount, setAmount] = useState(suggested ? String(suggested.amount) : '');
   const [message, setMessage] = useState('');
   const [reason, setReason] = useState('');
   const [amountError, setAmountError] = useState<string>();
@@ -209,6 +246,12 @@ function OfferActions({ offer, onExpired }: { offer: OfferDto; onExpired: () => 
               onChange={(event) => setAmount(event.target.value)}
             />
             <FieldError message={amountError} />
+            {suggested ? (
+              <p className="mt-1 text-xs text-ink-80">
+                Filled in with the suggested price, which covers a long day and your target. Change
+                it as you see fit.
+              </p>
+            ) : null}
           </div>
           <div>
             <Label htmlFor="quote-message">Message for the client (optional)</Label>
@@ -279,6 +322,9 @@ export function OfferDetail({ id }: { id: string }) {
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[2fr_1fr]">
         <div className="flex flex-col gap-6">
+          {isOpen || data.status === 'QUOTED' ? (
+            <ProfitPanel profitability={data.profitability} />
+          ) : null}
           <Panel title="The job">
             <dl className="grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
               <div>
@@ -341,32 +387,35 @@ export function OfferDetail({ id }: { id: string }) {
           </Panel>
         </div>
 
-        <Panel className="self-start">
-          {isOpen ? (
-            <>
-              <p className="text-sm text-ink-80">Time left to answer</p>
-              <p className="mb-4 mt-1 text-xl">
-                <Countdown expiresAt={data.expiresAt} onExpire={() => void offer.refetch()} />
-              </p>
-              <OfferActions offer={data} onExpired={() => void offer.refetch()} />
-            </>
-          ) : (
-            <>
-              <p className="font-bold">{CLOSED_LABELS[data.status]}</p>
-              {data.quote ? (
-                <p className="mt-2 text-sm">Your quote: {formatMoney(data.quote.amount)}</p>
-              ) : null}
-              {data.status === 'ACCEPTED' ? (
-                <Link
-                  href={`/mover/jobs/${move.id}`}
-                  className="mt-3 inline-block font-bold underline underline-offset-2"
-                >
-                  Open the job
-                </Link>
-              ) : null}
-            </>
-          )}
-        </Panel>
+        {/* The answer stays in reach while the mover reads the estimate. */}
+        <div className="flex flex-col gap-6 self-start lg:sticky lg:top-24">
+          <Panel>
+            {isOpen ? (
+              <>
+                <p className="text-sm text-ink-80">Time left to answer</p>
+                <p className="mb-4 mt-1 text-xl">
+                  <Countdown expiresAt={data.expiresAt} onExpire={() => void offer.refetch()} />
+                </p>
+                <OfferActions offer={data} onExpired={() => void offer.refetch()} />
+              </>
+            ) : (
+              <>
+                <p className="font-bold">{CLOSED_LABELS[data.status]}</p>
+                {data.quote ? (
+                  <p className="mt-2 text-sm">Your quote: {formatMoney(data.quote.amount)}</p>
+                ) : null}
+                {data.status === 'ACCEPTED' ? (
+                  <Link
+                    href={`/mover/jobs/${move.id}`}
+                    className="mt-3 inline-block font-bold underline underline-offset-2"
+                  >
+                    Open the job
+                  </Link>
+                ) : null}
+              </>
+            )}
+          </Panel>
+        </div>
       </div>
     </>
   );

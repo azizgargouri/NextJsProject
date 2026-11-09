@@ -14,10 +14,7 @@ import {
 import { env } from '../../config/env';
 import { BadRequestError } from '../../shared/database/errors';
 import { employmentContractRegistryAbi } from '../../../lib/blockchain/abi';
-import {
-  buildContractIntent,
-  contractIntentTypedData,
-} from '../../../lib/contracts/eip712';
+import { buildContractIntent, contractIntentTypedData } from '../../../lib/contracts/eip712';
 
 export interface ChainConfig {
   chainId: number;
@@ -131,7 +128,6 @@ export async function sendCreateContractTransaction(
   input: AnchorCreateInput,
 ): Promise<{ txHash: string; contractId: string }> {
   const { contractAddress } = getChainConfig();
-  const provider = getProvider();
   const wallet = getContractAdminWallet();
 
   await assertSystemWalletFunded(wallet.address);
@@ -182,7 +178,10 @@ export async function sendCreateContractTransaction(
   return { txHash: tx.hash, contractId: String(event.args.id).toLowerCase() };
 }
 
-function parseReceiptEvents(receipt: TransactionReceipt, contractAddress: string): LogDescription[] {
+function parseReceiptEvents(
+  receipt: TransactionReceipt,
+  contractAddress: string,
+): LogDescription[] {
   const iface = new Interface(employmentContractRegistryAbi);
 
   return receipt.logs
@@ -197,9 +196,7 @@ function parseReceiptEvents(receipt: TransactionReceipt, contractAddress: string
     .filter((event): event is LogDescription => event !== null);
 }
 
-async function confirmedTransaction(
-  txHash: string,
-): Promise<{
+async function confirmedTransaction(txHash: string): Promise<{
   receipt: TransactionReceipt;
   tx: TransactionResponse;
   events: ReturnType<typeof parseReceiptEvents>;
@@ -224,10 +221,7 @@ async function confirmedTransaction(
   return { receipt, tx, events: parseReceiptEvents(receipt, contractAddress) };
 }
 
-export async function isHrAdminOnChain(
-  wallet: string,
-  organizationHash: string,
-): Promise<boolean> {
+export async function isHrAdminOnChain(wallet: string, organizationHash: string): Promise<boolean> {
   const registry = getRegistryContract() as unknown as {
     isHrAdminFor(admin: string, organizationId: string): Promise<boolean>;
   };
@@ -345,7 +339,9 @@ export async function verifyCreateTransaction(
   );
 
   if (!event) {
-    throw new BadRequestError('The transaction does not contain the expected ContractCreated event.');
+    throw new BadRequestError(
+      'The transaction does not contain the expected ContractCreated event.',
+    );
   }
 
   const matches =
@@ -362,8 +358,7 @@ export async function verifyCreateTransaction(
     BigInt(event.args.nonce) === BigInt(input.nonce) &&
     BigInt(event.args.deadline) === BigInt(input.deadline) &&
     String(event.args.documentUri) === input.documentUri &&
-    String(event.args.employerSignature).toLowerCase() ===
-      input.employerSignature.toLowerCase();
+    String(event.args.employerSignature).toLowerCase() === input.employerSignature.toLowerCase();
 
   if (!matches) {
     throw new BadRequestError('The on-chain contract does not match the prepared document.');

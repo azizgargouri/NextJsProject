@@ -1,9 +1,23 @@
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
+import { ClientWorkspaceBar } from '@/components/features/workspace/workspace-links';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowRight, Minus, Plus, Truck, WifiOff, Weight, Box, UserCheck, LogIn, AlertTriangle, Calendar, Building } from 'lucide-react';
+import {
+  ArrowRight,
+  Minus,
+  Plus,
+  Truck,
+  WifiOff,
+  Weight,
+  Box,
+  UserCheck,
+  LogIn,
+  AlertTriangle,
+  Calendar,
+  Building,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { LoadScan, type ScanSuggestion } from './load-scan';
 import { RouteMapPicker } from './route-map-picker';
@@ -30,11 +44,41 @@ const CATALOGUE = [
 ];
 
 const VEHICLES = [
-  { name: 'Small Partner van', capacity: 3.5, payload: 600, base: 35, label: 'Boxes, studio & light luggage (< 600 kg)' },
-  { name: 'Compact van', capacity: 6, payload: 1000, base: 45, label: '1–8 boxes / studio (< 1,000 kg)' },
-  { name: 'Moving van', capacity: 14, payload: 1800, base: 75, label: '1–2 bedrooms / furniture (< 1.8 t)' },
-  { name: 'Box truck', capacity: 28, payload: 3500, base: 115, label: '2–3 bedrooms / full move (< 3.5 t)' },
-  { name: 'Large truck', capacity: 45, payload: 7500, base: 165, label: 'Large home / commercial move (< 7.5 t)' },
+  {
+    name: 'Small Partner van',
+    capacity: 3.5,
+    payload: 600,
+    base: 35,
+    label: 'Boxes, studio & light luggage (< 600 kg)',
+  },
+  {
+    name: 'Compact van',
+    capacity: 6,
+    payload: 1000,
+    base: 45,
+    label: '1–8 boxes / studio (< 1,000 kg)',
+  },
+  {
+    name: 'Moving van',
+    capacity: 14,
+    payload: 1800,
+    base: 75,
+    label: '1–2 bedrooms / furniture (< 1.8 t)',
+  },
+  {
+    name: 'Box truck',
+    capacity: 28,
+    payload: 3500,
+    base: 115,
+    label: '2–3 bedrooms / full move (< 3.5 t)',
+  },
+  {
+    name: 'Large truck',
+    capacity: 45,
+    payload: 7500,
+    base: 165,
+    label: 'Large home / commercial move (< 7.5 t)',
+  },
 ];
 
 const STORAGE_KEY = 'moveup_booking_draft_v1';
@@ -48,7 +92,9 @@ export function MoveBooking() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pickupAddress, setPickupAddress] = useState('12 Rue du Lac, Les Berges du Lac');
-  const [destinationAddress, setDestinationAddress] = useState('8 Avenue Habib Bourguiba, La Marsa');
+  const [destinationAddress, setDestinationAddress] = useState(
+    '8 Avenue Habib Bourguiba, La Marsa',
+  );
   const [isOffline, setIsOffline] = useState(false);
   const [chosenVehicle, setChosenVehicle] = useState<string>('AUTO');
   const [moveDate, setMoveDate] = useState<string>(() => new Date().toISOString().split('T')[0]!);
@@ -102,12 +148,31 @@ export function MoveBooking() {
     try {
       localStorage.setItem(
         STORAGE_KEY,
-        JSON.stringify({ items, distance, pickupAddress, destinationAddress, chosenVehicle, moveDate, timeSlot, scheduleMode }),
+        JSON.stringify({
+          items,
+          distance,
+          pickupAddress,
+          destinationAddress,
+          chosenVehicle,
+          moveDate,
+          timeSlot,
+          scheduleMode,
+        }),
       );
     } catch {
       // Ignore storage errors
     }
-  }, [items, distance, pickupAddress, destinationAddress, chosenVehicle, moveDate, timeSlot, scheduleMode, mounted]);
+  }, [
+    items,
+    distance,
+    pickupAddress,
+    destinationAddress,
+    chosenVehicle,
+    moveDate,
+    timeSlot,
+    scheduleMode,
+    mounted,
+  ]);
 
   const volume = useMemo(
     () => items.reduce((total, item) => total + item.volume * item.quantity, 0),
@@ -130,15 +195,22 @@ export function MoveBooking() {
   const vehicle =
     chosenVehicle === 'AUTO'
       ? recommendedVehicle
-      : VEHICLES.find((item) => item.name === chosenVehicle) ?? recommendedVehicle;
+      : (VEHICLES.find((item) => item.name === chosenVehicle) ?? recommendedVehicle);
 
   // Calibrated pricing: Base fee + km rate + volumetric fee + heavy cargo fee + floor access fee
   const floorSurcharge = !hasElevator && floorLevel > 0 ? floorLevel * 12 : 0;
   const price = Math.round(
-    vehicle.base + distance * 1.15 + volume * 4 + floorSurcharge + (weight > 400 ? (weight - 400) * 0.04 : 0),
+    vehicle.base +
+      distance * 1.15 +
+      volume * 4 +
+      floorSurcharge +
+      (weight > 400 ? (weight - 400) * 0.04 : 0),
   );
 
-  function changeItem(source: { id: string; name: string; volume: number; weight: number }, change: number) {
+  function changeItem(
+    source: { id: string; name: string; volume: number; weight: number },
+    change: number,
+  ) {
     setItems((current) => {
       const found = current.find((item) => item.id === source.id);
       if (!found && change > 0) return [...current, { ...source, quantity: 1 }];
@@ -225,7 +297,9 @@ export function MoveBooking() {
 
       if (status === 401 || code === 'UNAUTHORIZED') {
         useAuthStore.getState().logout();
-        setError('Your session has expired. Please sign in again — your inventory and draft are safely saved.');
+        setError(
+          'Your session has expired. Please sign in again — your inventory and draft are safely saved.',
+        );
         router.push('/sign-in?redirect=/request');
       } else {
         setError(message ?? 'Could not create your move. Please try again.');
@@ -245,9 +319,21 @@ export function MoveBooking() {
       <main className="grid min-h-dvh place-items-center bg-paper p-6 text-ink">
         <div className="w-full max-w-md border-2 border-ink bg-paper-soft p-7 text-center">
           <p className="mono text-[10px] text-hazard">[ SECURE BOOKING ]</p>
-          <h1 className="display mt-3 text-4xl">SIGN IN<br />TO BOOK.</h1>
-          <p className="mt-4 text-sm text-ink-80">A Client account is required before you can scan items, calculate a vehicle, or request a move.</p>
-          <Link href="/sign-in?redirect=/request" className="mono mt-6 inline-flex border-2 border-ink bg-ink px-5 py-3 text-xs font-bold text-paper hover:bg-hazard">SIGN IN AS CLIENT</Link>
+          <h1 className="display mt-3 text-4xl">
+            SIGN IN
+            <br />
+            TO BOOK.
+          </h1>
+          <p className="mt-4 text-sm text-ink-80">
+            A Client account is required before you can scan items, calculate a vehicle, or request
+            a move.
+          </p>
+          <Link
+            href="/sign-in?redirect=/request"
+            className="mono mt-6 inline-flex border-2 border-ink bg-ink px-5 py-3 text-xs font-bold text-paper hover:bg-hazard"
+          >
+            SIGN IN AS CLIENT
+          </Link>
         </div>
       </main>
     );
@@ -258,9 +344,25 @@ export function MoveBooking() {
       <main className="grid min-h-dvh place-items-center bg-paper p-6 text-ink">
         <div className="w-full max-w-md border-2 border-ink bg-paper-soft p-7 text-center">
           <p className="mono text-[10px] text-hazard">[ CLIENT ACCOUNT REQUIRED ]</p>
-          <h1 className="display mt-3 text-4xl">SWITCH<br />ACCOUNT.</h1>
-          <p className="mt-4 text-sm text-ink-80">You are signed in as a {user.role.toLowerCase()}. Only Client accounts can request a vehicle.</p>
-          <button type="button" onClick={() => { useAuthStore.getState().logout(); router.push('/sign-in?redirect=/request'); }} className="mono mt-6 border-2 border-ink bg-ink px-5 py-3 text-xs font-bold text-paper hover:bg-hazard">SIGN IN AS CLIENT</button>
+          <h1 className="display mt-3 text-4xl">
+            SWITCH
+            <br />
+            ACCOUNT.
+          </h1>
+          <p className="mt-4 text-sm text-ink-80">
+            You are signed in as a {user.role.toLowerCase()}. Only Client accounts can request a
+            vehicle.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              useAuthStore.getState().logout();
+              router.push('/sign-in?redirect=/request');
+            }}
+            className="mono mt-6 border-2 border-ink bg-ink px-5 py-3 text-xs font-bold text-paper hover:bg-hazard"
+          >
+            SIGN IN AS CLIENT
+          </button>
         </div>
       </main>
     );
@@ -290,10 +392,13 @@ export function MoveBooking() {
                 SIGN IN BEFORE BOOKING
               </Link>
             )}
-            <span className="mono text-[10px] text-ink-40 hidden sm:inline">&middot; STEP 01/02</span>
+            <span className="mono text-[10px] text-ink-40 hidden sm:inline">
+              &middot; STEP 01/02
+            </span>
           </div>
         </div>
       </header>
+      <ClientWorkspaceBar />
 
       {/* Guest Mode / Auth Status Notice */}
       {mounted && !isAuthenticated && (
@@ -312,7 +417,9 @@ export function MoveBooking() {
       {mounted && isAuthenticated && user?.role !== 'CLIENT' && (
         <div className="border-b border-ink bg-hazard px-4 py-2.5 text-center mono text-xs text-white flex items-center justify-center gap-3">
           <AlertTriangle size={15} />
-          <span>You are logged in as {user?.role}. Requesting a move requires a Client account.</span>
+          <span>
+            You are logged in as {user?.role}. Requesting a move requires a Client account.
+          </span>
           <button
             type="button"
             onClick={() => {
@@ -341,8 +448,8 @@ export function MoveBooking() {
             WHAT ARE YOU MOVING?
           </h1>
           <p className="mt-4 max-w-xl leading-relaxed text-sm text-ink-80 md:text-base">
-            Scan your space with live LiDAR depth / photo analysis or select items manually.
-            We calculate both space ($m^3$) and weight ($kg$) to guarantee a matching vehicle.
+            Scan your space with live LiDAR depth / photo analysis or select items manually. We
+            calculate both space ($m^3$) and weight ($kg$) to guarantee a matching vehicle.
           </p>
 
           {/* Interactive LiDAR & Photo Scanner Engine */}
@@ -361,8 +468,18 @@ export function MoveBooking() {
               </div>
             </div>
             <div className="mt-2 flex gap-4 border-t border-ink/20 pt-2 mono text-[10px] text-ink-80">
-              <span>VOL: <strong>{volume.toFixed(1)} / {vehicle.capacity} M&sup3;</strong></span>
-              <span>WEIGHT: <strong>{Math.round(weight)} / {vehicle.payload} KG</strong></span>
+              <span>
+                VOL:{' '}
+                <strong>
+                  {volume.toFixed(1)} / {vehicle.capacity} M&sup3;
+                </strong>
+              </span>
+              <span>
+                WEIGHT:{' '}
+                <strong>
+                  {Math.round(weight)} / {vehicle.payload} KG
+                </strong>
+              </span>
             </div>
           </div>
 
@@ -379,10 +496,7 @@ export function MoveBooking() {
               {CATALOGUE.map((item) => {
                 const selected = items.find((selectedItem) => selectedItem.id === item.id);
                 return (
-                  <div
-                    key={item.id}
-                    className="flex min-h-16 items-center justify-between py-3.5"
-                  >
+                  <div key={item.id} className="flex min-h-16 items-center justify-between py-3.5">
                     <div className="pr-2">
                       <p className="font-semibold text-sm md:text-base">{item.name}</p>
                       <p className="mono mt-0.5 text-[9px] text-ink-40">
@@ -422,7 +536,11 @@ export function MoveBooking() {
           <div className="mt-10">
             <RouteMapPicker
               initialDistance={distance}
-              onLocationSelect={({ pickupAddress: pAddr, destinationAddress: dAddr, distanceKm }) => {
+              onLocationSelect={({
+                pickupAddress: pAddr,
+                destinationAddress: dAddr,
+                distanceKm,
+              }) => {
                 setPickupAddress(pAddr);
                 setDestinationAddress(dAddr);
                 setDistance(distanceKm);
@@ -515,12 +633,22 @@ export function MoveBooking() {
                     onChange={(e) => setTimeSlot(e.target.value)}
                     className="w-full border-2 border-ink bg-paper px-2.5 py-1.5 text-xs font-semibold focus:outline-none focus:border-hazard"
                   >
-                    <option value="ASAP Express (Next available)">ASAP Express (Next available)</option>
-                    <option value="08:00 - 11:00 (Early Morning)">08:00 - 11:00 (Early Morning)</option>
-                    <option value="09:00 - 12:00 (Morning Slot)">09:00 - 12:00 (Morning Slot)</option>
+                    <option value="ASAP Express (Next available)">
+                      ASAP Express (Next available)
+                    </option>
+                    <option value="08:00 - 11:00 (Early Morning)">
+                      08:00 - 11:00 (Early Morning)
+                    </option>
+                    <option value="09:00 - 12:00 (Morning Slot)">
+                      09:00 - 12:00 (Morning Slot)
+                    </option>
                     <option value="11:00 - 14:00 (Midday Slot)">11:00 - 14:00 (Midday Slot)</option>
-                    <option value="14:00 - 17:00 (Afternoon Slot)">14:00 - 17:00 (Afternoon Slot)</option>
-                    <option value="17:00 - 20:00 (Evening Slot)">17:00 - 20:00 (Evening Slot)</option>
+                    <option value="14:00 - 17:00 (Afternoon Slot)">
+                      14:00 - 17:00 (Afternoon Slot)
+                    </option>
+                    <option value="17:00 - 20:00 (Evening Slot)">
+                      17:00 - 20:00 (Evening Slot)
+                    </option>
                     <option value="Flexible All-Day">Flexible All-Day</option>
                   </select>
                 </div>
@@ -601,8 +729,12 @@ export function MoveBooking() {
               {/* Volume gauge */}
               <div>
                 <div className="flex justify-between mono text-[10px]">
-                  <span className="flex items-center gap-1"><Box size={12} /> VOLUME</span>
-                  <strong>{volume.toFixed(1)} / {vehicle.capacity} M&sup3; ({volumePct}%)</strong>
+                  <span className="flex items-center gap-1">
+                    <Box size={12} /> VOLUME
+                  </span>
+                  <strong>
+                    {volume.toFixed(1)} / {vehicle.capacity} M&sup3; ({volumePct}%)
+                  </strong>
                 </div>
                 <div className="mt-1.5 h-2 w-full overflow-hidden border border-ink bg-paper-soft">
                   <div
@@ -615,7 +747,9 @@ export function MoveBooking() {
               {/* Weight gauge */}
               <div>
                 <div className="flex justify-between mono text-[10px]">
-                  <span className="flex items-center gap-1"><Weight size={12} /> TOTAL WEIGHT</span>
+                  <span className="flex items-center gap-1">
+                    <Weight size={12} /> TOTAL WEIGHT
+                  </span>
                   <strong className={isOverweight ? 'text-hazard font-bold' : ''}>
                     {Math.round(weight)} / {vehicle.payload} KG ({weightPct}%)
                   </strong>
@@ -654,7 +788,8 @@ export function MoveBooking() {
               ))}
             </select>
             <p className="mt-1.5 mono text-[9px] text-ink-40">
-              Auto selection monitors both $m^3$ space and weight payload. Heavy cargo triggers automatic vehicle upgrade.
+              Auto selection monitors both $m^3$ space and weight payload. Heavy cargo triggers
+              automatic vehicle upgrade.
             </p>
           </div>
 
@@ -680,9 +815,13 @@ export function MoveBooking() {
             {isSubmitting ? (
               'CREATING MOVE…'
             ) : !isAuthenticated ? (
-              <>SIGN IN TO REQUEST THIS VEHICLE <ArrowRight /></>
+              <>
+                SIGN IN TO REQUEST THIS VEHICLE <ArrowRight />
+              </>
             ) : (
-              <>SIGN &amp; REQUEST THIS VEHICLE <ArrowRight /></>
+              <>
+                SIGN &amp; REQUEST THIS VEHICLE <ArrowRight />
+              </>
             )}
           </Button>
 
@@ -713,11 +852,8 @@ export function MoveBooking() {
             onClick={handleOpenSignature}
             className="h-11 px-5 mono text-xs font-bold"
           >
-            {isSubmitting
-              ? 'CREATING…'
-              : !isAuthenticated
-              ? 'SIGN IN & BOOK'
-              : 'SIGN & BOOK'} <ArrowRight size={14} />
+            {isSubmitting ? 'CREATING…' : !isAuthenticated ? 'SIGN IN & BOOK' : 'SIGN & BOOK'}{' '}
+            <ArrowRight size={14} />
           </Button>
         </div>
       </div>

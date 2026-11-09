@@ -64,6 +64,54 @@ export interface QuoteDto {
   createdAt: string;
 }
 
+/** The mover's own running costs, used to work out what a job leaves them. */
+export interface MoverCostsDto {
+  fuelLitresPer100Km: number;
+  fuelPricePerLitre: number;
+  /** Helpers on a usual job, besides the driver. */
+  helpers: number;
+  helperHourlyRate: number;
+  /** Wear, maintenance and other costs that grow with distance. */
+  costPerKm: number;
+  /** Net per hour the mover wants to earn. */
+  targetHourlyNet: number;
+}
+
+export type ProfitVerdict = 'GOOD' | 'OK' | 'LOW';
+export type ProfitLineKind = 'PRICE' | 'COMMISSION' | 'FUEL' | 'HELPERS' | 'WEAR';
+
+export interface ProfitabilityDto {
+  /** Fixed price, or the mover's own quote. Null while a quote is still needed. */
+  price: number | null;
+  currency: string;
+  net: number | null;
+  /** Net if the job runs to the worst-case duration. */
+  netWorstCase: number | null;
+  netPerHour: number | null;
+  verdict: ProfitVerdict | null;
+  /** The mover's own hourly target, to compare against. */
+  targetHourlyNet: number;
+  /** Whole time away, from leaving base to getting back. */
+  hours: { likely: number; worst: number };
+  distanceKm: number;
+  /** Price (or the suggested quote) first, then each cost as a negative amount. */
+  breakdown: { label: string; amount: number; kind: ProfitLineKind }[];
+  reasons: string[];
+  warnings: string[];
+  /** Offered only while a quote is still needed, with what the mover would keep at that price. */
+  suggestedQuote: {
+    amount: number;
+    net: number;
+    netPerHour: number;
+    similarRange: { low: number; high: number } | null;
+  } | null;
+  /** ROUGH until the model has learned from enough of this mover's finished jobs. */
+  confidence: 'ROUGH' | 'GOOD';
+  basedOnJobs: number;
+  modelVersion: number | null;
+  costsAreDefaults: boolean;
+}
+
 export interface OfferDto {
   id: string;
   status: OfferStatus;
@@ -72,6 +120,7 @@ export interface OfferDto {
   /** True when the society set a fixed price the mover can accept directly. */
   canAccept: boolean;
   quote: QuoteDto | null;
+  profitability: ProfitabilityDto;
   move: {
     id: string;
     reference: string;
@@ -131,6 +180,13 @@ export interface LoadCheckDto extends LoadCountsDto {
   confirmedAt: string;
 }
 
+export interface BoxScanDto {
+  id: string;
+  code: string;
+  label: string;
+  scannedAt: string;
+}
+
 /** Proof still needed before the next status button unlocks. */
 export interface JobProofDto {
   minLoadPhotos: number;
@@ -140,9 +196,14 @@ export interface JobProofDto {
   loadCheck: LoadCheckDto | null;
   /** Worked out from the client's item list; null when they listed no items. */
   expectedLoad: LoadCountsDto | null;
+  /** Boxes scanned into the vehicle at pickup, newest first. They set the box count. */
+  boxes: BoxScanDto[];
+  canScanBoxes: boolean;
 }
 
-export interface LoadCheckPayload extends LoadCountsDto {
+/** The box count is not sent: it is the number of scanned boxes. */
+export interface LoadCheckPayload {
+  furniture: number;
   note?: string;
   confirmed: true;
 }
@@ -247,6 +308,9 @@ export interface MoverProfileDto {
   team: TeamMemberDto[];
   documents: MoverDocumentDto[];
   availableZones: { code: string; label: string }[];
+  /** The mover's costs, or the defaults until they enter their own. */
+  costs: MoverCostsDto;
+  costsAreDefaults: boolean;
 }
 
 export interface EarningDto {
@@ -307,6 +371,8 @@ export interface MoverProfilePayload {
   taxId?: string;
   bio?: string;
   zones?: string[];
+  /** Null goes back to the defaults. */
+  costs?: MoverCostsDto | null;
 }
 
 export interface VehiclePayload {

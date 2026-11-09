@@ -15,19 +15,23 @@ const envSchema = z.object({
     .positive()
     .default(60 * 60 * 24 * 30),
   MONGODB_URI: z.string().min(1, 'MONGODB_URI is required'),
+  MONGODB_DB_NAME: z.string().min(1).default('moveup'),
   OFFER_TTL_MINUTES: z.coerce.number().int().positive().default(120),
   UPLOAD_DIR: z.string().min(1).default('.uploads'),
-  COOKIE_SECURE: z.enum(['true', 'false']).transform((value) => value === 'true').optional(),
+  /** Defaults to on in production. The offline build turns it off to work over http://localhost. */
+  COOKIE_SECURE: z
+    .enum(['true', 'false'])
+    .transform((value) => value === 'true')
+    .optional(),
+  /** "off" makes the profitability estimate ignore the learned model and use the basic rules. */
+  PROFIT_MODEL: z.enum(['on', 'off']).default('on'),
   // Web3 is optional: the app still boots without it, but contract endpoints
   // return a clear "not configured" error until these are set.
   NEXT_PUBLIC_CHAIN_ID: z.preprocess(
     emptyToUndefined,
     z.coerce.number().int().positive().optional(),
   ),
-  NEXT_PUBLIC_RPC_URL: z.preprocess(
-    emptyToUndefined,
-    z.string().url().optional(),
-  ),
+  NEXT_PUBLIC_RPC_URL: z.preprocess(emptyToUndefined, z.string().url().optional()),
   NEXT_PUBLIC_CONTRACT_ADDRESS: z.preprocess(
     emptyToUndefined,
     z
@@ -76,9 +80,11 @@ export function env(): Env {
     ACCESS_TOKEN_TTL: process.env.ACCESS_TOKEN_TTL,
     REFRESH_TOKEN_TTL: process.env.REFRESH_TOKEN_TTL,
     MONGODB_URI: process.env.MONGODB_URI,
-    OFFER_TTL_MINUTES: process.env.OFFER_TTL_MINUTES,
-    UPLOAD_DIR: process.env.UPLOAD_DIR,
-    COOKIE_SECURE: process.env.COOKIE_SECURE,
+    MONGODB_DB_NAME: process.env.MONGODB_DB_NAME || undefined,
+    OFFER_TTL_MINUTES: process.env.OFFER_TTL_MINUTES || undefined,
+    UPLOAD_DIR: process.env.UPLOAD_DIR || undefined,
+    COOKIE_SECURE: process.env.COOKIE_SECURE || undefined,
+    PROFIT_MODEL: process.env.PROFIT_MODEL || undefined,
     NEXT_PUBLIC_CHAIN_ID: process.env.NEXT_PUBLIC_CHAIN_ID,
     NEXT_PUBLIC_RPC_URL: process.env.NEXT_PUBLIC_RPC_URL,
     NEXT_PUBLIC_CONTRACT_ADDRESS: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS,

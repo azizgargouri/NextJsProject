@@ -2,6 +2,7 @@ import { isValidObjectId } from 'mongoose';
 import { connectMongo } from '../../shared/database/mongoose';
 import {
   AvailabilityModel,
+  BoxScanModel,
   EarningModel,
   JobOfferModel,
   MessageModel,
@@ -18,6 +19,7 @@ import {
   UserModel,
   VehicleModel,
   type AvailabilityDoc,
+  type BoxScanDoc,
   type EarningDoc,
   type JobOfferDoc,
   type MessageDoc,
@@ -594,6 +596,48 @@ export const moverRepository = {
   async createPhoto(data: Record<string, unknown>): Promise<PhotoDoc> {
     await db();
     return (await PhotoModel.create(data)).toObject() as PhotoDoc;
+  },
+
+  // ---------- box scans ----------
+  async listBoxScans(moveId: string): Promise<BoxScanDoc[]> {
+    await db();
+    return BoxScanModel.find({ moveId }).sort({ createdAt: -1, _id: -1 }).lean<BoxScanDoc[]>();
+  },
+
+  async countBoxScans(moveId: string): Promise<number> {
+    await db();
+    return BoxScanModel.countDocuments({ moveId });
+  },
+
+  /** The unique index turns a second scan of the same box into a null. */
+  async createBoxScan(data: {
+    moveId: string;
+    moverId: string;
+    code: string;
+    label: string;
+  }): Promise<BoxScanDoc | null> {
+    await db();
+    try {
+      return (await BoxScanModel.create(data)).toObject() as BoxScanDoc;
+    } catch (error) {
+      if ((error as { code?: number }).code === 11000) return null;
+      throw error;
+    }
+  },
+
+  async deleteBoxScan(moveId: string, id: string): Promise<boolean> {
+    await db();
+    if (!validId(id)) return false;
+    return (await BoxScanModel.deleteOne({ _id: id, moveId })).deletedCount === 1;
+  },
+
+  /** A confirmed count stops matching once the scanned boxes change. */
+  async clearLoadCheck(moveId: string, moverId: string): Promise<void> {
+    await db();
+    await MoveRequestModel.updateOne(
+      { _id: moveId, assignedMoverId: moverId, status: 'IN_PROGRESS', progressStage: 'LOADING' },
+      { $set: { loadCheck: null } },
+    );
   },
 
   // ---------- notifications ----------

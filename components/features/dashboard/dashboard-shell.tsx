@@ -6,22 +6,12 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useAuthStore } from '@/hooks/stores/auth-store';
 import { Button } from '@/components/ui/button';
 import { useSignOut } from '@/hooks/content/auth/use-sign-out';
-
-const HR_NAV = [
-  { href: '/dashboard', label: 'Workspace' },
-  { href: '/admin', label: 'Admin Back-Office' },
-  { href: '/employees', label: 'Employees' },
-  { href: '/attendance', label: 'Attendance' },
-  { href: '/leave', label: 'Leave' },
-  { href: '/contracts', label: 'Contracts' },
-  { href: '/profile', label: 'Profile' },
-];
-
-const SELF_NAV = [
-  { href: '/me', label: 'My workspace' },
-  { href: '/contracts', label: 'My contracts' },
-  { href: '/profile', label: 'Profile' },
-];
+import { useOnlineStatus } from '@/hooks/use-online-status';
+import {
+  WorkspaceLinkList,
+  workspaceHome,
+  workspaceLinks,
+} from '@/components/features/workspace/workspace-links';
 
 /**
  * Protected shell — the authenticated app layout.
@@ -39,6 +29,7 @@ export function DashboardLayout({
   const { user, isAuthenticated } = useAuthStore();
   const [hydrated, setHydrated] = useState(false);
   const signOut = useSignOut();
+  const online = useOnlineStatus();
 
   useEffect(() => {
     const persistence = useAuthStore.persist;
@@ -65,15 +56,20 @@ export function DashboardLayout({
       router.replace('/sign-in');
       return;
     }
+    // Movers work in their own workspace (/mover); the HR pages (/me, contracts) stay reachable.
+    if (user?.role === 'MOVER' && pathname === '/dashboard') {
+      router.replace('/mover');
+      return;
+    }
     if (adminOnly && user?.role !== 'ADMIN') {
       if (user?.role === 'MOVER') {
-        router.replace('/me');
+        router.replace('/mover');
       } else {
         router.replace('/request');
       }
       return;
     }
-  }, [hydrated, isAuthenticated, adminOnly, user?.role, router]);
+  }, [hydrated, isAuthenticated, adminOnly, user?.role, router, pathname]);
 
   if (!hydrated || !isAuthenticated || (adminOnly && user?.role !== 'ADMIN')) {
     return (
@@ -84,7 +80,7 @@ export function DashboardLayout({
     );
   }
 
-  const navItems = user?.role === 'ADMIN' ? HR_NAV : SELF_NAV;
+  const navItems = workspaceLinks(user?.role);
 
   return (
     <div className="min-h-dvh bg-paper">
@@ -92,35 +88,32 @@ export function DashboardLayout({
         {/* Main top bar */}
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 md:px-6">
           <div className="flex items-center gap-6">
-            <Link href="/dashboard" className="mono text-sm font-bold flex items-center">
+            <Link
+              href={workspaceHome(user?.role)}
+              className="mono flex shrink-0 items-center text-sm font-bold"
+            >
               <span className="mr-2 inline-block size-2.5 bg-hazard" />
               MOVE<span className="text-hazard">UP</span>
             </Link>
 
-            {/* Desktop Navigation Links */}
-            <nav className="hidden md:flex items-center gap-6">
-              {navItems.map((item) => {
-                const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    aria-current={active ? 'page' : undefined}
-                    className={
-                      active
-                        ? 'mono border-b-2 border-hazard pb-1 text-[11px] font-bold text-ink'
-                        : 'mono border-b-2 border-transparent pb-1 text-[11px] text-ink-40 transition-colors hover:text-ink'
-                    }
-                  >
-                    {item.label.toUpperCase()}
-                  </Link>
-                );
-              })}
+            {/* Desktop navigation: every module of the signed-in role, in one header */}
+            <nav aria-label="Workspace" className="hidden items-center gap-5 lg:flex">
+              <WorkspaceLinkList links={navItems} variant="inline" />
             </nav>
           </div>
 
           {/* User profile & actions */}
           <div className="flex items-center gap-3 md:gap-4">
+            <p
+              className="mono hidden items-center gap-1.5 text-[10px] text-ink-80 sm:flex"
+              role="status"
+            >
+              <span
+                className={online ? 'inline-block size-2 bg-ink' : 'inline-block size-2 bg-hazard'}
+                aria-hidden
+              />
+              {online ? 'ONLINE' : 'OFFLINE'}
+            </p>
             <p className="mono text-[10px] text-ink-80 truncate max-w-[130px] sm:max-w-none">
               {user?.name?.toUpperCase() ?? 'OPERATOR'} / {user?.role ?? 'CLIENT'}
             </p>
@@ -135,26 +128,13 @@ export function DashboardLayout({
           </div>
         </div>
 
-        {/* Mobile horizontal scrollable navigation strip */}
-        <div className="flex md:hidden overflow-x-auto no-scrollbar border-t border-ink/15 px-4 py-2 gap-4 bg-paper-soft">
-          {navItems.map((item) => {
-            const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                aria-current={active ? 'page' : undefined}
-                className={
-                  active
-                    ? 'mono whitespace-nowrap border-b-2 border-hazard pb-0.5 text-[11px] font-bold text-ink'
-                    : 'mono whitespace-nowrap border-b-2 border-transparent pb-0.5 text-[11px] text-ink-40'
-                }
-              >
-                {item.label.toUpperCase()}
-              </Link>
-            );
-          })}
-        </div>
+        {/* Mobile and tablet: the same links as a scrollable strip */}
+        <nav
+          aria-label="Workspace"
+          className="no-scrollbar flex gap-4 overflow-x-auto border-t border-ink/15 bg-paper-soft px-4 py-2 lg:hidden"
+        >
+          <WorkspaceLinkList links={navItems} variant="strip" />
+        </nav>
       </header>
       {children}
     </div>
