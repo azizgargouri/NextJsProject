@@ -164,7 +164,8 @@ export function LayoutPanel({ home }: { home: HomeDetailDto }) {
         !generate.isPending && (
           <p className="mono mt-6 border border-dashed border-ink-40 px-4 py-5 text-[11px] text-ink-80">
             No layout yet. Press “Suggest layout” to place your {home.moveRequest?.totals.itemCount}{' '}
-            items in your {home.rooms.length} room{home.rooms.length === 1 ? '' : 's'}.
+            item{home.moveRequest?.totals.itemCount === 1 ? '' : 's'} in your {home.rooms.length}{' '}
+            room{home.rooms.length === 1 ? '' : 's'}.
           </p>
         )
       )}
