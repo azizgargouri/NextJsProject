@@ -7,6 +7,7 @@
  * audit → revalidate the affected pages → return a serialisable state for useActionState.
  */
 import { revalidatePath } from 'next/cache';
+import { qualityPaths } from '@/lib/quality/paths';
 import type { z } from 'zod';
 import { requireActionUser } from '@/server/shared/auth/session';
 import { DomainError, ValidationError } from '@/server/shared/database/errors';
@@ -57,7 +58,7 @@ export async function createClaimAction(
       api: 'createClaimAction',
       logInfo: { claimId: claim.id, reference: claim.reference },
     });
-    revalidatePath('/dashboard/claims');
+    qualityPaths('/claims').forEach((path) => revalidatePath(path));
     return {
       ok: true,
       message: `Claim ${claim.reference} submitted. Our team will get back to you.`,
@@ -84,10 +85,32 @@ export async function postClaimMessageAction(
       api: 'postClaimMessageAction',
       logInfo: { claimId },
     });
-    revalidatePath(`/dashboard/claims/${claimId}`);
+    qualityPaths(`/claims/${claimId}`).forEach((path) => revalidatePath(path));
     return { ok: true, message: 'Message sent' };
   } catch (error) {
     return failure(error, formData);
+  }
+}
+
+/** generateText inside a Server Action (course ch.6) — drafts a reply in the claim thread. */
+export async function suggestClaimMessageAction(claimId: string): Promise<ActionState> {
+  try {
+    const user = await requireActionUser(['CLIENT', 'MOVER']);
+    const { result, source } = await claimsService.suggestMessage(user, claimId);
+    logEvent({
+      event: EventType.AI_REQUEST,
+      userId: user.sub,
+      method: 'ACTION',
+      api: 'suggestClaimMessageAction',
+      logInfo: { claimId, source },
+    });
+    return {
+      ok: true,
+      message: source === 'ai' ? 'AI reply suggestion ready' : 'Smart reply suggestion ready',
+      suggestion: result,
+    };
+  } catch (error) {
+    return failure(error);
   }
 }
 
@@ -107,7 +130,7 @@ export async function createReviewAction(
       api: 'createReviewAction',
       logInfo: { reviewId: review.id, status: review.status },
     });
-    revalidatePath('/dashboard/reviews');
+    qualityPaths('/reviews').forEach((path) => revalidatePath(path));
     return {
       ok: true,
       message:
@@ -135,7 +158,7 @@ export async function replyToReviewAction(
       api: 'replyToReviewAction',
       logInfo: { reviewId },
     });
-    revalidatePath('/dashboard/reviews');
+    qualityPaths('/reviews').forEach((path) => revalidatePath(path));
     return { ok: true, message: 'Reply published' };
   } catch (error) {
     return failure(error, formData);
@@ -162,4 +185,146 @@ export async function suggestReplyAction(reviewId: string): Promise<ActionState>
   } catch (error) {
     return failure(error);
   }
+}
+
+/**
+ * AI Smart Review Polisher & Auto-Scorer for clients on `/dashboard/reviews`.
+ * Grounded strictly on:
+ *  1) Any rough notes typed by the client,
+ *  2) Any star ratings already clicked by the client, OR
+ *  3) Actual MongoDB claims filed by the client on `moveReference`.
+ * If none of the 3 exist, it refuses to guess and asks the client for input first.
+ */
+export async function polishClientReviewAction(input: {
+  roughDraft: string;
+  moveReference?: string;
+  rating?: number;
+  punctuality?: number;
+  care?: number;
+  communication?: number;
+}): Promise<{
+  ok: boolean;
+  reason: string;
+  polishedComment?: string;
+  rating?: number;
+  punctuality?: number;
+  care?: number;
+  communication?: number;
+}> {
+  const user = await requireActionUser(['CLIENT']);
+  const text = input.roughDraft.trim();
+  const moveRef = input.moveReference?.trim().toUpperCase();
+
+  // Check if the client has any real claims recorded in MongoDB for this moveReference.
+  const allClaims = await claimsService.listForParty(user, { page: 1, limit: 50, status: 'ALL' });
+  const moveClaims = moveRef
+    ? allClaims.data.filter((c) => c.moveReference?.toUpperCase() === moveRef)
+    : [];
+
+  const hasUserStars = Boolean(
+    input.rating || input.punctuality || input.care || input.communication,
+  );
+
+  // If the client gave no text, clicked no stars, and has no claims on this move -> do NOT hallucinate!
+  if (!text && !hasUserStars && moveClaims.length === 0) {
+    return {
+      ok: false,
+      reason: `AI cannot guess how move ${moveRef || ''} went without evidence: no claims were found on this move, and you haven't clicked any stars or typed keywords yet. Pick your star rating or type a few words first!`,
+    };
+  }
+
+  // Case 1: Grounded on real MongoDB claim(s) when text is empty
+  if (!text && moveClaims.length > 0 && !hasUserStars) {
+    const hasDelay = moveClaims.some((c) => c.category === 'DELAY');
+    const hasDamage = moveClaims.some((c) => c.category === 'DAMAGE');
+    const hasLoss = moveClaims.some((c) => c.category === 'LOSS');
+    const hasBehavior = moveClaims.some((c) => c.category === 'BEHAVIOUR');
+    const refs = moveClaims.map((c) => c.reference).join(', ');
+    const subjects = moveClaims.map((c) => `"${c.subject}"`).join(' and ');
+
+    const punctuality = hasDelay ? 1 : 4;
+    const care = hasDamage || hasLoss ? 2 : 4;
+    const communication = hasDelay || hasBehavior ? 2 : 4;
+    const rating = Math.max(1, Math.min(5, Math.round((punctuality + care + communication) / 3)));
+
+    const resolvedClaim = moveClaims.find((c) => c.status === 'RESOLVED' && c.resolution);
+    const resolutionTail = resolvedClaim
+      ? ` MoveUp support resolved claim ${resolvedClaim.reference} (${resolvedClaim.resolution?.amount ? `${resolvedClaim.resolution.amount} TND` : resolvedClaim.resolution?.outcome}).`
+      : ` Claim ${refs} is currently logged with MoveUp support.`;
+
+    return {
+      ok: true,
+      reason: `Grounded on ${moveClaims.length} MongoDB claim(s) filed for ${moveRef}: ${refs} (${subjects}).`,
+      polishedComment: `Move ${moveRef} experienced an issue reported under ${refs}: ${moveClaims.map((c) => c.subject).join('; ')}.${resolutionTail}`,
+      rating,
+      punctuality,
+      care,
+      communication,
+    };
+  }
+
+  // Case 2: Grounded on the user's rough draft and/or selected stars
+  const lower = text.toLowerCase();
+  const late = /late|retard|slow|wait|hour|heure/i.test(lower);
+  const broken = /broke|broken|crack|scratch|damage|lost|missing|cass|abîm|perdu/i.test(lower);
+  const rude = /rude|no call|sans prévenir|ignored|unprofessional/i.test(lower);
+  const great = /great|excellent|perfect|professional|careful|on time|super|parfait|ponctuel/i.test(
+    lower,
+  );
+
+  const baseStar = input.rating ?? (great ? 5 : late || broken || rude ? 2 : 4);
+  const punctuality = input.punctuality ?? (late ? 2 : great ? 5 : baseStar);
+  const care = input.care ?? (broken ? 2 : great ? 5 : baseStar);
+  const communication = input.communication ?? (rude ? 2 : great ? 5 : baseStar);
+  const rating =
+    input.rating ?? Math.max(1, Math.min(5, Math.round((punctuality + care + communication) / 3)));
+
+  let polishedComment = text;
+  const moveTag = moveRef ? ` (${moveRef})` : '';
+
+  if (!text && hasUserStars) {
+    if (rating >= 4) {
+      polishedComment = `Very satisfied with move${moveTag} (${rating}/5). Punctuality (${punctuality}/5), item care (${care}/5), and crew communication (${communication}/5) met our expectations.`;
+    } else if (rating === 3) {
+      polishedComment = `Mixed experience on move${moveTag} (${rating}/5). Punctuality was ${punctuality}/5, item care ${care}/5, and communication ${communication}/5.`;
+    } else {
+      polishedComment = `Disappointing experience on move${moveTag} (${rating}/5). Improvements are needed in punctuality (${punctuality}/5), item care (${care}/5), and communication (${communication}/5).`;
+    }
+  } else if (text.length < 140) {
+    const parts: string[] = [text.charAt(0).toUpperCase() + text.slice(1).replace(/[.!?]*$/, '.')];
+    if (late && !broken) {
+      parts.push(
+        `While the arrival window for the move${moveTag} experienced a delay, the crew handled our belongings once on site.`,
+      );
+    } else if (broken && !late) {
+      parts.push(
+        `Better protective wrapping is needed for fragile items during transit${moveTag}.`,
+      );
+    } else if (late && broken) {
+      parts.push(
+        `Both schedule punctuality and fragile-item protection during the move${moveTag} need improvement.`,
+      );
+    } else if (rating <= 2) {
+      parts.push(
+        `Service quality during move${moveTag} fell below expectations and requires follow-up.`,
+      );
+    } else {
+      parts.push(
+        `Overall a smooth experience${moveTag} with attentive handling from pickup to delivery.`,
+      );
+    }
+    polishedComment = parts.join(' ');
+  }
+
+  return {
+    ok: true,
+    reason: text
+      ? `Derived from your draft notes${hasUserStars ? ' + selected star ratings' : ''}.`
+      : `Generated from the star ratings you selected (${rating}/5 overall).`,
+    polishedComment,
+    rating,
+    punctuality,
+    care,
+    communication,
+  };
 }

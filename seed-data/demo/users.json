@@ -1,0 +1,105 @@
+[{
+	"_id": {
+		"$oid": "6adf1d078470fbc93fdc72b3"
+	},
+	"email": "admin@moveup.tn",
+	"__v": {
+		"$numberInt": "0"
+	},
+	"createdAt": {
+		"$date": {
+			"$numberLong": "1793006855491"
+		}
+	},
+	"deletedAt": null,
+	"locale": "en",
+	"name": "Société MoveUp",
+	"passwordHash": "$2b$10$jeifWECBH3XYWZqNOkgIw.B0emekv4EBOhQTMkcT3b5/HeCygMA7q",
+	"phone": "+216710000000",
+	"role": "ADMIN",
+	"status": "ACTIVE",
+	"updatedAt": {
+		"$date": {
+			"$numberLong": "1794219486402"
+		}
+	}
+},
+{
+	"_id": {
+		"$oid": "6adf1d078470fbc93fdc72b4"
+	},
+	"email": "client@moveup.tn",
+	"__v": {
+		"$numberInt": "0"
+	},
+	"createdAt": {
+		"$date": {
+			"$numberLong": "1793006855495"
+		}
+	},
+	"deletedAt": null,
+	"locale": "en",
+	"name": "Amira Ben Salah",
+	"passwordHash": "$2b$10$Ul4bleE8V7/WfQo52iTHxubExguUR4Jm.4jBOppg3jNHENlGRpPT.",
+	"phone": "+21655123456",
+	"role": "CLIENT",
+	"status": "ACTIVE",
+	"updatedAt": {
+		"$date": {
+			"$numberLong": "1794219486410"
+		}
+	}
+},
+{
+	"_id": {
+		"$oid": "6aea749833ea29d9284b47c4"
+	},
+	"email": "mover2@moveup.tn",
+	"__v": {
+		"$numberInt": "0"
+	},
+	"createdAt": {
+		"$date": {
+			"$numberLong": "1793750168321"
+		}
+	},
+	"deletedAt": null,
+	"locale": "fr",
+	"name": "Sahel Déménagement",
+	"passwordHash": "$2b$10$/TUVGqMgzcMvgFcrN6ZoI.NvmZ3JViM.pM5WSkfWtR9EMr36EyZjq",
+	"phone": "+21697222333",
+	"role": "MOVER",
+	"status": "ACTIVE",
+	"updatedAt": {
+		"$date": {
+			"$numberLong": "1794219487620"
+		}
+	}
+},
+{
+	"_id": {
+		"$oid": "6adf1d078470fbc93fdc72b5"
+	},
+	"email": "mover@moveup.tn",
+	"__v": {
+		"$numberInt": "0"
+	},
+	"createdAt": {
+		"$date": {
+			"$numberLong": "1793006855497"
+		}
+	},
+	"deletedAt": null,
+	"locale": "en",
+	"name": "Mehdi Transport",
+	"passwordHash": "$2b$10$Ul4bleE8V7/WfQo52iTHxubExguUR4Jm.4jBOppg3jNHENlGRpPT.",
+	"phone": "+21698123456",
+	"role": "MOVER",
+	"status": "ACTIVE",
+	"updatedAt": {
+		"$date": {
+			"$numberLong": "1794219486411"
+		}
+	}
+}]
+

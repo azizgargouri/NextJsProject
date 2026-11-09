@@ -3,7 +3,9 @@ import Link from 'next/link';
 import { requirePageUser } from '@/server/shared/auth/session';
 import { reviewsRepository, reviewsService } from '@/server/modules/reviews';
 import { connectMongo } from '@/server/shared/database/mongoose';
+import { clientMoveOptions } from '@/server/modules/moves/moves.options';
 import { UserModel } from '@/server/shared/database/models/user.model';
+import { MoverProfileModel } from '@/server/shared/database/models/mover-profile.model';
 import {
   EmptyBlock,
   PageTitle,
@@ -22,10 +24,11 @@ export const metadata: Metadata = { title: 'Reviews' };
 export default async function ReviewsPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ moveRef?: string; moverId?: string }>;
+  searchParams: Promise<{ moveRef?: string; moverId?: string }>;
 }) {
-  const { moveRef, moverId } = (await searchParams) ?? {};
   const user = await requirePageUser();
+  // "Rate the mover" on the tracking page links here with the move already chosen.
+  const { moveRef, moverId } = await searchParams;
   const page = await reviewsService.listForParty(user, { page: 1, limit: 30 });
 
   if (user.role === 'MOVER') {
@@ -59,18 +62,38 @@ export default async function ReviewsPage({
   }
 
   await connectMongo();
-  const movers = await UserModel.find({ role: 'MOVER', status: 'ACTIVE', deletedAt: null })
-    .select('name')
-    .sort({ name: 1 })
-    .lean<{ _id: unknown; name: string }[]>();
+  const [movers, profiles] = await Promise.all([
+    UserModel.find({ role: 'MOVER', status: 'ACTIVE', deletedAt: null })
+      .select('name')
+      .sort({ name: 1 })
+      .lean<{ _id: unknown; name: string }[]>(),
+    MoverProfileModel.find()
+      .select('userId companyName')
+      .lean<{ userId: string; companyName?: string }[]>(),
+  ]);
+
+  const companyByUserId = new Map(
+    profiles.map((p) => [String(p.userId), p.companyName || undefined]),
+  );
+  const moverList = movers.map((mover) => {
+    const id = String(mover._id);
+    return {
+      id,
+      name: companyByUserId.get(id) ?? mover.name,
+    };
+  });
+
+  // The client's real moves (booked or seeded), never invented ones.
+  const completedMoves = await clientMoveOptions(user.sub);
 
   return (
     <div className="space-y-10">
       <PageTitle kicker="AFTER YOUR MOVE" title="RATE YOUR MOVER." />
       <ReviewForm
-        movers={movers.map((mover) => ({ id: String(mover._id), name: mover.name }))}
-        defaultMoverId={moverId}
+        movers={moverList}
+        completedMoves={completedMoves}
         defaultMoveReference={moveRef}
+        defaultMoverId={moverId}
       />
       <section className="space-y-4">
         <h2 className="mono text-[11px]">My reviews ({page.meta.itemCount})</h2>
@@ -105,7 +128,17 @@ function ReviewCard({
         <div className="flex items-center gap-3">
           <Stars value={review.rating} />
           <span className="mono text-[10px] text-ink-80">
-            {showStatus ? review.mover?.name : review.client?.name} · MOVE {review.moveReference}
+            {showStatus && review.mover ? (
+              <Link
+                href={`/movers/${review.mover.id}`}
+                className="underline underline-offset-4 hover:text-hazard"
+              >
+                {review.mover.name}
+              </Link>
+            ) : (
+              review.client?.name
+            )}{' '}
+            · MOVE {review.moveReference}
           </span>
         </div>
         <div className="flex items-center gap-3">

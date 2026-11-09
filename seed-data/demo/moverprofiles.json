@@ -1,0 +1,64 @@
+[{
+	"_id": {
+		"$oid": "6adf1d078470fbc93fdc72b6"
+	},
+	"userId": "6adf1d078470fbc93fdc72b5",
+	"__v": {
+		"$numberInt": "0"
+	},
+	"bio": "Van, 14 m³ — grand Tunis.",
+	"companyName": "Mehdi Transport",
+	"createdAt": {
+		"$date": {
+			"$numberLong": "1793006855502"
+		}
+	},
+	"ratingAvg": {
+		"$numberDouble": "3.5"
+	},
+	"ratingCount": {
+		"$numberInt": "2"
+	},
+	"updatedAt": {
+		"$date": {
+			"$numberLong": "1794219487680"
+		}
+	},
+	"verificationStatus": "APPROVED",
+	"zones": [
+		"TUN"
+	]
+},
+{
+	"_id": {
+		"$oid": "6aea749833ea29d9284b47c5"
+	},
+	"userId": "6aea749833ea29d9284b47c4",
+	"__v": {
+		"$numberInt": "0"
+	},
+	"bio": "",
+	"companyName": "Sahel Déménagement",
+	"createdAt": {
+		"$date": {
+			"$numberLong": "1793750168325"
+		}
+	},
+	"ratingAvg": {
+		"$numberInt": "3"
+	},
+	"ratingCount": {
+		"$numberInt": "1"
+	},
+	"updatedAt": {
+		"$date": {
+			"$numberLong": "1794219487682"
+		}
+	},
+	"verificationStatus": "APPROVED",
+	"zones": [
+		"SOU",
+		"MON"
+	]
+}]
+

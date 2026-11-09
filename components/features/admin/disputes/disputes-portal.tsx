@@ -51,7 +51,7 @@ const options = <T extends string>(
 /** A-08 dispute desk: inbox with filters → sheet with evidence, AI triage and decision. */
 export function DisputesPortal() {
   const { setPage: publishPage, clearPage, clearFooter } = useAdminShell();
-  const [status, setStatus] = useState<ClaimStatus | 'ALL'>('OPEN');
+  const [status, setStatus] = useState<ClaimStatus | 'ALL'>('ALL');
   const [priority, setPriority] = useState<ClaimPriority | 'ALL'>('ALL');
   const [category, setCategory] = useState<ClaimCategory | 'ALL'>('ALL');
   const [search, setSearch] = useState('');
@@ -214,7 +214,20 @@ export function DisputesPortal() {
                         → {claim.mover?.name ?? 'no mover'}
                       </span>
                     </td>
-                    <td className="px-3 py-2.5">{CLAIM_CATEGORY_LABELS[claim.category]}</td>
+                    <td className="px-3 py-2.5">
+                      <span>{CLAIM_CATEGORY_LABELS[claim.category]}</span>
+                      {claim.visionAnalysis ? (
+                        <span className="mt-0.5 block font-mono text-[10px] text-amber-600">
+                          Vision: {claim.visionAnalysis.overallSeverity} (
+                          {claim.visionAnalysis.recommendedClaimAmountTnd} TND)
+                        </span>
+                      ) : null}
+                      {claim.aiMediation ? (
+                        <span className="mt-0.5 block font-mono text-[10px] text-primary">
+                          Mediation: {claim.aiMediation.recommendedAmountTnd} TND
+                        </span>
+                      ) : null}
+                    </td>
                     <td className="px-3 py-2.5">
                       {claim.priority ? (
                         <AdminBadge variant={PRIORITY_VARIANT[claim.priority]}>

@@ -26,34 +26,13 @@ import {
   type PackUnit,
   type Rect,
 } from './layout-packer';
-import type { LayoutItemUpdateInput } from './layout.schema';
+import { buildLayoutUnits } from '../../../lib/room-layout/units';
+import type { LayoutGenerateInput, LayoutItemUpdateInput } from './layout.schema';
 import type { ClientRef, MoveItemResponse } from './move-requests.service';
 
 /** One physical thing to place: each unit of an item, boxes grouped in stacks. */
 export function buildUnits(items: MoveItemResponse[]): PackUnit[] {
-  return items.flatMap((item) => {
-    const { widthCm, depthCm, stackable } = item.footprint;
-    if (stackable) {
-      const stacks = Math.ceil(item.quantity / BOX_STACK);
-      return Array.from({ length: stacks }, (_, index) => {
-        const inStack = Math.min(BOX_STACK, item.quantity - index * BOX_STACK);
-        return {
-          unitId: `${item.id}-stack-${index + 1}`,
-          itemId: item.id,
-          name: `${item.name} (stack of ${inStack})`,
-          widthCm,
-          depthCm,
-        };
-      });
-    }
-    return Array.from({ length: item.quantity }, (_, index) => ({
-      unitId: `${item.id}-${index + 1}`,
-      itemId: item.id,
-      name: item.quantity > 1 ? `${item.name} #${index + 1}` : item.name,
-      widthCm,
-      depthCm,
-    }));
-  });
+  return buildLayoutUnits(items, BOX_STACK);
 }
 
 function toPackRooms(home: HomeDetailResponse): PackRoom[] {
@@ -88,6 +67,8 @@ export interface LayoutPlanResponse {
   stale: boolean;
   /** Items the client moved, rotated or took out (regenerate would replace them). */
   manualChanges: number;
+  /** Rooms the client chose for given pieces before generating. */
+  roomChoices: { unitId: string; roomId: string }[];
   createdAt: string;
 }
 
@@ -133,19 +114,27 @@ function serializePlan(plan: LayoutPlanDoc, currentHash: string | null): LayoutP
     manualChanges:
       plan.placements.filter((placement) => placement.source === 'client').length +
       plan.unplaced.filter((unit) => unit.removedByClient).length,
+    roomChoices: (plan.roomChoices ?? []).map(({ unitId, roomId }) => ({ unitId, roomId })),
     createdAt: plan.updatedAt.toISOString(),
   };
 }
 
 /** Smart Room Layout: AI room/wall choices → exact positions → saved plan. */
 export class LayoutService {
-  async generate(client: ClientRef, homeId: string): Promise<LayoutPlanResponse> {
+  async generate(
+    client: ClientRef,
+    homeId: string,
+    input: LayoutGenerateInput = { roomChoices: [] },
+  ): Promise<LayoutPlanResponse> {
     const home = await homesService.getMine(client, homeId);
     if (!home.moveRequest) throw new BadRequestError('Link a move request to this house first.');
     if (home.rooms.length === 0) throw new BadRequestError('Add at least one room first.');
 
     const rooms = toPackRooms(home);
     const units = buildUnits(home.moveRequest.items);
+    const roomChoices = this.checkRoomChoices(rooms, units, input.roomChoices);
+    const fixedRoom = new Map(roomChoices.map((choice) => [choice.unitId, choice.roomId]));
+    const keyByRoomId = new Map(rooms.map((room, index) => [room.id, `R${index + 1}`]));
     // The AI sees short keys (R1, R2…): models mis-copy 24-char Mongo ids.
     const roomIdByKey = new Map(rooms.map((room, index) => [`R${index + 1}`, room.id]));
     const ai = await planWithAi(
@@ -158,16 +147,31 @@ export class LayoutService {
         doors: room.openings.filter((o) => o.kind === 'DOOR').map((o) => o.wall),
         windows: room.openings.filter((o) => o.kind === 'WINDOW').map((o) => o.wall),
       })),
-      units.map(({ unitId, name, widthCm, depthCm }) => ({ unitId, name, widthCm, depthCm })),
+      units.map(({ unitId, name, widthCm, depthCm }) => {
+        const fixed = fixedRoom.get(unitId);
+        return {
+          unitId,
+          name,
+          widthCm,
+          depthCm,
+          ...(fixed ? { room: keyByRoomId.get(fixed) } : {}),
+        };
+      }),
     );
-    const packed = packLayout(
-      rooms,
-      units,
-      ai.layout.placements.map((choice) => ({
-        ...choice,
-        roomId: roomIdByKey.get(choice.roomId.trim().toUpperCase()) ?? choice.roomId,
-      })),
-    );
+    // The client's room choices are binding: the assistant only picks the wall there.
+    const choices = ai.layout.placements.map((choice) => ({
+      ...choice,
+      roomId:
+        fixedRoom.get(choice.unitId) ??
+        roomIdByKey.get(choice.roomId.trim().toUpperCase()) ??
+        choice.roomId,
+    }));
+    for (const [unitId, roomId] of fixedRoom) {
+      if (!choices.some((choice) => choice.unitId === unitId)) {
+        choices.push({ unitId, roomId, wall: 'N', reason: 'In the room you chose.' });
+      }
+    }
+    const packed = packLayout(rooms, units, choices);
     const hash = inputHash(rooms, units);
 
     await connectMongo();
@@ -184,6 +188,7 @@ export class LayoutService {
           unplaced: packed.unplaced,
           tips: ai.layout.tips.slice(0, 4),
           warnings: packed.warnings,
+          roomChoices,
           inputHash: hash,
         },
       },
@@ -191,6 +196,24 @@ export class LayoutService {
     ).lean<LayoutPlanDoc>();
     if (!plan) throw new Error('Layout plan was not saved');
     return serializePlan(plan, hash);
+  }
+
+  /** Keeps choices for pieces of this request; a room that is not in this house is an error. */
+  private checkRoomChoices(
+    rooms: PackRoom[],
+    units: PackUnit[],
+    roomChoices: LayoutGenerateInput['roomChoices'],
+  ) {
+    const roomIds = new Set(rooms.map((room) => room.id));
+    const unitIds = new Set(units.map((unit) => unit.unitId));
+    const kept = new Map<string, string>();
+    for (const { unitId, roomId } of roomChoices) {
+      if (!roomIds.has(roomId)) {
+        throw new ValidationError('One of the chosen rooms is no longer in this house.');
+      }
+      if (unitIds.has(unitId)) kept.set(unitId, roomId);
+    }
+    return [...kept].map(([unitId, roomId]) => ({ unitId, roomId }));
   }
 
   async get(client: ClientRef, homeId: string): Promise<LayoutPlanResponse> {

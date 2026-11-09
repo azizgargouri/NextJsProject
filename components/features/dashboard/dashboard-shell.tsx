@@ -10,7 +10,7 @@ import { useOnlineStatus } from '@/hooks/use-online-status';
 import {
   WorkspaceLinkList,
   workspaceHome,
-  workspaceLinks,
+  useWorkspaceLinks,
 } from '@/components/features/workspace/workspace-links';
 
 /**
@@ -30,6 +30,7 @@ export function DashboardLayout({
   const [hydrated, setHydrated] = useState(false);
   const signOut = useSignOut();
   const online = useOnlineStatus();
+  const navItems = useWorkspaceLinks(user?.role);
 
   useEffect(() => {
     const persistence = useAuthStore.persist;
@@ -79,8 +80,6 @@ export function DashboardLayout({
       </div>
     );
   }
-
-  const navItems = workspaceLinks(user?.role);
 
   return (
     <div className="min-h-dvh bg-paper">

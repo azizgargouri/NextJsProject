@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -14,14 +14,15 @@ import { StatusLabel } from '@/components/ui/status-chip';
 import { LoadingBlock } from '@/components/features/hr/loading-block';
 import {
   useAttendance,
-  useCheckIn,
   useCreateLeaveRequest,
   useLeaveRequests,
   useLocationTracking,
   useMyEmployee,
+  useVoiceChallenge,
   useVoiceCheckin,
 } from '@/hooks/content/hr';
 import { extractErrorMessage } from '@/lib/api/errors';
+import { convertToWav16k } from '@/lib/audio/wav';
 import type { AttendanceDto, LeaveRequestDto } from '@/types';
 
 const LEAVE_TYPES = [
@@ -65,107 +66,157 @@ function formatDate(value: string) {
   });
 }
 
-function recordVoiceClip(seconds = 4): Promise<File> {
-  return new Promise((resolve, reject) => {
-    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
-      reject(new Error('Voice recording is not supported in this browser.'));
-      return;
-    }
-    navigator.mediaDevices
-      .getUserMedia({ audio: true })
-      .then((stream) => {
-        const recorder = new MediaRecorder(stream);
-        const chunks: Blob[] = [];
-        recorder.ondataavailable = (event) => {
-          if (event.data.size > 0) chunks.push(event.data);
-        };
-        recorder.onstop = () => {
-          stream.getTracks().forEach((track) => track.stop());
-          const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
-          resolve(new File([blob], 'voice.webm', { type: blob.type || 'audio/webm' }));
-        };
-        recorder.onerror = () => reject(new Error('Could not record your voice.'));
-        recorder.start();
-        window.setTimeout(() => {
-          if (recorder.state !== 'inactive') recorder.stop();
-        }, seconds * 1000);
-      })
-      .catch(() => reject(new Error('Microphone access was blocked. Allow it and try again.')));
-  });
-}
-
-function fileToBase64(file: File): Promise<string> {
+function blobToBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '');
     reader.onerror = () => reject(new Error('Could not read the recording.'));
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(blob);
   });
 }
 
-/** Voice check-in: record 4s → Kaggle verifier → accept/review/reject. */
+/** Voice check-in: hold to record, release to verify via the Kaggle engine. */
 function VoiceCheckinSection() {
   const voice = useVoiceCheckin();
-  const [busy, setBusy] = useState(false);
+  const challengeQuery = useVoiceChallenge();
+  const [recorder, setRecorder] = useState<MediaRecorder | null>(null);
+  const [holding, setHolding] = useState(false);
+  const [verifying, setVerifying] = useState(false);
   const [result, setResult] = useState<string | null>(null);
-  const [transcript, setTranscript] = useState(
-    "I'm at the Ben Salah job in La Marsa, code Tunis, check me in",
-  );
+  // Transcript = what the server asked you to say. It stays editable so a
+  // wrong spoken word is what gets verified (and reported to RH).
+  const [transcript, setTranscript] = useState('');
   const [jobId, setJobId] = useState('JOB-101');
-  const [challenge, setChallenge] = useState('Tunis');
 
-  const run = async () => {
-    setResult(null);
-    setBusy(true);
-    try {
-      const file = await recordVoiceClip(4);
-      const audio_b64 = await fileToBase64(file);
-      const response = await voice.mutateAsync({
-        audio_b64,
-        transcript,
-        job_id: jobId,
-        challenge,
-        lat: 36.8784,
-        lng: 10.3249,
-      });
-      setResult(
-        `${response.decision.toUpperCase()} · speaker ${response.speaker_score.toFixed(2)} (${response.voice_label}) · score ${response.threshold.toFixed(2)} · ${response.reasons.join(', ') || '—'}`,
-      );
-    } catch (error) {
-      setResult(extractErrorMessage(error, 'Voice check-in failed.'));
-    } finally {
-      setBusy(false);
+  const serverChallenge = challengeQuery.data?.challenge ?? 'Tunis';
+  const serverSentence = challengeQuery.data?.sentence ?? '';
+
+  // Prefill the required sentence once the server issues it.
+  useEffect(() => {
+    if (serverSentence) setTranscript(serverSentence);
+  }, [serverSentence]);
+
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+
+  const clearPreview = () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(null);
+    setPendingFile(null);
+  };
+
+  const discardPreview = () => {
+    clearPreview();
+    setResult('Discarded. Hold the button to record again.');
+  };
+
+  const sendPreview = () => {
+    if (!pendingFile) return;
+    void (async () => {
+      setVerifying(true);
+      try {
+        // Kaggle's verifier reads audio with soundfile, which cannot decode
+        // the WebM/Opus MediaRecorder produces. Send 16 kHz mono WAV instead.
+        const wav = await convertToWav16k(pendingFile);
+        const audio_b64 = await blobToBase64(wav);
+        const response = await voice.mutateAsync({
+          audio_b64,
+          transcript,
+          job_id: jobId,
+          challenge: serverChallenge,
+          lat: 36.8784,
+          lng: 10.3249,
+        });
+        setResult(
+          `${response.decision.toUpperCase()} · speaker ${response.speaker_score.toFixed(2)} (${response.voice_label}) · score ${response.threshold.toFixed(2)} · ${response.reasons.join(', ') || '—'}`,
+        );
+        clearPreview();
+      } catch (error) {
+        setResult(extractErrorMessage(error, 'Voice check-in failed.'));
+      } finally {
+        setVerifying(false);
+      }
+    })();
+  };
+
+  const startHold = () => {
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+      setResult('Voice recording is not supported in this browser.');
+      return;
     }
+    setResult(null);
+    navigator.mediaDevices
+      .getUserMedia({ audio: true })
+      .then((stream) => {
+        const rec = new MediaRecorder(stream);
+        rec.onstop = () => stream.getTracks().forEach((track) => track.stop());
+        setRecorder(rec);
+        rec.start();
+        setHolding(true);
+      })
+      .catch(() => setResult('Microphone access was blocked. Allow it and try again.'));
+  };
+
+  const endHold = () => {
+    if (!recorder) return;
+    const rec = recorder;
+    setRecorder(null);
+    setHolding(false);
+    if (rec.state === 'inactive') return;
+
+    // On release: stop, then present playback before sending.
+    clearPreview();
+    const chunks: Blob[] = [];
+    rec.ondataavailable = (event) => {
+      if (event.data.size > 0) chunks.push(event.data);
+    };
+    rec.onstop = () => {
+      const blob = new Blob(chunks, { type: rec.mimeType || 'audio/webm' });
+      const file = new File([blob], 'voice.webm', { type: blob.type || 'audio/webm' });
+      if (file.size === 0) {
+        setResult('Recording was empty. Hold the button again and speak.');
+        return;
+      }
+      setPendingFile(file);
+      setPreviewUrl(URL.createObjectURL(blob));
+    };
+    rec.stop();
   };
 
   return (
-    <section className="mt-8 border border-ink bg-paper p-5">
+    <section className="border border-ink bg-paper p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="mono text-[11px] font-bold">VOICE CHECK-IN</h2>
+          <h2 className="mono text-[11px] font-bold">TODAY&apos;S ATTENDANCE — VOICE CHECK-IN</h2>
           <p className="mono mt-2 text-[9px] text-ink-40">
-            RECORD 4 SECONDS — SAY THE JOB + CODE. VERIFIED BY THE KAGGLE VOICE ENGINE.
+            HOLD THE BUTTON WHILE SPEAKING, RELEASE TO VERIFY. VERIFIED BY THE KAGGLE VOICE ENGINE.
           </p>
         </div>
         <Button
-          variant="primary"
-          size="sm"
-          className="h-8 px-3 text-[9px]"
-          disabled={busy}
-          onClick={() => void run()}
+          variant="hazard"
+          size="lg"
+          className={holding ? 'select-none bg-ink text-paper' : 'select-none'}
+          disabled={verifying}
+          onPointerDown={() => startHold()}
+          onPointerUp={() => endHold()}
+          onPointerLeave={() => endHold()}
+          onPointerCancel={() => endHold()}
+          onContextMenu={(event) => event.preventDefault()}
         >
-          {busy ? <Loader2 size={12} className="animate-spin" /> : null}
-          {busy ? 'RECORDING…' : 'Record & check in'}
+          {verifying ? (
+            <Loader2 size={14} className="animate-spin" />
+          ) : null}
+          {verifying ? 'VERIFYING…' : holding ? 'RELEASE TO LISTEN' : 'HOLD TO RECORD'}
         </Button>
       </div>
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
         <FieldRow>
-          <Label htmlFor="voice-transcript">WHAT YOU SAY</Label>
+          <Label htmlFor="voice-transcript">SAY THIS (SERVER SENTENCE)</Label>
           <Input
             id="voice-transcript"
             value={transcript}
             onChange={(event) => setTranscript(event.target.value)}
-            placeholder="I'm at the Ben Salah job…, code Tunis"
+            placeholder={challengeQuery.isLoading ? 'Fetching challenge from server…' : 'server sentence'}
           />
         </FieldRow>
         <FieldRow>
@@ -173,14 +224,42 @@ function VoiceCheckinSection() {
           <Input id="voice-job" value={jobId} onChange={(event) => setJobId(event.target.value)} />
         </FieldRow>
         <FieldRow>
-          <Label htmlFor="voice-challenge">CODE WORD</Label>
-          <Input
-            id="voice-challenge"
-            value={challenge}
-            onChange={(event) => setChallenge(event.target.value)}
-          />
+          <Label htmlFor="voice-challenge">CODE WORD (SERVER)</Label>
+          <Input id="voice-challenge" value={serverChallenge} readOnly disabled />
         </FieldRow>
       </div>
+      <p className="mono mt-2 text-[9px] text-ink-40">
+        HOLD TO RECORD, RELEASE TO HEAR IT BACK. THEN CHOOSE RECORD AGAIN OR SEND.
+      </p>
+      {previewUrl && pendingFile && (
+        <div className="mt-3 border border-ink/20 bg-paper-soft px-3 py-2">
+          <p className="mono text-[9px] text-ink-40">
+            YOUR TAKE — LISTEN BEFORE SENDING. RH KEEPS THE AUDIO FOR FAULTY CHECK-INS.
+          </p>
+          <audio src={previewUrl} controls className="mt-2 w-full" />
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 px-3 text-[9px]"
+              disabled={verifying}
+              onClick={discardPreview}
+            >
+              Record again
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              className="h-8 px-3 text-[9px]"
+              disabled={verifying}
+              onClick={sendPreview}
+            >
+              {verifying ? <Loader2 size={12} className="animate-spin" /> : null}
+              Send for verification
+            </Button>
+          </div>
+        </div>
+      )}
       {result && (
         <p className="mono mt-3 border border-ink/20 bg-paper-soft px-3 py-2 text-[9px] normal-case tracking-normal text-ink-80">
           {result}
@@ -190,30 +269,12 @@ function VoiceCheckinSection() {
   );
 }
 
-function getPosition(): Promise<GeolocationPosition> {
-  return new Promise((resolve, reject) => {
-    if (typeof navigator === 'undefined' || !navigator.geolocation) {
-      reject(new Error('Geolocation is not available in this browser'));
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(resolve, reject, {
-      enableHighAccuracy: true,
-      timeout: 8000,
-      maximumAge: 60000,
-    });
-  });
-}
-
-/** Self-service workspace: today's attendance card + leave tab (the local /me module). */
+/** Self-service workspace: voice check-in + leave tab (the local /me module). */
 export function MyWorkspaceView() {
   const user = useAuthStore((state) => state.user);
   const profileQuery = useMyEmployee();
 
   const [tab, setTab] = useState<TabId>('attendance');
-  const [geoMessage, setGeoMessage] = useState<string | null>(null);
-  const [checkInError, setCheckInError] = useState<string | null>(null);
-  const [checkInOk, setCheckInOk] = useState<string | null>(null);
-  const [allowWithoutLocation, setAllowWithoutLocation] = useState(false);
 
   const profile = profileQuery.data ?? null;
   const employeeRef = profile?.employeeRef;
@@ -221,69 +282,14 @@ export function MyWorkspaceView() {
   const todayQuery = useAttendance({ employeeRef: employeeRef ?? '' }, Boolean(employeeRef));
   const leaveQuery = useLeaveRequests({ employeeRef: employeeRef ?? '' }, Boolean(employeeRef));
 
-  const checkIn = useCheckIn();
   const createLeave = useCreateLeaveRequest();
 
   const today: AttendanceDto | null = todayQuery.data?.[0] ?? null;
   const leaves: LeaveRequestDto[] = leaveQuery.data ?? [];
   const checkedIn = Boolean(today?.clockIn);
-  const checkingIn = checkIn.isPending;
 
   // Keep sending location samples while checked in and this workspace is open.
   useLocationTracking(checkedIn);
-
-  const submitCheckIn = useCallback(
-    async (shareLocation: boolean) => {
-      setCheckInError(null);
-      setCheckInOk(null);
-      setAllowWithoutLocation(false);
-
-      let coords: { latitude: number; longitude: number; accuracy: number } | null = null;
-      if (shareLocation) {
-        setGeoMessage('Asking your browser for your location…');
-        try {
-          const position = await getPosition();
-          coords = {
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-            accuracy: position.coords.accuracy,
-          };
-          setGeoMessage('Location captured — HR can see it on the team map.');
-        } catch (error) {
-          const code = (error as GeolocationPositionError | undefined)?.code;
-          setGeoMessage(
-            code === 1
-              ? 'Location permission was blocked. Allow it in your browser and try again — or continue without it.'
-              : 'We could not get your location. Try again, or check in without it.',
-          );
-          setCheckInError(
-            'Location not shared. Try again to allow it, or check in without location.',
-          );
-          setAllowWithoutLocation(true);
-          return;
-        }
-      }
-
-      checkIn.mutate(coords ?? {}, {
-        onSuccess: (response) => {
-          const punches = response.attendance.punches ?? [];
-          const lastPunch = punches[punches.length - 1];
-          const at = formatTime(lastPunch?.at ?? response.attendance.clockIn);
-          const suffix = lastPunch?.location ? ' — location recorded for HR.' : '.';
-
-          setCheckInOk(
-            response.alreadyCheckedIn
-              ? `Check-in registered again at ${at}${suffix}`
-              : `Checked in at ${at}${suffix}`,
-          );
-        },
-        onError: (error) => {
-          setCheckInError(extractErrorMessage(error, 'Failed to check in. Please try again.'));
-        },
-      });
-    },
-    [checkIn],
-  );
 
   const {
     register,
@@ -343,8 +349,6 @@ export function MyWorkspaceView() {
 
       {profile && (
         <>
-          <VoiceCheckinSection />
-
           <div className="mt-8 flex gap-1 border-b border-ink" role="tablist">
             {TABS.map((item) => {
               const active = tab === item.id;
@@ -368,70 +372,8 @@ export function MyWorkspaceView() {
           </div>
 
           {tab === 'attendance' && (
-            <section className="mt-6 border border-ink bg-paper p-5" role="tabpanel">
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div>
-                  <h2 className="mono text-[11px] font-bold">TODAY&apos;S ATTENDANCE</h2>
-                  <p className="mono mt-2 text-[10px] text-ink-40">
-                    {todayQuery.isLoading
-                      ? 'LOADING…'
-                      : checkedIn
-                        ? `CHECKED IN AT ${formatTime(today?.clockIn)} · ${
-                            (today?.punches?.length ?? 1)
-                          } REGISTRATION${(today?.punches?.length ?? 1) === 1 ? '' : 'S'} TODAY`
-                        : 'NOT CHECKED IN YET'}
-                  </p>
-                </div>
-                <Button
-                  variant={checkedIn ? 'outline' : 'hazard'}
-                  size="sm"
-                  disabled={checkingIn}
-                  onClick={() => void submitCheckIn(true)}
-                  title="Register a check-in now — each press is timestamped and records where you are"
-                >
-                  {checkingIn ? (
-                    <Loader2 className="animate-spin" size={14} />
-                  ) : checkedIn ? (
-                    'Check in again'
-                  ) : (
-                    'Check in'
-                  )}
-                </Button>
-              </div>
-
-              <p className="mono mt-3 text-[9px] text-ink-40">
-                {checkedIn
-                  ? today?.location
-                    ? 'EACH CHECK-IN IS TIMESTAMPED AND STORES WHERE IT WAS REGISTERED.'
-                    : 'YOU CHECKED IN WITHOUT SHARING A LOCATION — PRESS AGAIN TO SHARE IT.'
-                  : 'CHECK IN WITH ONE CLICK — YOUR BROWSER WILL ASK FOR YOUR LOCATION.'}
-              </p>
-
-              {allowWithoutLocation && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="mt-3 h-8 px-3 text-[9px]"
-                  disabled={checkingIn}
-                  onClick={() => void submitCheckIn(false)}
-                >
-                  Check in without location
-                </Button>
-              )}
-
-              {geoMessage && (
-                <p className="mono mt-3 text-[9px] text-ink-40">{geoMessage.toUpperCase()}</p>
-              )}
-              {checkInOk && (
-                <p className="mono mt-3 border border-ink px-3 py-2 text-[10px] text-ink">
-                  {checkInOk.toUpperCase()}
-                </p>
-              )}
-              {checkInError && (
-                <p className="mono mt-3 border border-hazard bg-hazard/5 px-3 py-2 text-[10px] text-hazard">
-                  {checkInError.toUpperCase()}
-                </p>
-              )}
+            <section className="mt-6 space-y-6" role="tabpanel">
+              <VoiceCheckinSection />
 
               {today?.location && (
                 <p className="mono mt-3 text-[9px] text-ink-40">

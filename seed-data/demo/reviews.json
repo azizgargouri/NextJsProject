@@ -1,0 +1,209 @@
+[{
+	"_id": {
+		"$oid": "6aea74ce33ea29d9284b47d5"
+	},
+	"moveReference": "MV-2026-0101",
+	"clientId": "6adf1d078470fbc93fdc72b4",
+	"moverId": "6adf1d078470fbc93fdc72b5",
+	"__v": {
+		"$numberInt": "0"
+	},
+	"care": {
+		"$numberInt": "5"
+	},
+	"comment": "Very professional team, on time and careful with fragile items. Highly recommend!",
+	"communication": {
+		"$numberInt": "4"
+	},
+	"createdAt": {
+		"$date": {
+			"$numberLong": "1793750222353"
+		}
+	},
+	"moderatedBy": null,
+	"moderation": {
+		"source": "rules",
+		"sentiment": "POSITIVE",
+		"toxic": false,
+		"reasons": [],
+		"topics": [
+			"PUNCTUALITY",
+			"CARE",
+			"PROFESSIONALISM"
+		],
+		"model": null,
+		"createdAt": {
+			"$date": {
+				"$numberLong": "1794219487654"
+			}
+		}
+	},
+	"moderationNote": null,
+	"moverReply": null,
+	"punctuality": {
+		"$numberInt": "5"
+	},
+	"rating": {
+		"$numberInt": "5"
+	},
+	"status": "PUBLISHED",
+	"updatedAt": {
+		"$date": {
+			"$numberLong": "1794219487654"
+		}
+	}
+},
+{
+	"_id": {
+		"$oid": "6aea74ce33ea29d9284b47d6"
+	},
+	"moverId": "6adf1d078470fbc93fdc72b5",
+	"clientId": "6adf1d078470fbc93fdc72b4",
+	"moveReference": "MV-2026-0118",
+	"__v": {
+		"$numberInt": "0"
+	},
+	"care": {
+		"$numberInt": "3"
+	},
+	"comment": "Three hours late and no call to warn us. The move itself was ok.",
+	"communication": {
+		"$numberInt": "2"
+	},
+	"createdAt": {
+		"$date": {
+			"$numberLong": "1793750222357"
+		}
+	},
+	"moderatedBy": null,
+	"moderation": {
+		"source": "rules",
+		"sentiment": "NEGATIVE",
+		"toxic": false,
+		"reasons": [],
+		"topics": [
+			"PUNCTUALITY",
+			"COMMUNICATION"
+		],
+		"model": null,
+		"createdAt": {
+			"$date": {
+				"$numberLong": "1794219487671"
+			}
+		}
+	},
+	"moderationNote": null,
+	"moverReply": null,
+	"punctuality": {
+		"$numberInt": "1"
+	},
+	"rating": {
+		"$numberInt": "2"
+	},
+	"status": "PUBLISHED",
+	"updatedAt": {
+		"$date": {
+			"$numberLong": "1794219487671"
+		}
+	}
+},
+{
+	"_id": {
+		"$oid": "6aea74ce33ea29d9284b47d7"
+	},
+	"moveReference": "MV-2026-0097",
+	"clientId": "6adf1d078470fbc93fdc72b4",
+	"moverId": "6aea749833ea29d9284b47c4",
+	"__v": {
+		"$numberInt": "0"
+	},
+	"care": {
+		"$numberInt": "2"
+	},
+	"comment": "Équipe sympathique mais un carton a disparu. Le support a bien géré la réclamation.",
+	"communication": {
+		"$numberInt": "4"
+	},
+	"createdAt": {
+		"$date": {
+			"$numberLong": "1793750222380"
+		}
+	},
+	"moderatedBy": null,
+	"moderation": {
+		"source": "rules",
+		"sentiment": "NEUTRAL",
+		"toxic": false,
+		"reasons": [],
+		"topics": [],
+		"model": null,
+		"createdAt": {
+			"$date": {
+				"$numberLong": "1794219487675"
+			}
+		}
+	},
+	"moderationNote": null,
+	"moverReply": null,
+	"punctuality": {
+		"$numberInt": "4"
+	},
+	"rating": {
+		"$numberInt": "3"
+	},
+	"status": "PUBLISHED",
+	"updatedAt": {
+		"$date": {
+			"$numberLong": "1794219487675"
+		}
+	}
+},
+{
+	"_id": {
+		"$oid": "6aea74ce33ea29d9284b47d8"
+	},
+	"moverId": "6aea749833ea29d9284b47c4",
+	"clientId": "6adf1d078470fbc93fdc72b4",
+	"moveReference": "MV-2026-0150",
+	"__v": {
+		"$numberInt": "0"
+	},
+	"care": null,
+	"comment": "Bande de voleurs, appelez-moi au +216 55 123 456 si vous osez",
+	"communication": null,
+	"createdAt": {
+		"$date": {
+			"$numberLong": "1793750222380"
+		}
+	},
+	"moderatedBy": null,
+	"moderation": {
+		"source": "rules",
+		"sentiment": "NEGATIVE",
+		"toxic": true,
+		"reasons": [
+			"Insulting or abusive language",
+			"Contains personal contact details"
+		],
+		"topics": [],
+		"model": null,
+		"createdAt": {
+			"$date": {
+				"$numberLong": "1794219487676"
+			}
+		}
+	},
+	"moderationNote": null,
+	"moverReply": null,
+	"punctuality": null,
+	"rating": {
+		"$numberInt": "1"
+	},
+	"status": "FLAGGED",
+	"updatedAt": {
+		"$date": {
+			"$numberLong": "1794219487676"
+		}
+	}
+}]
+

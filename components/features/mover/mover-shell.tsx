@@ -4,7 +4,18 @@ import { useEffect, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
-import { Bell, Briefcase, CalendarDays, Home, Inbox, UserRound, Wallet } from 'lucide-react';
+import {
+  Bell,
+  Bot,
+  Briefcase,
+  CalendarDays,
+  CircleAlert,
+  Home,
+  Inbox,
+  Star,
+  UserRound,
+  Wallet,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/hooks/stores/auth-store';
 import { useSignOut } from '@/hooks/content/auth/use-sign-out';
@@ -20,6 +31,10 @@ const NAV = [
   { href: '/mover/jobs', label: 'Jobs', icon: Briefcase },
   { href: '/mover/availability', label: 'Calendar', icon: CalendarDays },
   { href: '/mover/earnings', label: 'Earnings', icon: Wallet },
+  // Quality (claims, reviews, AI assistant): shared with the client workspace.
+  { href: '/mover/claims', label: 'Claims', icon: CircleAlert },
+  { href: '/mover/reviews', label: 'Reviews', icon: Star },
+  { href: '/mover/assistant', label: 'Assistant', icon: Bot },
 ] as const;
 
 function isActive(pathname: string, href: string): boolean {
@@ -75,7 +90,7 @@ function Header({ unlocked }: { unlocked: boolean }) {
         </Link>
 
         {unlocked ? (
-          <nav aria-label="Workspace" className="hidden items-center md:flex">
+          <nav aria-label="Workspace" className="hidden items-center lg:flex">
             {NAV.map(({ href, label }) => (
               <Link
                 key={href}
@@ -131,7 +146,7 @@ function BottomNav() {
   return (
     <nav
       aria-label="Workspace"
-      className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-ink bg-paper pb-[env(safe-area-inset-bottom)] md:hidden print:hidden"
+      className="no-scrollbar fixed inset-x-0 bottom-0 z-40 flex overflow-x-auto border-t border-ink bg-paper pb-[env(safe-area-inset-bottom)] lg:hidden print:hidden"
     >
       {NAV.map(({ href, label, icon: Icon }) => (
         <Link
@@ -139,7 +154,7 @@ function BottomNav() {
           href={href}
           aria-current={isActive(pathname, href) ? 'page' : undefined}
           className={cn(
-            'mono flex min-h-14 flex-col items-center justify-center gap-1 text-[9px] tracking-normal focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-hazard',
+            'mono flex min-h-14 min-w-[20%] shrink-0 flex-col items-center justify-center gap-1 px-2 text-[9px] tracking-normal focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-hazard',
             isActive(pathname, href) && 'bg-ink text-paper',
           )}
         >
@@ -185,7 +200,7 @@ function MoverGate({ pathname, children }: { pathname: string; children: ReactNo
       <main
         className={cn(
           'mx-auto max-w-6xl px-4 py-6 md:px-6 md:py-10 print:max-w-none print:p-0',
-          unlocked && 'pb-24 md:pb-10',
+          unlocked && 'pb-24 lg:pb-10',
         )}
       >
         {application.isPending ? (

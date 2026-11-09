@@ -41,6 +41,8 @@ export interface PlannerUnit {
   name: string;
   widthCm: number;
   depthCm: number;
+  /** Room the client chose for this piece; the planner only picks the wall. */
+  room?: string;
 }
 
 const SYSTEM_PROMPT = `You are the furniture layout planner of MoveUp, a moving company.
@@ -56,6 +58,7 @@ Rules:
 - Moving boxes go to the storage room, otherwise the largest room.
 - Fridge, washing machine, wardrobe, bookshelf and TV stand always stand against a wall, never CENTER.
 - Avoid the wall that has the room's door when another wall works. Keep big items on long walls.
+- A unit with a "room" was put there by the client: use exactly that roomId and only choose the wall.
 - Use only the roomId and unitId values given. Place every unit exactly once.
 - "reason": one short sentence (max 15 words) a client understands.
 - "tips": 2 to 4 short practical tips for move-in day.`;
@@ -74,6 +77,7 @@ export function buildLayoutMessages(rooms: PlannerRoom[], units: PlannerUnit[]) 
       unitId: unit.unitId,
       name: unit.name,
       footprintCm: `${unit.widthCm} x ${unit.depthCm}`,
+      ...(unit.room ? { room: unit.room } : {}),
     })),
   });
   return { system: SYSTEM_PROMPT, user };

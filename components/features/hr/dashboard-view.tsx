@@ -4,7 +4,6 @@ import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { StatusLabel } from '@/components/ui/status-chip';
 import { LoadingBlock } from '@/components/features/hr/loading-block';
-import LocationMap, { type MapPoint } from '@/components/features/hr/location-map';
 import {
   useAttendance,
   useDashboardStats,
@@ -44,12 +43,17 @@ function isVoiceMismatch(label: string, decision: string, reasons: string[]): bo
   return (
     decision === 'reject' ||
     label === 'different_voice' ||
-    reasons.some((reason) => reason.includes('voice') || reason.includes('different'))
+    reasons.some(
+      (reason) =>
+        reason.includes('voice') || reason.includes('different') || reason.includes('challenge'),
+    )
   );
 }
 
 function VoiceAlertsSection() {
   const voice = useVoiceCheckins();
+  const [playing, setPlaying] = useState<string | null>(null);
+  const [urls, setUrls] = useState<Record<string, string>>({});
 
   if (voice.isError) return null;
 
@@ -58,12 +62,34 @@ function VoiceAlertsSection() {
     isVoiceMismatch(row.voiceLabel, row.decision, row.reasons),
   );
 
+  const listen = async (id: string) => {
+    if (urls[id]) {
+      setPlaying((current) => (current === id ? null : id));
+      return;
+    }
+    try {
+      const { axiosClient } = await import('@/lib/api/client');
+      const { data } = await axiosClient.get(`/api/voice/checkins/${id}/audio`, {
+        responseType: 'blob',
+      });
+      setUrls((current) => ({
+        ...current,
+        [id]: URL.createObjectURL(new Blob([data as Blob], { type: 'audio/webm' })),
+      }));
+      setPlaying(id);
+    } catch {
+      setPlaying(null);
+    }
+  };
+
   return (
     <section className="mt-6 border border-ink bg-paper">
       <div className="border-b border-ink px-5 py-3">
         <h2 className="mono text-[11px] font-bold">VOICE CHECK-IN ALERTS</h2>
         <p className="mono mt-1 text-[9px] text-ink-40">
-          {voice.isLoading ? 'LOADING…' : `${mismatches.length} MISMATCH${mismatches.length === 1 ? '' : 'ES'} · ${rows.length} ATTEMPT${rows.length === 1 ? '' : 'S'} TOTAL`}
+          {voice.isLoading
+            ? 'LOADING…'
+            : `${mismatches.length} MISMATCH${mismatches.length === 1 ? '' : 'ES'} · ${rows.length} ATTEMPT${rows.length === 1 ? '' : 'S'} TOTAL`}
         </p>
       </div>
       {mismatches.length === 0 ? (
@@ -73,20 +99,36 @@ function VoiceAlertsSection() {
       ) : (
         <ul>
           {mismatches.slice(0, 10).map((row) => (
-            <li
-              key={row.id}
-              className="flex flex-wrap items-center gap-3 border-b border-ink/15 px-5 py-3 last:border-0"
-            >
-              <span className="mono text-[10px] font-bold">⚠ {row.employeeRef}</span>
-              <span className="mono text-[10px] text-ink-40">
-                speaker {row.speakerScore.toFixed(2)} · {row.voiceLabel} · {row.decision}
-              </span>
-              <span className="mono text-[10px] text-ink-40">
-                {new Date(row.createdAt).toLocaleString([], { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
-              </span>
-              <span className="mono ml-auto text-[9px] text-hazard">
-                {(row.reasons.join(', ') || 'DIFFERENT VOICE').toUpperCase()}
-              </span>
+            <li key={row.id} className="border-b border-ink/15 px-5 py-3 last:border-0">
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="mono text-[10px] font-bold">⚠ {row.employeeRef}</span>
+                <span className="mono text-[10px] text-ink-40">
+                  speaker {row.speakerScore.toFixed(2)} · {row.voiceLabel} · {row.decision}
+                </span>
+                <span className="mono text-[10px] text-ink-40">
+                  {new Date(row.createdAt).toLocaleString([], {
+                    day: '2-digit',
+                    month: 'short',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </span>
+                <span className="mono ml-auto text-[9px] text-hazard">
+                  {(row.reasons.join(', ') || 'DIFFERENT VOICE').toUpperCase()}
+                </span>
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => void listen(row.id)}
+                  className="mono border border-ink px-3 py-1.5 text-[9px] hover:bg-ink hover:text-paper"
+                >
+                  {playing === row.id ? 'HIDE REC' : 'LISTEN REC'}
+                </button>
+                {playing === row.id && urls[row.id] && (
+                  <audio controls autoPlay src={urls[row.id]} className="w-full sm:w-80" />
+                )}
+              </div>
             </li>
           ))}
         </ul>
@@ -95,15 +137,12 @@ function VoiceAlertsSection() {
   );
 }
 
-/** HR control dashboard — stats, today's roster, schedule and the team map. */
+/** HR control dashboard — stats, today's roster, schedule and voice alerts. */
 export function DashboardView() {
   const statsQuery = useDashboardStats();
   const employeesQuery = useEmployees();
   const attendanceQuery = useAttendance({});
   const leaveQuery = useLeaveRequests({});
-
-  const [mapSelection, setMapSelection] = useState<string>('all');
-  const [mapCollapsed, setMapCollapsed] = useState(false);
 
   const employees = useMemo(() => employeesQuery.data ?? [], [employeesQuery.data]);
   const attendance = useMemo(() => attendanceQuery.data ?? [], [attendanceQuery.data]);
@@ -153,32 +192,6 @@ export function DashboardView() {
         a.employee.fullName.localeCompare(b.employee.fullName),
     );
   }, [team, attendance, leaves]);
-
-  const mapPoints = useMemo<MapPoint[]>(() => {
-    const seen = new Set<string>();
-    const points: MapPoint[] = [];
-
-    for (const record of attendance) {
-      if (!record.location || !record.employee) continue;
-      if (seen.has(record.employee.employeeRef)) continue;
-      seen.add(record.employee.employeeRef);
-
-      points.push({
-        id: record.employee.employeeRef,
-        name: record.employee.fullName,
-        lat: record.location.lat,
-        lng: record.location.lng,
-      });
-    }
-
-    return points;
-  }, [attendance]);
-
-  const visiblePoints = useMemo(
-    () =>
-      mapSelection === 'all' ? mapPoints : mapPoints.filter((point) => point.id === mapSelection),
-    [mapPoints, mapSelection],
-  );
 
   const statTiles = [
     { label: 'Employees', value: stats ? String(stats.totalEmployees) : '—' },
@@ -242,7 +255,6 @@ export function DashboardView() {
           ) : (
             <ul>
               {roster.map((row) => {
-                const hasLocation = Boolean(row.record?.location);
                 return (
                   <li
                     key={row.employee.id}
@@ -261,18 +273,6 @@ export function DashboardView() {
                         </span>
                       )}
                       <StatusLabel kind="roster" value={row.state} />
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 px-2 text-[9px]"
-                        disabled={!hasLocation}
-                        onClick={() => {
-                          setMapSelection(row.employee.employeeRef);
-                          setMapCollapsed(false);
-                        }}
-                      >
-                        {hasLocation ? 'Map' : 'No location'}
-                      </Button>
                     </div>
                   </li>
                 );
@@ -316,97 +316,7 @@ export function DashboardView() {
         </div>
       </section>
 
-      <section className="mt-6 border border-ink bg-paper">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-ink px-5 py-3">
-          <div>
-            <h2 className="mono text-[11px] font-bold">TEAM LOCATION</h2>
-            <p className="mono mt-1 text-[9px] text-ink-40">
-              {mapPoints.length === 0
-                ? 'NO SHARED LOCATIONS YET TODAY'
-                : `${mapPoints.length} SHARING · PICK ONE TO FOCUS`}
-            </p>
-          </div>
-          {mapPoints.length > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 px-3 text-[9px]"
-              aria-expanded={!mapCollapsed}
-              aria-controls="team-location-map"
-              onClick={() => setMapCollapsed((value) => !value)}
-            >
-              {mapCollapsed ? 'Show map' : 'Hide map'}
-            </Button>
-          )}
-        </div>
-
-        {!mapCollapsed && (
-          <div id="team-location-map" className="space-y-3 p-4">
-            {mapPoints.length === 0 ? (
-              <p className="mono border border-dashed border-ink/40 px-4 py-10 text-center text-[10px] text-ink-40">
-                LOCATIONS SHOW UP HERE AS EMPLOYEES CHECK IN.
-              </p>
-            ) : (
-              <>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setMapSelection('all')}
-                    aria-pressed={mapSelection === 'all'}
-                    className={
-                      mapSelection === 'all'
-                        ? 'mono border border-ink bg-ink px-3 py-1.5 text-[9px] text-paper'
-                        : 'mono border border-ink/40 px-3 py-1.5 text-[9px] text-ink-40 transition-colors hover:border-ink hover:text-ink'
-                    }
-                  >
-                    ALL · {mapPoints.length}
-                  </button>
-                  {mapPoints.map((point) => {
-                    const active = mapSelection === point.id;
-                    return (
-                      <button
-                        key={point.id}
-                        type="button"
-                        onClick={() => setMapSelection(point.id)}
-                        aria-pressed={active}
-                        className={
-                          active
-                            ? 'mono border border-hazard bg-hazard px-3 py-1.5 text-[9px] text-white'
-                            : 'mono border border-ink/40 px-3 py-1.5 text-[9px] text-ink-40 transition-colors hover:border-ink hover:text-ink'
-                        }
-                      >
-                        {point.name.toUpperCase()}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <LocationMap points={visiblePoints} height="24rem" />
-
-                <p className="mono text-[9px] text-ink-40">
-                  {mapSelection === 'all'
-                    ? `SHOWING ${mapPoints.length} SHARED LOCATION${mapPoints.length === 1 ? '' : 'S'}`
-                    : `${visiblePoints[0]?.name.toUpperCase() ?? ''} · ${visiblePoints[0]?.lat.toFixed(5) ?? ''}, ${visiblePoints[0]?.lng.toFixed(5) ?? ''}`}
-                </p>
-              </>
-            )}
-          </div>
-        )}
-      </section>
-
       <VoiceAlertsSection />
-
-      <section className="mt-6">
-        <p className="mono mb-3 text-[10px] text-ink-40">PLATFORM MODULES — PENDING</p>
-        <div className="grid grid-cols-1 gap-px border border-ink bg-ink md:grid-cols-3">
-          {['REQUEST A MOVE', 'MY QUOTES', 'MOVE HISTORY'].map((cell) => (
-            <div key={cell} className="bg-paper p-8">
-              <p className="display text-2xl">{cell}</p>
-              <p className="mono mt-2 text-[10px] text-ink-40">STATUS: QUEUED</p>
-            </div>
-          ))}
-        </div>
-      </section>
     </main>
   );
 }

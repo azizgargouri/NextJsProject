@@ -102,14 +102,40 @@ Compared `dev` with the `smart-room` branch page by page, running the branch sid
 
 Tested: the AI layout for "Demo flat, Sfax" placed all 37 pieces (24 placements, boxes stacked) with the local `qwen2.5-coder:7b` in 87 s. The small model put the washing machine in the office and the desk in the main bedroom; drag them in the editor, or use Groq or a larger Ollama model for better placements.
 
+### `rh-and-employee-tracking` (fedibenman) — merged 2026-11-09, merge `e0e6a65`
+
+Description: `docs/IMPLEMENTATION.md`. Most of the module (employees, attendance, leave, crews, tracking, contracts, custodial wallets) already reached `dev` through `main`, and `dev`'s copy is newer where they differ. The merge brought the last six commits: server-generated voice challenge, listen-before-send recording, HR playback of faulty attempts, 16 kHz WAV conversion. No conflicts.
+
+- Fixes: unused variable in the HR dashboard; `force-dynamic` on the voice routes; voice check-in answers 503 (service not configured / unreachable) or 400 (not JSON) instead of a bare 500.
+- Navigation: HR employees (CLIENT accounts with an employee record) get "HR file" and "Contracts" in the header; the admin sidebar has "HR workspace" (EN/FR) → `/dashboard`.
+- Decisions (merge notes §6): one `ADMIN` role for back office and HR; `/dashboard` renders HR for `ADMIN` and the client workspace for everyone else.
+- Setup: `WALLET_ENCRYPTION_KEY` is required by `yarn db:seed` (HR wallets) and must never change once wallets exist. The voice check-in needs `VOICE_API_BASE_URL` (the Kaggle notebook's ngrok URL).
+- HR demo logins: `hr@moveup.tn` / `Hr#2026!` (ADMIN); `alice|bob|carol|dave|eve@moveup.tn` / `Demo#2026!` (CLIENT employees).
+
+### `feat/member6-quality-ai-v2` (abderrahmen007) — merged 2026-11-09
+
+Description: `docs/member-6-v2-quality-ai.md`, `seed-data/README.md`. Brings the multimodal Vision AI claim scanner (red-rectangle damage zones, three demo presets), the AI dispute mediator, the mover scorecard, the evidence gallery and printable dossier, and a demo data kit.
+
+- Conflicts: `next.config.ts` keeps `dev`'s offline `distDir` plus the branch's 8 MB Server Action limit (claim photos); the branch's picsum image domains were dropped (no placeholder photos). The claim and review forms and pages take the branch's new UI.
+- Logical integration: the branch's move picker used four invented moves (`MV-2026-0155` …). It now lists the client's **real** moves (`server/modules/moves/moves.options.ts`), and keeps `dev`'s pre-fill from the tracking page (`?moveRef=&moverId=`).
+- Vision AI uses the configured `OLLAMA_URL` (was hard-coded to `127.0.0.1`) and `OLLAMA_VISION_MODEL` (`qwen2.5vl:7b` locally); with no cloud key it falls back to its rule engine.
+- Checks: tsc clean, eslint 0 errors, `yarn test` 21/21, `next build` succeeds; claim picker, pre-fill, client claims list and admin disputes verified in the browser. Demo data: `yarn db:seed:quality`.
+
+### Member 6 mover and admin wiring — 2026-11-09
+
+Followed `CLAUDE_MOVER_INTEGRATION_GUIDE.md` (from the member6 branch). The quality backend already supported the `MOVER` role, but nothing in the mover workspace reached it, and the admin sidebar still labelled working modules "Soon".
+
+- Mover app: Claims, Reviews and Assistant in the header and bottom bar; `/mover/claims` (+ detail with AI reply suggestions), `/mover/reviews`, `/mover/assistant` render the shared pages inside the mover shell instead of sending movers to the client workspace. The profile has a Reputation panel with the AI trust scorecard and a link to the public page `/movers/[id]`.
+- Links inside the shared pages follow the role (`lib/quality/paths.ts`); the server actions revalidate both `/dashboard` and `/mover` paths.
+- Admin: Move requests, Assignments, Disputes and Customer reviews no longer show "Soon" (their portals are built); Mover reviews still does.
+- Verified as `mover@moveup.tn`: claims list and detail stay in `/mover`, reviews, assistant, scorecard generation; the client's claim links still go to `/dashboard`.
+
 ## Waiting to be integrated
 
 Measured against `dev` on 2026-11-09, after the `main` sync:
 
-| Branch                       | Author         | Not yet in `dev`                                                                      |
-| ---------------------------- | -------------- | ------------------------------------------------------------------------------------- |
-| `rh-and-employee-tracking`   | fedibenman     | 6 commits, 11 files: voice check-in fixes (16 kHz WAV, stored recordings) and RH docs |
-| `requests-and-inventory`     | aziz           | nothing (fully merged)                                                                |
-| `feat/member6-quality-ai-v2` | abderrahmen007 | nothing (fully merged)                                                                |
-| `unified-all-features`       | aziz           | nothing (fully merged)                                                                |
-| `mover-side`                 | Salhi Firas    | nothing (fully merged)                                                                |
+| Branch                   | Author      | Not yet in `dev`       |
+| ------------------------ | ----------- | ---------------------- |
+| `requests-and-inventory` | aziz        | nothing (fully merged) |
+| `unified-all-features`   | aziz        | nothing (fully merged) |
+| `mover-side`             | Salhi Firas | nothing (fully merged) |

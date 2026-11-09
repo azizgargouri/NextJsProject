@@ -131,7 +131,9 @@ Mongoose v9 specifics: no `FilterQuery` export (use `Record<string, unknown>`), 
 - Back-office i18n (EN/FR): `lib/i18n/admin/{en,fr,index}.tsx` — typed dictionaries (`fr: AdminMessages` must match `en`), `AdminI18nProvider` inside `AdminShell`, `useAdminI18n()` → `{ m, fmt, locale, setLocale }`. Locale = the signed-in user's `locale` (`ar` falls back to `en`); the header EN/FR switch and Settings both PATCH `/api/account/profile`. Never hard-code admin UI strings — add keys to both dictionaries; use `fmt.*` for dates/money/bytes. Nav items carry a `key` (labels from `m.nav.items`). Server error messages are still English (password "current incorrect" is mapped client-side).
 - Storage portal (`/admin/storage`): bucket reachability/usage, cursor-paginated object list with owner + in-use flag, download, delete.
 - **Mover workspace** (`/mover`, from the `mover-side` branch, merged into `dev`): offers, jobs, calendar, earnings, profile, QR box scanning at pickup, profitability estimate with a trained duration model, offline build (`yarn offline`), 150 tests (`TEST_MONGODB_URI=mongodb://localhost:27017 yarn test:mover`). Code in `server/modules/mover`, `app/(mover)`, `components/features/mover`; details in `MOVER_SIDE.md` and `OFFLINE.md`. Offers only reach movers once client move creation and admin dispatch (`dispatchMove()`) exist.
-- Nav: every module routes; remaining unbuilt modules show a "Soon" badge and land on an honest "not connected" page: Move requests, Assignments, Disputes, Mover reviews, Customer reviews.
+- **Seeder playground** (`server/modules/playground`): fake, coherent data for every module, using the app's own services where a flow exists. `yarn db:playground` (`--only=accounts,bookings,mover,smartRooms,quality,hr`, `--status`, `--reset`) or `/admin/playground` (per-module Seed, Seed all, Reset). Everything is marked (`@playground.moveup.tn` users, `MU-PG-` bookings, `MV-PG-` mover requests, `CLM-PG-` claims, `[Playground]` houses, `PG-EMP-` staff) so reset removes only playground data. Needs `yarn db:seed` first. Off in production unless `PLAYGROUND_ENABLED=true`.
+- Admin nav: every module routes. Move requests, Assignments, Disputes and Customer reviews are live portals; only Mover reviews still shows a "Soon" badge and an honest "not connected" page.
+- Mover workspace also hosts Member 6's quality screens: `/mover/claims`, `/mover/claims/[id]`, `/mover/reviews`, `/mover/assistant` re-export the shared `/dashboard` pages inside the mover shell (`app/(mover)/mover/(quality)`, which provides the workspace context). Links inside them follow the role via `lib/quality/paths.ts`; server actions revalidate both paths. The mover profile has a Reputation panel (AI trust scorecard + public page link).
 
 ## Likely next features (not built yet — do not assume otherwise)
 
@@ -148,7 +150,7 @@ Mongoose v9 specifics: no `FilterQuery` export (use `Record<string, unknown>`), 
 4. Lint failures during `next build`: unused variables (`@typescript-eslint/no-unused-vars`) are build-breaking errors — clean imports before building.
 5. zod: `.partial()` on a schema that has `.refine()` throws at build ("page data collection") — restructure as base + refine (see `server/modules/pricing/pricing.schema.ts`).
 6. Prettier: pass explicit file paths; glob braces do not expand in this shell.
-6b. Display text with diacritics inside `overflow-hidden` reveal masks needs headroom (`pt-[0.2em] -mt-[0.2em]`) or French capitals lose their accents.
+   6b. Display text with diacritics inside `overflow-hidden` reveal masks needs headroom (`pt-[0.2em] -mt-[0.2em]`) or French capitals lose their accents.
 7. Before committing UI work run the impeccable checker: `node /Users/Apple/.agents/skills/impeccable/scripts/detect.mjs --json <files>`.
 
 ## Git workflow

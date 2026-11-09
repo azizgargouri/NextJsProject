@@ -1,7 +1,9 @@
 import {
   BadgeDollarSign,
+  BriefcaseBusiness,
   ClipboardList,
   FileText,
+  FlaskConical,
   Gauge,
   Gavel,
   HardDrive,
@@ -34,14 +36,18 @@ export interface AdminNavGroup {
 export const adminNavGroups: AdminNavGroup[] = [
   {
     key: 'workspace',
-    items: [{ key: 'overview', href: '/admin', icon: Gauge }],
+    items: [
+      { key: 'overview', href: '/admin', icon: Gauge },
+      // HR lives in the staff workspace (employees, attendance, leave, contracts).
+      { key: 'hr', href: '/dashboard', icon: BriefcaseBusiness },
+    ],
   },
   {
     key: 'operations',
     items: [
-      { key: 'moves', href: '/admin/moves', icon: ClipboardList, upcoming: true },
-      { key: 'assignments', href: '/admin/assignments', icon: Truck, upcoming: true },
-      { key: 'disputes', href: '/admin/disputes', icon: Gavel, upcoming: true },
+      { key: 'moves', href: '/admin/moves', icon: ClipboardList },
+      { key: 'assignments', href: '/admin/assignments', icon: Truck },
+      { key: 'disputes', href: '/admin/disputes', icon: Gavel },
     ],
   },
   {
@@ -53,7 +59,6 @@ export const adminNavGroups: AdminNavGroup[] = [
         key: 'customerReviews',
         href: '/admin/customer-reviews',
         icon: MessageSquareText,
-        upcoming: true,
       },
     ],
   },
@@ -64,6 +69,7 @@ export const adminNavGroups: AdminNavGroup[] = [
       { key: 'content', href: '/admin/content', icon: FileText },
       { key: 'storage', href: '/admin/storage', icon: HardDrive },
       { key: 'audit', href: '/admin/audit', icon: History },
+      { key: 'playground', href: '/admin/playground', icon: FlaskConical },
     ],
   },
 ];

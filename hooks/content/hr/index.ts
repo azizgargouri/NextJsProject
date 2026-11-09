@@ -1,6 +1,6 @@
 export { useEmployees, useMyEmployee, useCreateEmployee, useUpdateEmployee } from './use-employees';
 export { useAttendance, useCheckIn } from './use-attendance';
-export { useVoiceCheckin, useVoiceCheckins } from './use-voice';
+export { useVoiceChallenge, useVoiceCheckin, useVoiceCheckins } from './use-voice';
 export {
   useLeaveRequests,
   useCreateLeaveRequest,

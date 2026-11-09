@@ -1,14 +1,18 @@
 import { NextResponse } from 'next/server';
 import { asClient, parseBody } from '../homes/homes.controller';
-import { LayoutItemUpdateSchema } from './layout.schema';
+import { LayoutGenerateSchema, LayoutItemUpdateSchema } from './layout.schema';
 import { layoutService } from './layout.service';
 
 /** HTTP adapter for a house's layout plan (generate / read / delete). */
 class LayoutController {
   generate(request: Request, homeId: string) {
-    return asClient(request, async (client) =>
-      NextResponse.json({ plan: await layoutService.generate(client, homeId) }, { status: 201 }),
-    );
+    return asClient(request, async (client) => {
+      const input = await parseBody(request, LayoutGenerateSchema, 'Please check the room choices');
+      return NextResponse.json(
+        { plan: await layoutService.generate(client, homeId, input) },
+        { status: 201 },
+      );
+    });
   }
 
   findOne(request: Request, homeId: string) {

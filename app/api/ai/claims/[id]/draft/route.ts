@@ -10,7 +10,8 @@ import {
   aiModel,
   claimDraftByTemplate,
   claimDraftPrompt,
-  isAiEnabled,
+  isAiAvailable,
+  markAiFailure,
 } from '@/server/modules/ai';
 
 export const maxDuration = 30;
@@ -36,8 +37,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       logInfo: { claimId: id },
     });
 
-    if (!isAiEnabled()) {
-      return new Response(claimDraftByTemplate(claim), {
+    if (!(await isAiAvailable())) {
+      const text = claimDraftByTemplate(claim);
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        async start(controller) {
+          const words = text.split(/(\s+)/);
+          for (const word of words) {
+            if (!word) continue;
+            controller.enqueue(encoder.encode(word));
+            await new Promise((resolve) => setTimeout(resolve, 18));
+          }
+          controller.close();
+        },
+      });
+      return new Response(stream, {
         headers: { 'Content-Type': 'text/plain; charset=utf-8' },
       });
     }
@@ -50,6 +64,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       prompt: claimDraftPrompt(claim, instruction),
       maxOutputTokens: 400,
       abortSignal: AbortSignal.timeout(AI_LIMITS.timeoutMs),
+      onError: ({ error }) => {
+        markAiFailure(error);
+      },
     });
     return result.toTextStreamResponse();
   } catch (error) {

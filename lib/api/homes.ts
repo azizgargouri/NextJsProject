@@ -91,10 +91,14 @@ export const homesApi = {
     }
   },
 
-  generateLayout: async (homeId: string): Promise<LayoutPlanDto> => {
+  /** `roomChoices`: pieces the client placed in a room themselves (the assistant keeps them there). */
+  generateLayout: async (
+    homeId: string,
+    roomChoices: LayoutPlanDto['roomChoices'] = [],
+  ): Promise<LayoutPlanDto> => {
     const { data } = await axiosClient.post<{ plan: LayoutPlanDto }>(
       `/api/homes/${homeId}/layout`,
-      {},
+      { roomChoices },
       { timeout: LAYOUT_TIMEOUT_MS },
     );
     return data.plan;

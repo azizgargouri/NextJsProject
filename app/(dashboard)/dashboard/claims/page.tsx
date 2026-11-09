@@ -15,6 +15,7 @@ import {
   formatDate,
 } from '@/components/features/workspace/workspace-blocks';
 import { cn } from '@/lib/utils';
+import { qualityBase } from '@/lib/quality/paths';
 
 export const metadata: Metadata = { title: 'Claims' };
 
@@ -28,6 +29,7 @@ export default async function ClaimsPage({
   const query = ClaimPartyQuerySchema.parse({ ...(await searchParams), limit: 20 });
   const page = await claimsService.listForParty(user, query);
   const isClient = user.role === 'CLIENT';
+  const base = `${qualityBase(user.role)}/claims`;
 
   return (
     <div className="space-y-8">
@@ -36,7 +38,7 @@ export default async function ClaimsPage({
         title={isClient ? 'MY CLAIMS.' : 'CLAIMS ABOUT ME.'}
       >
         {isClient ? (
-          <Link href="/dashboard/claims/new" className={buttonVariants({ variant: 'hazard' })}>
+          <Link href={`${base}/new`} className={buttonVariants({ variant: 'hazard' })}>
             New claim
           </Link>
         ) : null}
@@ -49,7 +51,7 @@ export default async function ClaimsPage({
         {(['ALL', ...CLAIM_STATUSES] as const).map((status) => (
           <Link
             key={status}
-            href={status === 'ALL' ? '/dashboard/claims' : `/dashboard/claims?status=${status}`}
+            href={status === 'ALL' ? base : `${base}?status=${status}`}
             aria-current={query.status === status ? 'true' : undefined}
             className={cn(
               'flex-1 bg-paper px-4 py-2 text-center hover:bg-ink hover:text-paper',
@@ -72,7 +74,7 @@ export default async function ClaimsPage({
           {page.data.map((claim) => (
             <li key={claim.id}>
               <Link
-                href={`/dashboard/claims/${claim.id}`}
+                href={`${base}/${claim.id}`}
                 className="grid gap-3 p-5 transition-colors hover:bg-paper-soft md:grid-cols-[1fr_auto] md:items-center"
               >
                 <div>

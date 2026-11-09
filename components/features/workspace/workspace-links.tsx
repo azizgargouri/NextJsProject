@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import type { AuthUser } from '@/hooks/stores/auth-store';
 import { useAuthStore } from '@/hooks/stores/auth-store';
+import { useMyEmployee } from '@/hooks/content/hr/use-employees';
 import { cn } from '@/lib/utils';
 
 export interface WorkspaceLink {
@@ -42,6 +43,22 @@ const ADMIN_LINKS: WorkspaceLink[] = [
   { href: '/contracts', label: 'Contracts' },
   { href: '/profile', label: 'Profile' },
 ];
+
+/** Staff who sign in as clients (the HR module's employees) also get their HR pages. */
+const EMPLOYEE_LINKS: WorkspaceLink[] = [
+  { href: '/me', label: 'HR file' },
+  { href: '/contracts', label: 'Contracts' },
+];
+
+/**
+ * The header links of the signed-in user: the role's modules, plus the HR pages
+ * when a client account is also an employee in the HR directory.
+ */
+export function useWorkspaceLinks(role: AuthUser['role'] | undefined): WorkspaceLink[] {
+  const { data: employee } = useMyEmployee(role === 'CLIENT');
+  const links = workspaceLinks(role);
+  return role === 'CLIENT' && employee ? [...links, ...EMPLOYEE_LINKS] : links;
+}
 
 export function workspaceLinks(role: AuthUser['role'] | undefined): WorkspaceLink[] {
   if (role === 'ADMIN') return ADMIN_LINKS;
@@ -104,6 +121,7 @@ export function ClientWorkspaceBar() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+  const links = useWorkspaceLinks(mounted && isAuthenticated ? user?.role : undefined);
 
   if (!mounted || !isAuthenticated || user?.role !== 'CLIENT') return null;
   return (
@@ -112,7 +130,7 @@ export function ClientWorkspaceBar() {
       className="no-scrollbar flex gap-5 overflow-x-auto border-b border-ink/15 bg-paper-soft px-4 py-2.5 md:px-6"
     >
       <div className="mx-auto flex w-full max-w-7xl gap-5">
-        <WorkspaceLinkList links={CLIENT_LINKS} variant="strip" />
+        <WorkspaceLinkList links={links} variant="strip" />
       </div>
     </nav>
   );

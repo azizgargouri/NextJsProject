@@ -51,6 +51,8 @@ export interface LayoutPlanDoc {
   unplaced: LayoutUnplacedDoc[];
   tips: string[];
   warnings: string[];
+  /** Rooms the client fixed for given pieces before generating. */
+  roomChoices: { unitId: string; roomId: string }[];
   inputHash: string;
   createdAt: Date;
   updatedAt: Date;
@@ -121,6 +123,10 @@ const LayoutPlanSchema = new Schema<LayoutPlanDoc>(
     },
     tips: { type: [String], default: [] },
     warnings: { type: [String], default: [] },
+    roomChoices: {
+      type: [{ _id: false, unitId: String, roomId: String }],
+      default: [],
+    },
     inputHash: { type: String, required: true },
   },
   { timestamps: true },
