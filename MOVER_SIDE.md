@@ -317,7 +317,7 @@ A full project audit was run on this branch. The build, type check, lint (0 erro
 5. **Session tokens are readable by page scripts.** The access token is saved in `localStorage`, the refresh token is also returned in the sign-in response body, and there are no security headers.
 6. **Move references can collide.** Five random digits per year give about a 50% chance of a duplicate within roughly 370 moves. Retry on a duplicate, or use a counter.
 7. **Background tasks only run when movers use the app.** Add a cron route for `sweep()`.
-8. **Uploads are stored on the server's disk** (`.uploads`), which won't survive serverless or multi-server hosting. An S3 driver is planned.
+8. ~~**Uploads are stored on the server's disk**~~ Fixed on `dev`: on Vercel, mover files go to the S3 bucket when `S3_*` is set, otherwise to MongoDB (`moverfiles`); local development keeps the disk. `MOVER_STORAGE` forces a backend.
 
 **Not built yet:** client move creation, admin dispatch and mover approval, and the admin moves, assignments, disputes and review pages.
 

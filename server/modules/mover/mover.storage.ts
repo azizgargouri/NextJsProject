@@ -3,12 +3,18 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { env } from '../../config/env';
 import { FILE_URL_TTL_SECONDS } from './mover.constants';
+import { connectMongo } from '../../shared/database/mongoose';
+import { MoverFileModel } from '../../shared/database/models/mover-file.model';
+import { storage } from '../../shared/storage/s3';
 
 /**
- * Local private storage for mover photos and documents. It has the same
- * putObject/getObject shape as server/shared/storage/s3.ts on origin/main, so
- * connecting S3 means swapping this object. Files sit outside /public and are
- * reachable only through a short-lived signed URL.
+ * Private storage for mover photos and documents. Files are never public: they
+ * are reachable only through a short-lived signed URL. Where the bytes live
+ * depends on the host:
+ *   - "disk":  UPLOAD_DIR on the local disk (development, the offline build);
+ *   - "s3":    the S3-compatible bucket, on Vercel when S3_* is configured;
+ *   - "mongo": MongoDB, on Vercel without a bucket (its disk is read-only).
+ * MOVER_STORAGE forces one of them.
  */
 const KEY_PATTERN = /^mover\/[a-f0-9]{24}\/[a-z]+\/[a-f0-9-]{36}\.(jpg|png|webp|pdf)$/;
 
@@ -19,8 +25,32 @@ const CONTENT_TYPES: Record<string, string> = {
   pdf: 'application/pdf',
 };
 
-function resolveKey(key: string): string {
+type Driver = 's3' | 'mongo' | 'disk';
+
+function s3Configured(): boolean {
+  return ['S3_ENDPOINT', 'S3_ACCESS_KEY', 'S3_SECRET_KEY', 'S3_BUCKET'].every((name) =>
+    Boolean(process.env[name]?.trim()),
+  );
+}
+
+export function moverStorageDriver(): Driver {
+  const forced = process.env.MOVER_STORAGE?.trim();
+  if (forced === 's3' || forced === 'mongo' || forced === 'disk') return forced;
+  // Serverless hosts (Vercel) have a read-only filesystem: use the bucket, else MongoDB.
+  if (process.env.VERCEL) return s3Configured() ? 's3' : 'mongo';
+  return 'disk';
+}
+
+function checkKey(key: string): void {
   if (!KEY_PATTERN.test(key)) throw new Error('Invalid storage key');
+}
+
+function contentTypeOf(key: string): string {
+  return CONTENT_TYPES[key.split('.').pop() ?? ''] ?? 'application/octet-stream';
+}
+
+function resolveKey(key: string): string {
+  checkKey(key);
   return path.resolve(env().UPLOAD_DIR, key);
 }
 
@@ -30,15 +60,44 @@ export const moverStorage = {
   },
 
   async putObject(key: string, body: Uint8Array): Promise<void> {
+    checkKey(key);
+    const contentType = contentTypeOf(key);
+    const driver = moverStorageDriver();
+    if (driver === 's3') return storage.putObject(key, body, contentType);
+    if (driver === 'mongo') {
+      await connectMongo();
+      await MoverFileModel.updateOne(
+        { key },
+        { $set: { contentType, size: body.byteLength, data: Buffer.from(body) } },
+        { upsert: true },
+      );
+      return;
+    }
     const target = resolveKey(key);
     await mkdir(path.dirname(target), { recursive: true });
     await writeFile(target, body);
   },
 
   async getObject(key: string): Promise<{ body: Uint8Array; contentType: string }> {
+    checkKey(key);
+    const driver = moverStorageDriver();
+    if (driver === 's3') {
+      const object = await storage.getObject(key);
+      return { body: object.body, contentType: object.contentType || contentTypeOf(key) };
+    }
+    if (driver === 'mongo') {
+      await connectMongo();
+      const file = await MoverFileModel.findOne({ key }).lean();
+      if (!file) throw Object.assign(new Error('File not found'), { code: 'ENOENT' });
+      // `.lean()` returns BSON Binary; normalise to a Node Buffer.
+      const raw = file.data as unknown as Buffer | { buffer: ArrayBuffer };
+      const body = Buffer.isBuffer(raw)
+        ? raw
+        : Buffer.from((raw as { buffer: ArrayBuffer }).buffer);
+      return { body, contentType: file.contentType };
+    }
     const body = await readFile(resolveKey(key));
-    const extension = key.split('.').pop() ?? '';
-    return { body, contentType: CONTENT_TYPES[extension] ?? 'application/octet-stream' };
+    return { body, contentType: contentTypeOf(key) };
   },
 };
 
