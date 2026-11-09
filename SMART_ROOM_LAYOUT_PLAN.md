@@ -163,16 +163,16 @@ Sign in as `client@moveup.tn` and confirm you **cannot** see Omar's houses.
 
 **Backend** (`server/modules/room-layout/`)
 
-- `static-move-requests.ts` — **the only file to replace** when `requests-and-inventory` merges.
-  Items use their exact `Move.items` shape `{ id, name, volume, weight, quantity }`:
+- `move-requests.service.ts` — reads the client's real `Move`s (`clientId`), newest first.
+  `moveDate` is the day picked at booking (older moves fall back to `createdAt`).
+  Demo moves are seeded by `yarn db:seed`:
 
   | Reference        | Owner                   | Route                    | Items |
   | ---------------- | ----------------------- | ------------------------ | ----- |
   | `MU-2026-DEMO01` | `omar.client@moveup.tn` | Les Berges du Lac → Sfax | 37    |
   | `MU-2026-DEMO02` | `omar.client@moveup.tn` | Ariana → Tunis           | 14    |
-  | `MU-2026-DEMO03` | `client@moveup.tn`      | La Marsa → Bizerte       | 12    |
 
-  Static data can't know Mongo ids, so ownership is by email here (the real model uses `clientId`).
+  `client@moveup.tn` gets the live move `MU-2026-004281`.
 
 - `furniture-sizes.ts` — floor footprint per catalogue id (bed 160×200, sofa 200×90, wardrobe
   120×60, table 160×90, desk 120×60, TV stand 150×40, fridge 60×65, washer 60×60, chair 50×50,
@@ -348,7 +348,7 @@ get the warning) → **Delete plan**.
 - Honest errors when both AI providers are down; mobile layout check.
 - `npx tsc --noEmit`, `yarn lint`, `yarn build` all green.
 - Merge notes for the team:
-  - swap `static-move-request.ts` for the real `Move` model when `requests-and-inventory` lands;
+  - ✅ static move requests swapped for the real `Move` model (unified-all-features);
   - **dashboard entry moves:** on `requests-and-inventory` / `rh-and-employee-tracking`,
     `/dashboard` becomes an admin-only HR page and clients are redirected to `/request`. When those
     merge, keep their version of `app/(dashboard)/dashboard/page.tsx` and instead add

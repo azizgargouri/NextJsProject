@@ -8,6 +8,7 @@ import { AttendanceModel } from './shared/database/models/attendance.model';
 import { LeaveRequestModel } from './shared/database/models/leave-request.model';
 import { WorkScheduleModel } from './shared/database/models/work-schedule.model';
 import { MoveModel } from './shared/database/models/move.model';
+import { MOVE_STAGES_SPEC } from './modules/moves/moves.service';
 import { PricingRuleModel } from './shared/database/models/pricing-rule.model';
 import { ContentEntryModel } from './shared/database/models/content-entry.model';
 import {
@@ -80,7 +81,7 @@ async function seed() {
   );
 
   // Omar (Smart layout client)
-  await UserModel.findOneAndUpdate(
+  const omarDoc = await UserModel.findOneAndUpdate(
     { email: 'omar.client@moveup.tn' },
     {
       $set: {
@@ -94,7 +95,7 @@ async function seed() {
       },
       $setOnInsert: { email: 'omar.client@moveup.tn' },
     },
-    { upsert: true },
+    { upsert: true, returnDocument: 'after' },
   );
 
   // Demo mover (approved) + mover profile
@@ -174,6 +175,80 @@ async function seed() {
       { upsert: true },
     );
     console.log('Seeded live move: MU-2026-004281 (IN_TRANSIT) for client@moveup.tn');
+  }
+
+  // Smart Room Layout demo: two booked (not started) moves for omar.client
+  if (omarDoc) {
+    const demoMoves = [
+      {
+        reference: 'MU-2026-DEMO01',
+        pickupAddress: '12 Rue du Lac, Les Berges du Lac, Tunis',
+        destinationAddress: '45 Avenue Habib Bourguiba, Sfax',
+        moveDate: '2026-11-20',
+        distance: 270,
+        volume: 15.18,
+        estimatedPrice: 486,
+        vehicle: { name: 'Box truck', capacity: 28, payload: 3500 },
+        items: [
+          { id: 'bed', name: 'Double Bed', volume: 1.8, weight: 55, quantity: 2 },
+          { id: 'wardrobe', name: 'Wardrobe (2 doors)', volume: 1.4, weight: 70, quantity: 2 },
+          { id: 'sofa', name: '3-Seater Sofa', volume: 1.6, weight: 65, quantity: 1 },
+          { id: 'tv-stand', name: 'TV stand', volume: 0.4, weight: 20, quantity: 1 },
+          { id: 'table', name: 'Dining Table', volume: 1.25, weight: 35, quantity: 1 },
+          { id: 'chair', name: 'Chair / Armchair', volume: 0.18, weight: 8, quantity: 6 },
+          { id: 'fridge', name: 'Fridge / Freezer', volume: 1.1, weight: 85, quantity: 1 },
+          { id: 'washer', name: 'Washing machine', volume: 0.65, weight: 72, quantity: 1 },
+          { id: 'desk', name: 'Office desk', volume: 0.6, weight: 30, quantity: 1 },
+          { id: 'scan-7f3a', name: 'Bookshelf (scanned)', volume: 0.5, weight: 25, quantity: 1 },
+          { id: 'box', name: 'Moving box', volume: 0.08, weight: 12, quantity: 20 },
+        ],
+      },
+      {
+        reference: 'MU-2026-DEMO02',
+        pickupAddress: '3 Rue Ibn Khaldoun, Ariana',
+        destinationAddress: '18 Rue de Marseille, Tunis',
+        moveDate: '2026-12-05',
+        distance: 10,
+        volume: 5.75,
+        estimatedPrice: 80,
+        vehicle: { name: 'Compact van', capacity: 6, payload: 1000 },
+        items: [
+          { id: 'bed', name: 'Double Bed', volume: 1.8, weight: 55, quantity: 1 },
+          { id: 'table', name: 'Dining Table', volume: 1.25, weight: 35, quantity: 1 },
+          { id: 'chair', name: 'Chair / Armchair', volume: 0.18, weight: 8, quantity: 2 },
+          { id: 'fridge', name: 'Fridge / Freezer', volume: 1.1, weight: 85, quantity: 1 },
+          { id: 'desk', name: 'Office desk', volume: 0.6, weight: 30, quantity: 1 },
+          { id: 'box', name: 'Moving box', volume: 0.08, weight: 12, quantity: 8 },
+        ],
+      },
+    ];
+    for (const { reference, moveDate, ...move } of demoMoves) {
+      const day = new Date(moveDate);
+      await MoveModel.findOneAndUpdate(
+        { reference },
+        {
+          $set: {
+            ...move,
+            clientId: String(omarDoc._id),
+            moveDate: day,
+            trackingToken: `demo-tracking-${reference.toLowerCase()}`,
+            mover: { userId: moverId, name: 'Mehdi Transport', phone: '+21698123456', companyName: 'Mehdi Transport' },
+            currentStage: 'CONFIRMED',
+            stages: MOVE_STAGES_SPEC.map((stage) => ({
+              key: stage.key,
+              title: stage.title,
+              detail: stage.detail,
+              durationMinutes: stage.minutes,
+              estimatedAt: day,
+              completedAt: null,
+            })),
+          },
+          $setOnInsert: { reference },
+        },
+        { upsert: true },
+      );
+    }
+    console.log('Seeded smart-layout moves: MU-2026-DEMO01, MU-2026-DEMO02 for omar.client@moveup.tn');
   }
 
   // Pricing rule — one active table (registry exclusivity is a service rule).

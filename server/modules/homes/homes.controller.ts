@@ -29,7 +29,7 @@ export async function asClient(
 ): Promise<NextResponse> {
   try {
     const client = await requireRole(request, ['CLIENT']);
-    return await handler({ id: client.sub, email: client.email });
+    return await handler({ id: client.sub });
   } catch (error) {
     return errorResponse(error);
   }

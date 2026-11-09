@@ -1,10 +1,30 @@
+import { connectMongo } from '../../shared/database/mongoose';
+import { MoveModel, type MoveDoc } from '../../shared/database/models/move.model';
 import { footprintFor, summarizeItems, type Footprint } from './furniture-sizes';
-import { STATIC_MOVE_REQUESTS, type StaticMoveRequest } from './static-move-requests';
 
 /** The signed-in client, as the guards resolve it from database truth. */
 export interface ClientRef {
   id: string;
-  email: string;
+}
+
+/** The slice of a client's Move that Smart Room Layout uses. */
+export interface ClientMoveRequest {
+  reference: string;
+  pickupAddress: string;
+  destinationAddress: string;
+  moveDate: string;
+  items: MoveDoc['items'];
+}
+
+function toRequest(move: MoveDoc): ClientMoveRequest {
+  return {
+    reference: move.reference,
+    pickupAddress: move.pickupAddress,
+    destinationAddress: move.destinationAddress,
+    // Moves booked before moveDate was stored fall back to their booking day.
+    moveDate: (move.moveDate ?? move.createdAt).toISOString().slice(0, 10),
+    items: move.items,
+  };
 }
 
 export interface MoveItemResponse {
@@ -25,26 +45,22 @@ export interface LinkedMoveRequestResponse {
   totals: ReturnType<typeof summarizeItems>;
 }
 
-/**
- * Client move requests for Smart Room Layout. Reads STATIC data today; when
- * the Move model is merged, only the two lookups below change
- * (`MoveModel.find({ clientId: client.id })` / `findOne({ reference, clientId })`).
- */
+/** Client move requests for Smart Room Layout: the client's own Moves, newest first. */
 export class MoveRequestsService {
-  async listForClient(client: ClientRef): Promise<StaticMoveRequest[]> {
-    return STATIC_MOVE_REQUESTS.filter((request) => request.clientEmail === client.email);
+  async listForClient(client: ClientRef): Promise<ClientMoveRequest[]> {
+    await connectMongo();
+    const moves = await MoveModel.find({ clientId: client.id }).sort({ createdAt: -1 }).lean<MoveDoc[]>();
+    return moves.map(toRequest);
   }
 
-  async findForClient(client: ClientRef, reference: string): Promise<StaticMoveRequest | null> {
-    return (
-      STATIC_MOVE_REQUESTS.find(
-        (request) => request.reference === reference && request.clientEmail === client.email,
-      ) ?? null
-    );
+  async findForClient(client: ClientRef, reference: string): Promise<ClientMoveRequest | null> {
+    await connectMongo();
+    const move = await MoveModel.findOne({ reference, clientId: client.id }).lean<MoveDoc>();
+    return move ? toRequest(move) : null;
   }
 
   /** Request + every item's floor footprint + totals (the AI input in step 3). */
-  expand(request: StaticMoveRequest): LinkedMoveRequestResponse {
+  expand(request: ClientMoveRequest): LinkedMoveRequestResponse {
     return {
       reference: request.reference,
       pickupAddress: request.pickupAddress,
