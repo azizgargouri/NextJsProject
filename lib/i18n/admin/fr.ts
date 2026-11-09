@@ -625,15 +625,11 @@ export const fr: AdminMessages = {
     modules: {
       accounts: {
         title: 'Comptes',
-        body: 'Trois clients et deux déménageurs, approuvés et assurés.',
+        body: 'Huit clients et cinq déménageurs dans six villes, approuvés et assurés.',
       },
       bookings: {
-        title: 'Réservations et suivi',
-        body: 'Quatre réservations par client : affectée, en route, en transit et terminée.',
-      },
-      mover: {
-        title: 'Espace déménageur',
-        body: 'Demandes envoyées à mover@moveup.tn : offres ouvertes, une mission affectée, une en chargement, une terminée avec son gain.',
+        title: 'Réservations et missions',
+        body: 'Cinq réservations par client via le vrai parcours : envoyées aux déménageurs, devis, acceptées, en route, chargement, en transit, livrées et terminées avec gains.',
       },
       smartRooms: {
         title: 'Smart rooms',
@@ -641,7 +637,7 @@ export const fr: AdminMessages = {
       },
       quality: {
         title: 'Réclamations et avis',
-        body: 'Une réclamation et un avis sur chaque réservation terminée ; notes des déménageurs mises à jour.',
+        body: 'Un avis sur chaque réservation terminée et des réclamations sur la plupart ; notes mises à jour.',
       },
       hr: {
         title: 'RH',
@@ -653,6 +649,10 @@ export const fr: AdminMessages = {
       movers: 'déménageurs',
       bookings: 'réservations',
       requests: 'demandes',
+      quotes: 'devis',
+      active: 'en cours',
+      delivered: 'à confirmer',
+      completed: 'terminées',
       openOffers: 'offres ouvertes',
       jobs: 'missions',
       earnings: 'gains',

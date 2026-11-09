@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import { connectMongo } from '../shared/database/mongoose';
 import { UserModel } from '../shared/database/models/user.model';
 import { MoveModel } from '../shared/database/models/move.model';
+import { MoveRequestModel } from '../shared/database/models/move-request.model';
 import { HomeModel } from '../shared/database/models/home.model';
 import { movesService } from '../modules/moves/moves.service';
 import { homesService } from '../modules/homes/homes.service';
@@ -17,7 +18,7 @@ try {
 /**
  * STATIC demo move requests for the demo client, for testing Smart Room Layout,
  * tracking and the rest of the client workspace before real bookings exist.
- * They go through the normal booking service, so they are ordinary Moves with
+ * They go through the normal booking service (dispatched to movers), with
  * a fixed `MU-2026-DEMO0x` reference. Idempotent: existing references are kept.
  *
  *   yarn db:seed && yarn db:seed:demo-moves
@@ -144,13 +145,14 @@ async function seed() {
   const clientRef = { id: String(client._id) };
 
   for (const { reference, ...input } of DEMO_MOVES) {
-    if (await MoveModel.exists({ reference })) {
+    if ((await MoveRequestModel.exists({ reference })) || (await MoveModel.exists({ reference }))) {
       console.log(`  ${reference} already exists`);
       continue;
     }
     // The booking service prices the move, picks the vehicle and builds the stages.
+    // Bookings are dispatched to movers like any client booking; only the reference is fixed.
     const created = await movesService.create(input, clientRef.id);
-    await MoveModel.updateOne({ reference: created.reference }, { $set: { reference } });
+    await MoveRequestModel.updateOne({ _id: created.id }, { $set: { reference } });
     console.log(`  ${reference} created (${input.items.length} item lines)`);
   }
 
