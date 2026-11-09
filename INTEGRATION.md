@@ -82,6 +82,20 @@ The `main` sync brought the HR module's routing, which sent every `MOVER` to `/m
 
 When another branch touches post-sign-in routing, keep this rule: `ADMIN` → `/admin`, `MOVER` → `/mover`, `CLIENT` → `/request` (unless a `redirect`/`next` parameter is given).
 
+### Smart room check and one workspace header — 2026-11-09
+
+Compared `dev` with the `smart-room` branch page by page, running the branch side by side on port 3100 against the same database.
+
+- **`dev` has the newer smart room code.** Omar's later commits (homes reading the client's real Moves instead of static demo requests, one dashboard shell for the homes pages) reached `dev` through `main`. The branch still has the older standalone version, so nothing was copied back from it.
+- **The UI matches:** house list, add a house, the house page with rooms drawn to scale, doors and windows, layout and drag-and-drop editor.
+- **One behavioural difference, by design:** on the branch, "Moving in" offers static sample requests (`MU-2026-DEMO00x`). On `dev` it lists the client's real moves, so a client must book a move first (Book move → `POST /api/moves`). Verified end to end: booked a move, linked it to a house, generated the layout with Ollama (`qwen2.5-coder:7b`, 27 s, 4 of 4 items placed in sensible rooms).
+- **Header:** the signed-in shell now has one role-aware header (`components/features/workspace/workspace-links.tsx`) instead of HR links plus a second workspace bar:
+  - client: Overview · Book move · Live tracking · Smart rooms · Claims · Reviews · Assistant;
+  - mover (on the HR pages): Mover workspace · HR file · Contracts · Profile;
+  - admin: unchanged HR and back-office links.
+
+  `/request` and `/track` stay open to guests, and show the same client links to signed-in clients.
+
 ## Waiting to be integrated
 
 Measured against `dev` on 2026-11-09, after the `main` sync:
