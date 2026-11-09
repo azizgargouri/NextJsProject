@@ -71,8 +71,27 @@ async function guarded<T>(operation: () => Promise<T>): Promise<T> {
     const name = (error as { name?: string }).name;
     if (name === 'NoSuchKey' || name === 'NotFound') throw error;
     if (process.env.NODE_ENV === 'development') console.error('[storage]', error);
-    throw new ServiceUnavailableError('Object storage is unreachable');
+    throw new ServiceUnavailableError(storageFailureMessage(error));
   }
+}
+
+/**
+ * What went wrong, in terms an operator can act on (the cause used to be hidden
+ * behind "unreachable"). Logged server-side too, so Vercel's logs show it.
+ */
+function storageFailureMessage(error: unknown): string {
+  const { name, $metadata } = error as { name?: string; $metadata?: { httpStatusCode?: number } };
+  const status = $metadata?.httpStatusCode;
+  console.error('[storage]', name, status, (error as Error).message);
+  // R2 answers both a wrong secret and a read-only key with AccessDenied (403).
+  if (name === 'InvalidAccessKeyId' || name === 'SignatureDoesNotMatch' || status === 401) {
+    return `Object storage rejected the credentials (${name ?? status}): check S3_ACCESS_KEY and S3_SECRET_KEY.`;
+  }
+  if (name === 'AccessDenied' || status === 403) {
+    return 'Object storage refused the request (AccessDenied): S3_ACCESS_KEY / S3_SECRET_KEY are wrong, or the key lacks read & write access to the bucket.';
+  }
+  if (name === 'NoSuchBucket') return 'Object storage bucket not found: check S3_BUCKET.';
+  return `Object storage is unreachable (${name ?? 'network error'}): check S3_ENDPOINT.`;
 }
 
 export function isMissingObjectError(error: unknown): boolean {
