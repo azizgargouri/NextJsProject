@@ -18,10 +18,13 @@ export function connectMongo(): Promise<Mongoose> {
   const { env } = require('../../config/env') as typeof import('../../config/env');
   const uri = env().MONGODB_URI;
 
-  globalForMongoose.__moveUpMongoose = mongoose.connect(uri, {
-    serverSelectionTimeoutMS: 5_000,
-    dbName: 'moveup',
-  });
+  globalForMongoose.__moveUpMongoose = mongoose
+    .connect(uri, { serverSelectionTimeoutMS: 5_000, dbName: 'moveup' })
+    .catch((error) => {
+      // Don't cache a failure: the next request retries (e.g. MongoDB started after the app).
+      globalForMongoose.__moveUpMongoose = undefined;
+      throw error;
+    });
 
   return globalForMongoose.__moveUpMongoose;
 }
