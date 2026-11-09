@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useTransition } from 'react';
+import { ClientWorkspaceBar } from '@/components/features/workspace/workspace-links';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -31,14 +32,70 @@ import type { MoveDataDto, MoveStageDto } from '@/lib/api/moves';
 type StageState = 'done' | 'active' | 'upcoming';
 
 const FALLBACK_STAGES: MoveStageDto[] = [
-  { key: 'CONFIRMED', title: 'Booking confirmed', detail: 'Your move request has been confirmed and scheduled.', durationMinutes: 0, estimatedAt: new Date(Date.now() - 3600000).toISOString(), completedAt: new Date(Date.now() - 3600000).toISOString() },
-  { key: 'ASSIGNED', title: 'Vehicle assigned', detail: 'Moving van · 14 m³ · Mehdi Transport assigned.', durationMinutes: 12, estimatedAt: new Date(Date.now() - 2400000).toISOString(), completedAt: new Date(Date.now() - 2400000).toISOString() },
-  { key: 'EN_ROUTE', title: 'Driver en route', detail: 'Driver is travelling to your pickup location.', durationMinutes: 18, estimatedAt: new Date().toISOString(), completedAt: null },
-  { key: 'ARRIVED', title: 'Vehicle arrives', detail: 'Driver arrives at 12 Rue du Lac.', durationMinutes: 5, estimatedAt: new Date(Date.now() + 1080000).toISOString(), completedAt: null },
-  { key: 'LOADING', title: 'Loading starts', detail: 'Furniture and boxes are checked and loaded.', durationMinutes: 45, estimatedAt: new Date(Date.now() + 1380000).toISOString(), completedAt: null },
-  { key: 'IN_TRANSIT', title: 'In transit', detail: 'Your load is on the road to destination.', durationMinutes: 26, estimatedAt: new Date(Date.now() + 4080000).toISOString(), completedAt: null },
-  { key: 'DELIVERY', title: 'Delivery', detail: 'Unloading items at the delivery address.', durationMinutes: 35, estimatedAt: new Date(Date.now() + 5640000).toISOString(), completedAt: null },
-  { key: 'COMPLETED', title: 'Move completed', detail: 'Confirm delivery or report a problem.', durationMinutes: null, estimatedAt: new Date(Date.now() + 7740000).toISOString(), completedAt: null },
+  {
+    key: 'CONFIRMED',
+    title: 'Booking confirmed',
+    detail: 'Your move request has been confirmed and scheduled.',
+    durationMinutes: 0,
+    estimatedAt: new Date(Date.now() - 3600000).toISOString(),
+    completedAt: new Date(Date.now() - 3600000).toISOString(),
+  },
+  {
+    key: 'ASSIGNED',
+    title: 'Vehicle assigned',
+    detail: 'Moving van · 14 m³ · Mehdi Transport assigned.',
+    durationMinutes: 12,
+    estimatedAt: new Date(Date.now() - 2400000).toISOString(),
+    completedAt: new Date(Date.now() - 2400000).toISOString(),
+  },
+  {
+    key: 'EN_ROUTE',
+    title: 'Driver en route',
+    detail: 'Driver is travelling to your pickup location.',
+    durationMinutes: 18,
+    estimatedAt: new Date().toISOString(),
+    completedAt: null,
+  },
+  {
+    key: 'ARRIVED',
+    title: 'Vehicle arrives',
+    detail: 'Driver arrives at 12 Rue du Lac.',
+    durationMinutes: 5,
+    estimatedAt: new Date(Date.now() + 1080000).toISOString(),
+    completedAt: null,
+  },
+  {
+    key: 'LOADING',
+    title: 'Loading starts',
+    detail: 'Furniture and boxes are checked and loaded.',
+    durationMinutes: 45,
+    estimatedAt: new Date(Date.now() + 1380000).toISOString(),
+    completedAt: null,
+  },
+  {
+    key: 'IN_TRANSIT',
+    title: 'In transit',
+    detail: 'Your load is on the road to destination.',
+    durationMinutes: 26,
+    estimatedAt: new Date(Date.now() + 4080000).toISOString(),
+    completedAt: null,
+  },
+  {
+    key: 'DELIVERY',
+    title: 'Delivery',
+    detail: 'Unloading items at the delivery address.',
+    durationMinutes: 35,
+    estimatedAt: new Date(Date.now() + 5640000).toISOString(),
+    completedAt: null,
+  },
+  {
+    key: 'COMPLETED',
+    title: 'Move completed',
+    detail: 'Confirm delivery or report a problem.',
+    durationMinutes: null,
+    estimatedAt: new Date(Date.now() + 7740000).toISOString(),
+    completedAt: null,
+  },
 ];
 
 function StageMarker({ state }: { state: StageState }) {
@@ -115,7 +172,8 @@ export function MoveTracking({
         }
       } catch (err: unknown) {
         if (!cancelled) {
-          const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+          const msg = (err as { response?: { data?: { message?: string } } })?.response?.data
+            ?.message;
           setLoadError(msg || 'Could not find move with this reference code or link.');
         }
       } finally {
@@ -184,16 +242,15 @@ export function MoveTracking({
         const res = await api.moves.advance(move.id, stageKey);
         setMove(res.move);
       } catch (err: unknown) {
-        const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+        const msg = (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message;
         setLoadError(msg || 'Failed to advance stage');
       }
     });
   };
 
   const currentStages = move?.stages ?? FALLBACK_STAGES;
-  const matchedStageIndex = move
-    ? currentStages.findIndex((s) => s.key === move.currentStage)
-    : 2;
+  const matchedStageIndex = move ? currentStages.findIndex((s) => s.key === move.currentStage) : 2;
   const currentIndex = matchedStageIndex >= 0 ? matchedStageIndex : 2;
 
   const displayStages = currentStages.map((stage, index) => ({
@@ -203,13 +260,21 @@ export function MoveTracking({
     time:
       index <= currentIndex && stage.completedAt
         ? new Date(stage.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        : new Date(stage.estimatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    state: (index < currentIndex ? 'done' : index === currentIndex ? 'active' : 'upcoming') as StageState,
+        : new Date(stage.estimatedAt).toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
+    state: (index < currentIndex
+      ? 'done'
+      : index === currentIndex
+        ? 'active'
+        : 'upcoming') as StageState,
     duration: stage.durationMinutes ? `${stage.durationMinutes} min estimated` : undefined,
   }));
 
   const activeStage = displayStages[currentIndex] ?? displayStages[0]!;
-  const nextStage = currentIndex < displayStages.length - 1 ? displayStages[currentIndex + 1] : null;
+  const nextStage =
+    currentIndex < displayStages.length - 1 ? displayStages[currentIndex + 1] : null;
 
   const canAdvance =
     user?.role === 'ADMIN' ||
@@ -252,7 +317,10 @@ export function MoveTracking({
             </button>
 
             {/* Reference Search input */}
-            <form onSubmit={handleSearch} className="flex items-center border-2 border-ink bg-paper">
+            <form
+              onSubmit={handleSearch}
+              className="flex items-center border-2 border-ink bg-paper"
+            >
               <input
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
@@ -269,12 +337,15 @@ export function MoveTracking({
           </div>
         </div>
       </header>
+      <ClientWorkspaceBar />
 
       {/* User's Active Moves bar (if signed in) */}
       {userMoves.length > 0 && (
         <div className="border-b border-ink bg-paper-soft px-4 py-2.5">
           <div className="mx-auto flex max-w-7xl items-center gap-2 overflow-x-auto text-xs">
-            <span className="mono text-[10px] text-ink-60 shrink-0 font-bold">YOUR ACTIVE MOVES:</span>
+            <span className="mono text-[10px] text-ink-60 shrink-0 font-bold">
+              YOUR ACTIVE MOVES:
+            </span>
             {userMoves.map((m) => {
               const isSelected = move?.reference === m.reference;
               return (
@@ -286,7 +357,9 @@ export function MoveTracking({
                     setToken(m.trackingToken || '');
                   }}
                   className={`mono inline-flex items-center gap-1.5 border px-2.5 py-1 text-[11px] font-bold transition shrink-0 ${
-                    isSelected ? 'border-hazard bg-hazard text-white' : 'border-ink bg-paper hover:bg-ink hover:text-paper'
+                    isSelected
+                      ? 'border-hazard bg-hazard text-white'
+                      : 'border-ink bg-paper hover:bg-ink hover:text-paper'
                   }`}
                 >
                   <Truck size={12} />
@@ -357,17 +430,23 @@ export function MoveTracking({
                         : 'border-ink/40 bg-paper'
                     }`}
                   >
-                    {checkedItems[idx]
-                      ? <CheckSquare size={14} className="shrink-0 text-emerald-600" />
-                      : <Square size={14} className="shrink-0 text-ink-40" />
-                    }
-                    <span className="font-semibold flex-1">{item.name} × {item.quantity}</span>
-                    <span className="text-ink-60">{(item.volume * item.quantity).toFixed(2)}m³ · {item.weight * item.quantity}kg</span>
+                    {checkedItems[idx] ? (
+                      <CheckSquare size={14} className="shrink-0 text-emerald-600" />
+                    ) : (
+                      <Square size={14} className="shrink-0 text-ink-40" />
+                    )}
+                    <span className="font-semibold flex-1">
+                      {item.name} × {item.quantity}
+                    </span>
+                    <span className="text-ink-60">
+                      {(item.volume * item.quantity).toFixed(2)}m³ · {item.weight * item.quantity}kg
+                    </span>
                   </button>
                 ))}
               </div>
               <p className="mono text-[10px] text-ink-40 mt-2">
-                {Object.values(checkedItems).filter(Boolean).length}/{move.items.length} LOADED &amp; VERIFIED
+                {Object.values(checkedItems).filter(Boolean).length}/{move.items.length} LOADED
+                &amp; VERIFIED
               </p>
             </div>
           )}
@@ -380,20 +459,28 @@ export function MoveTracking({
               <p className="mono text-[10px] text-hazard font-bold">
                 REF / {move?.reference ?? 'MU-2026-DEMO'}
               </p>
-              {isLoading && <span className="mono text-[10px] text-hazard animate-pulse">REFRESHING…</span>}
+              {isLoading && (
+                <span className="mono text-[10px] text-hazard animate-pulse">REFRESHING…</span>
+              )}
             </div>
 
             <h1 className="display mt-3 text-4xl sm:text-5xl leading-none">
               {activeStage.key === 'COMPLETED' ? (
-                <>MOVE<br />DELIVERED.</>
+                <>
+                  MOVE
+                  <br />
+                  DELIVERED.
+                </>
               ) : (
-                <>NEXT UPDATE<br />IN {minutes} MIN.</>
+                <>
+                  NEXT UPDATE
+                  <br />
+                  IN {minutes} MIN.
+                </>
               )}
             </h1>
 
-            <p className="mt-3 text-sm leading-6 text-ink-80 font-medium">
-              {activeStage.detail}
-            </p>
+            <p className="mt-3 text-sm leading-6 text-ink-80 font-medium">{activeStage.detail}</p>
 
             {loadError && (
               <div className="mono mt-3 border border-hazard bg-hazard/10 p-2.5 text-[11px] text-hazard">
@@ -407,10 +494,13 @@ export function MoveTracking({
                 <div>
                   <p className="mono text-[9px] text-ink-40">ASSIGNED OPERATOR &amp; VEHICLE</p>
                   <p className="mt-0.5 text-sm font-bold">
-                    {move?.mover?.name ?? 'Mehdi Transport'} &middot; {move?.vehicle?.name ?? 'Moving van (14 m³)'}
+                    {move?.mover?.name ?? 'Mehdi Transport'} &middot;{' '}
+                    {move?.vehicle?.name ?? 'Moving van (14 m³)'}
                   </p>
                   <p className="mono mt-0.5 text-[10px] text-ink-60">
-                    {move?.estimatedPrice ? `${move.estimatedPrice} TND ALL-INCLUSIVE` : '185 TND ALL-INCLUSIVE'}
+                    {move?.estimatedPrice
+                      ? `${move.estimatedPrice} TND ALL-INCLUSIVE`
+                      : '185 TND ALL-INCLUSIVE'}
                   </p>
                 </div>
 
@@ -516,7 +606,9 @@ export function MoveTracking({
                           stage.state === 'active' ? 'text-hazard font-bold' : 'text-ink-40'
                         }`}
                       >
-                        {stage.state === 'active' ? `${minutes} MIN REMAINING` : stage.duration.toUpperCase()}
+                        {stage.state === 'active'
+                          ? `${minutes} MIN REMAINING`
+                          : stage.duration.toUpperCase()}
                       </p>
                     )}
                   </div>
@@ -525,8 +617,8 @@ export function MoveTracking({
                       stage.state === 'active'
                         ? 'text-hazard font-bold'
                         : stage.state === 'upcoming'
-                        ? 'text-ink-40'
-                        : 'text-ink'
+                          ? 'text-ink-40'
+                          : 'text-ink'
                     }`}
                   >
                     {stage.time}
@@ -538,7 +630,9 @@ export function MoveTracking({
 
           {/* Post-Move Quality Actions */}
           <div className="mt-8 border-t-2 border-ink pt-5 space-y-2">
-            <p className="mono text-[10px] text-ink-40 font-bold uppercase mb-2">QUALITY &amp; ASSISTANCE</p>
+            <p className="mono text-[10px] text-ink-40 font-bold uppercase mb-2">
+              QUALITY &amp; ASSISTANCE
+            </p>
             <Link
               href={`/dashboard/claims/new?moveRef=${encodeURIComponent(move?.reference ?? '')}&moverId=${encodeURIComponent(move?.mover?.userId ?? '')}`}
               className="mono flex items-center justify-between border border-ink p-3 text-xs hover:bg-ink hover:text-paper transition"
