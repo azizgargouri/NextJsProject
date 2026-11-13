@@ -1,40 +1,30 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/hooks/stores/auth-store';
 import { AuthPanel } from '@/components/features/auth/auth-panel';
 
 /**
  * Auth layout shell: split screen — telemetry panel (desktop) + form column.
- * Authenticated visitors are redirected away from auth pages
- * (replicates instanct-ui `Application.tsx` route-guard behaviour).
+ *
+ * Auth pages stay reachable even when a persisted session exists. Redirecting
+ * authenticated visitors away made an expired/revoked session impossible to
+ * replace: `/dashboard` bounced to `/sign-in`, and `/sign-in` bounced to `/`.
+ * Protected pages are guarded by `DashboardLayout`; this shell only waits for
+ * the persisted auth store to hydrate.
  */
 export function AuthLayout({ children }: { children: React.ReactNode }) {
-  const router = useRouter();
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const [checked, setChecked] = useState(false);
 
   useEffect(() => {
-    if (!useAuthStore.persist.hasHydrated()) return;
-    if (isAuthenticated) {
-      router.replace('/');
+    if (useAuthStore.persist.hasHydrated()) {
+      setChecked(true);
       return;
     }
-    setChecked(true);
-  }, [isAuthenticated, router]);
 
-  useEffect(() => {
     // Persisted state may still be resolving on first paint.
-    const unsub = useAuthStore.persist.onFinishHydration(() => {
-      if (useAuthStore.getState().isAuthenticated) {
-        router.replace('/');
-      } else {
-        setChecked(true);
-      }
-    });
-    return unsub;
-  }, [router]);
+    return useAuthStore.persist.onFinishHydration(() => setChecked(true));
+  }, []);
 
   if (!checked) {
     return (
