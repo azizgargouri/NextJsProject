@@ -46,11 +46,16 @@ export function DashboardLayout({
 
   useEffect(() => {
     if (!useAuthStore.persist.hasHydrated()) return;
-    if (!isAuthenticated) {
+
+    // Read the live store rather than the render snapshot: hydration can
+    // complete between the first render and this effect, leaving the captured
+    // `isAuthenticated` false even though the persisted session is valid.
+    const session = useAuthStore.getState();
+    if (!session.isAuthenticated) {
       router.replace('/sign-in');
       return;
     }
-    if (adminOnly && user?.role !== 'ADMIN') {
+    if (adminOnly && session.user?.role !== 'ADMIN') {
       router.replace('/me');
       return;
     }
