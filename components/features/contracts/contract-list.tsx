@@ -272,6 +272,33 @@ export function ContractList({
                   EMPLOYER SIG {chainView.employerSignature.slice(0, 26)}… · EMPLOYEE SIG{' '}
                   {chainView.employeeSignature.slice(0, 26)}…
                 </p>
+                {chainView.nft && (
+                  <div className="mt-3 grid gap-2 border-t border-ink/20 pt-3 md:grid-cols-3">
+                    <div>
+                      <p className="mono text-[9px] text-ink-40">NFT TOKEN</p>
+                      <p className="mono break-all text-[10px] normal-case tracking-normal">
+                        #{chainView.nft.tokenId}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="mono text-[9px] text-ink-40">NFT OWNER (EMPLOYER)</p>
+                      <p className="mono break-all text-[10px] normal-case tracking-normal">
+                        {chainView.nft.employer}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="mono text-[9px] text-ink-40">NFT CO-OWNER (EMPLOYEE)</p>
+                      <p className="mono break-all text-[10px] normal-case tracking-normal">
+                        {chainView.nft.employee}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {chainView.nft && (
+                  <p className="mono mt-2 break-all text-[8px] text-ink-40">
+                    TOKEN URI {chainView.nft.tokenUri}
+                  </p>
+                )}
               </div>
             )}
 

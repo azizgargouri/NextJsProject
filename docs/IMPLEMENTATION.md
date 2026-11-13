@@ -9,7 +9,7 @@ Do not rewrite the module from scratch. Port the existing branch.
 ## 1. Repository facts
 
 - Remote: `https://github.com/mAmineSouissi/NextJsProject.git`
-- Source branch: `rh-and-employee-tracking` @ `b0aeff4`
+- Source branch: `rh-and-employee-tracking` @ `HEAD` (fetch first; it includes the NFT contract upgrade)
 - Target branch: `dev` @ `3f7a725` (fetch first; it may be newer)
 - Merge base: `5aafdd4` (`main`)
 - Source commits, in order:
@@ -44,12 +44,29 @@ Port the entire module, not a subset:
 | Attendance | clock-in/out, statuses, history, geofence |
 | Leave | employee requests, HR approve/reject |
 | Crews & tracking | crews, members, live pings, session stop, history/map |
-| Contracts | PDF upload, prepare, propose, employee sign, anchor on-chain, view PDF, terminate |
+| Contracts | PDF upload, prepare, propose, employee sign, anchor on-chain as a soulbound ERC721, view PDF, terminate |
 | Custodial wallets | server-generated wallets, AES-256-GCM at rest, server-side EIP-712 signing |
 | Profile | name, email, wallet address, phone |
 | Voice check-in | server challenge, hold-to-record, playback, send, verdict, RH alerts + audio playback |
 | Notebooks | speaker verification / voice check-in, geo-fraud analysis |
 | Blockchain | `EmploymentContractRegistry.sol`, Hardhat config, deploy/grant/dump scripts, ABI |
+
+### 2.1 Contract NFT model
+
+- Every anchored employment contract mints exactly one **soulbound ERC721** in
+  `EmploymentContractRegistry`.
+- `tokenId = uint256(contractId)`; the contract record is still stored in the
+  registry mapping, so `getContract(contractId)` remains the source of truth.
+- The employer is the ERC721 `ownerOf`; the employee is recorded as co-owner.
+  `ownersOf(tokenId)` returns both signers and `isContractOwner(account, tokenId)`
+  returns true for either of them.
+- `tokenURI(tokenId)` returns the contract's `documentUri` (the PDF URI).
+- Transfers revert with `ContractNftNonTransferable`; the NFT is a provenance
+  record, not a tradable asset. Minting happens automatically inside
+  `createContract` and `amendContract`; the app does not send a separate mint
+  transaction.
+- Keep `lib/blockchain/abi/EmploymentContractRegistry.json` in sync with the
+  compiled artifact (`npm run compile && npm run export-abi` in `blockchain/`).
 
 Key entry points: `/dashboard`, `/employees`, `/attendance`, `/leave`, `/contracts`, `/me`, `/profile`, `/api/contracts/*`, `/api/voice/*`, `/api/employees/*`, `/api/attendance/*`, `/api/leave-requests/*`, `/api/crews/*`, `/api/tracking/*`.
 
@@ -193,7 +210,7 @@ Add/verify these variables (never commit real values):
 | `NEXT_PUBLIC_CHAIN_ID` | `80002` for Polygon Amoy. |
 | `NEXT_PUBLIC_CHAIN_NAME` | `Polygon Amoy`. |
 | `NEXT_PUBLIC_RPC_URL` | `https://rpc-amoy.polygon.technology`. |
-| `NEXT_PUBLIC_CONTRACT_ADDRESS` | Deployed registry address. Current Amoy: `0xBEBf6067E65Cd53aF37B0033bA9099D0Ed71559f`. |
+| `NEXT_PUBLIC_CONTRACT_ADDRESS` | Deployed registry address. Current Amoy NFT registry: `0x411Aa05114E52A6b1768399784DBc1368F719b09`. |
 | `NEXT_PUBLIC_BLOCK_EXPLORER_URL` | `https://amoy.polygonscan.com`. |
 | `VOICE_API_BASE_URL` | Stable ngrok URL of the Kaggle Flask app. |
 | `MONGODB_URI`, `JWT_SECRET`, TTLs, seed vars | Existing app config. |

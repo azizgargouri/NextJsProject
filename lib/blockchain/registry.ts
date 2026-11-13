@@ -62,6 +62,18 @@ interface RegistryContract {
     signature: string,
   ): Promise<ContractTransactionResponse>;
   isHrAdminFor(admin: string, organizationHash: string): Promise<boolean>;
+  ownerOf(tokenId: bigint): Promise<string>;
+  coOwnerOf(tokenId: bigint): Promise<string>;
+  ownersOf(tokenId: bigint): Promise<[string, string]>;
+  isContractOwner(account: string, tokenId: bigint): Promise<boolean>;
+  tokenURI(tokenId: bigint): Promise<string>;
+}
+
+export interface ContractNftInfo {
+  tokenId: string;
+  employer: string;
+  employee: string;
+  tokenUri: string;
 }
 
 export interface OnChainContractRecord {
@@ -88,6 +100,7 @@ export interface OnChainContractRecord {
   document: string;
   employerSignature: string;
   employeeSignature: string;
+  nft: ContractNftInfo | null;
 }
 
 function assertConfigured(): void {
@@ -181,6 +194,20 @@ export async function readContractOnChain(
   const registry = attachRegistry(getReadProvider());
   const record = await registry.getContract(contractId);
 
+  let nft: ContractNftInfo | null = null;
+  try {
+    const tokenId = BigInt(contractId);
+    const [employer, employee] = await registry.ownersOf(tokenId);
+    nft = {
+      tokenId: tokenId.toString(),
+      employer: String(employer),
+      employee: String(employee),
+      tokenUri: await registry.tokenURI(tokenId),
+    };
+  } catch {
+    // Legacy registries (deployed before the NFT upgrade) have no token.
+  }
+
   return {
     id: String(record.id),
     organizationId: String(record.organizationId),
@@ -205,6 +232,7 @@ export async function readContractOnChain(
     document: String(record.document),
     employerSignature: String(record.employerSignature),
     employeeSignature: String(record.employeeSignature),
+    nft,
   };
 }
 

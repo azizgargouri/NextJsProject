@@ -5,6 +5,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 
 /**
  * @title EmploymentContractRegistry
@@ -38,8 +39,14 @@ import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
  * Lifecycle:
  *  Active -> Terminated
  *  Active -> Superseded (a newer dual-signed version was issued)
+ *
+ * NFT model:
+ *  - Every contract mints one non-transferable ERC721 token.
+ *  - The employer is the ERC721 owner; the employee is recorded as co-owner.
+ *  - `ownersOf` / `isContractOwner` expose both signers.
+ *  - The token id is `uint256(contractId)`.
  */
-contract EmploymentContractRegistry is Ownable, Pausable, EIP712 {
+contract EmploymentContractRegistry is Ownable, Pausable, EIP712, ERC721 {
     enum Status {
         None,
         Active,
@@ -113,7 +120,17 @@ contract EmploymentContractRegistry is Ownable, Pausable, EIP712 {
     /// @notice HR wallet => organisation hash (bytes32(0) means not authorized).
     mapping(address => bytes32) public hrOrganization;
 
+    /// @notice Contract NFT token id => co-owner (the employee).
+    mapping(uint256 => address) private _coOwners;
+
     event HrAdminUpdated(address indexed admin, bytes32 indexed organizationId, bool enabled);
+
+    event ContractNftMinted(
+        bytes32 indexed contractId,
+        uint256 indexed tokenId,
+        address indexed employer,
+        address employee
+    );
 
     event ContractCreated(
         bytes32 indexed id,
@@ -164,10 +181,13 @@ contract EmploymentContractRegistry is Ownable, Pausable, EIP712 {
     error InvalidVersion();
     error InvalidPreviousContract();
     error ContractAlreadyExists();
+    error ContractNftAlreadyMinted();
+    error ContractNftNonTransferable();
 
     constructor(address initialOwner)
         Ownable(initialOwner)
         EIP712("MoveUp Employment Contract Registry", "2")
+        ERC721("MoveUp Employment Contract", "MOVEUP-EMP")
     {}
 
     modifier onlyHrAdmin() {
@@ -394,9 +414,47 @@ contract EmploymentContractRegistry is Ownable, Pausable, EIP712 {
         return _hashTypedDataV4(_structHash(intent));
     }
 
+    /// @notice ERC721 co-owner of a contract NFT (the employee).
+    function coOwnerOf(uint256 tokenId) public view returns (address) {
+        _requireOwned(tokenId);
+        return _coOwners[tokenId];
+    }
+
+    /// @notice Both signers that own a contract NFT.
+    function ownersOf(uint256 tokenId) public view returns (address employer, address employee) {
+        employer = ownerOf(tokenId);
+        employee = _coOwners[tokenId];
+    }
+
+    /// @notice True when `account` is either the ERC721 owner or the co-owner.
+    function isContractOwner(address account, uint256 tokenId) public view returns (bool) {
+        return _ownerOf(tokenId) == account || _coOwners[tokenId] == account;
+    }
+
+    /// @notice Metadata URI for the contract NFT (the canonical document URI).
+    function tokenURI(uint256 tokenId) public view override returns (string memory) {
+        _requireOwned(tokenId);
+        return _contracts[bytes32(tokenId)].documentUri;
+    }
+
     /* ------------------------------------------------------------------ */
     /*                              Internal                              */
     /* ------------------------------------------------------------------ */
+
+    /**
+     * @dev Employment-contract NFTs are soulbound: they prove the agreement and
+     *      must not be transferable to a third party. Minting and burning are
+     *      still allowed.
+     */
+    function _update(address to, uint256 tokenId, address auth)
+        internal
+        override
+        returns (address)
+    {
+        address from = _ownerOf(tokenId);
+        if (from != address(0) && to != address(0)) revert ContractNftNonTransferable();
+        return super._update(to, tokenId, auth);
+    }
 
     function _verifySignedIntent(
         ContractIntent calldata intent,
@@ -464,6 +522,26 @@ contract EmploymentContractRegistry is Ownable, Pausable, EIP712 {
             employerSignature: employerSignature,
             employeeSignature: employeeSignature
         });
+
+        _mintContractNft(contractId, intent.employer, intent.employee);
+    }
+
+    /**
+     * @dev Mints the soulbound contract NFT to the employer and records the
+     *      employee as co-owner.
+     */
+    function _mintContractNft(
+        bytes32 contractId,
+        address employer,
+        address employee
+    ) private {
+        uint256 tokenId = uint256(contractId);
+        if (_ownerOf(tokenId) != address(0)) revert ContractNftAlreadyMinted();
+
+        _mint(employer, tokenId);
+        _coOwners[tokenId] = employee;
+
+        emit ContractNftMinted(contractId, tokenId, employer, employee);
     }
 
     function _structHash(ContractIntent calldata intent) private pure returns (bytes32) {

@@ -440,6 +440,36 @@ describe('EmploymentContractRegistry (dual-signed)', () => {
     });
   });
 
+  describe('Contract NFTs', () => {
+    it('mints a soulbound NFT to the employer and records the employee as co-owner', async () => {
+      const { registry, hr, employee, outsider, contractId } = await loadFixture(
+        createContractFixture,
+      );
+      const tokenId = BigInt(contractId);
+
+      expect(await registry.ownerOf(tokenId)).to.equal(hr.address);
+      expect(await registry.coOwnerOf(tokenId)).to.equal(employee.address);
+      expect(await registry.isContractOwner(hr.address, tokenId)).to.equal(true);
+      expect(await registry.isContractOwner(employee.address, tokenId)).to.equal(true);
+      expect(await registry.isContractOwner(outsider.address, tokenId)).to.equal(false);
+      expect(await registry.tokenURI(tokenId)).to.equal(DOCUMENT_URI);
+      expect(await registry.balanceOf(hr.address)).to.equal(1n);
+
+      const [employerOwner, employeeOwner] = await registry.ownersOf(tokenId);
+      expect(employerOwner).to.equal(hr.address);
+      expect(employeeOwner).to.equal(employee.address);
+    });
+
+    it('rejects transferring the contract NFT', async () => {
+      const { registry, hr, outsider, contractId } = await loadFixture(createContractFixture);
+      const tokenId = BigInt(contractId);
+
+      await expect(
+        registry.connect(hr).transferFrom(hr.address, outsider.address, tokenId),
+      ).to.be.revertedWithCustomError(registry, 'ContractNftNonTransferable');
+    });
+  });
+
   describe('Amendments', () => {
     it('supersedes the old version with a fresh dual-signed version', async () => {
       const { registry, hr, employee, contractId } = await loadFixture(createContractFixture);
