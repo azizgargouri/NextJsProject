@@ -1,13 +1,19 @@
 {
-  "address": "0x9F36aBD9337EB2f403f6b18371D49865B1EF82FB",
+  "address": "0x0a0679eCb1cb60f0CfE28b39FB608f26ee90dd7e",
   "chainId": 80002,
   "network": "amoy",
   "deployer": "0xF95093Db7d2C58ddb5380645B2E463dCe1a61E2d",
-  "note": "Deployed externally from Remix. Owner is the system wallet; the HR app wallet is granted HR admin on first contract creation.",
-  "previousDeployment": {
-    "address": "0x411Aa05114E52A6b1768399784DBc1368F719b09",
-    "deployedAt": "2026-11-13T11:53:20.590Z",
-    "blockNumber": 52748181,
-    "transactionHash": "0x2559ef251a052b4f0f7923fe17c473ca5038b237bfb0a92dbd44882e604e9c66"
-  }
+  "note": "Current registry. Owner is the system wallet; the HR app wallet is granted HR admin on first contract creation (or manually).",
+  "previousDeployments": [
+    {
+      "address": "0x9F36aBD9337EB2f403f6b18371D49865B1EF82FB",
+      "note": "Deployed externally from Remix. Owner is the system wallet."
+    },
+    {
+      "address": "0x411Aa05114E52A6b1768399784DBc1368F719b09",
+      "deployedAt": "2026-11-13T11:53:20.590Z",
+      "blockNumber": 52748181,
+      "transactionHash": "0x2559ef251a052b4f0f7923fe17c473ca5038b237bfb0a92dbd44882e604e9c66"
+    }
+  ]
 }
