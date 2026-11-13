@@ -210,7 +210,7 @@ Add/verify these variables (never commit real values):
 | `NEXT_PUBLIC_CHAIN_ID` | `80002` for Polygon Amoy. |
 | `NEXT_PUBLIC_CHAIN_NAME` | `Polygon Amoy`. |
 | `NEXT_PUBLIC_RPC_URL` | `https://rpc-amoy.polygon.technology`. |
-| `NEXT_PUBLIC_CONTRACT_ADDRESS` | Deployed registry address. Current Amoy NFT registry: `0x411Aa05114E52A6b1768399784DBc1368F719b09`. |
+| `NEXT_PUBLIC_CONTRACT_ADDRESS` | Deployed registry address. Current Amoy NFT registry: `0x9F36aBD9337EB2f403f6b18371D49865B1EF82FB`. |
 | `NEXT_PUBLIC_BLOCK_EXPLORER_URL` | `https://amoy.polygonscan.com`. |
 | `VOICE_API_BASE_URL` | Stable ngrok URL of the Kaggle Flask app. |
 | `MONGODB_URI`, `JWT_SECRET`, TTLs, seed vars | Existing app config. |
